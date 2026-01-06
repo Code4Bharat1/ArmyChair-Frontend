@@ -10,7 +10,6 @@ export default function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
-  const [rememberMe, setRememberMe] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
@@ -35,25 +34,15 @@ export default function Login() {
 
       const { token, user } = res.data;
 
-      // 🔐 Store token & user
+      // 🔐 Store data in localStorage
       localStorage.setItem("accessToken", token);
       localStorage.setItem("user", JSON.stringify(user));
 
-      if (rememberMe) {
-        localStorage.setItem("rememberMe", "true");
-      }
-
       setSuccess("Login successful. Redirecting...");
 
-      // 🚀 Role-based redirect
+      // 🚀 Redirect to home
       setTimeout(() => {
-        if (user.role === "admin") {
-          router.push("/dashboard");
-        } else if (user.role === "warehouse") {
-          router.push("/inventory");
-        } else {
-          router.push("/");
-        }
+        router.push("/");
       }, 800);
     } catch (err) {
       setError(
@@ -115,7 +104,7 @@ export default function Login() {
             </div>
 
             {/* Password */}
-            <div className="mb-4">
+            <div className="mb-6">
               <label className="block text-sm text-neutral-300 mb-2">
                 Password
               </label>
@@ -140,26 +129,6 @@ export default function Login() {
                   )}
                 </button>
               </div>
-            </div>
-
-            {/* Remember */}
-            <div className="flex justify-between items-center mb-6">
-              <label className="flex items-center gap-2 text-sm text-neutral-300">
-                <input
-                  type="checkbox"
-                  checked={rememberMe}
-                  onChange={(e) => setRememberMe(e.target.checked)}
-                  className="accent-amber-600"
-                />
-                Remember me
-              </label>
-
-              <button
-                type="button"
-                className="text-sm text-amber-500 hover:text-amber-400"
-              >
-                Forgot password?
-              </button>
             </div>
 
             {/* Button */}
