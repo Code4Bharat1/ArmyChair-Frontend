@@ -1,244 +1,243 @@
-"use client"
-import React, { useState } from 'react';
-import { Search, User, AlertCircle, Filter, Download, Plus } from 'lucide-react';
-import Sidebar from '../Sidebar/sidebar';
+  "use client";
+  import React, { useEffect, useMemo, useState } from "react";
+  import { Search, User, AlertCircle, Plus, Trash2, Pencil } from "lucide-react";
+  import Sidebar from "../Sidebar/sidebar";
+  import axios from "axios";
 
+  export default function InventoryPage() {
+    const [inventory, setInventory] = useState([]);
+    const [loading, setLoading] = useState(true);
 
-export default function InventoryPage() {
-  const [searchTerm, setSearchTerm] = useState('');
-  const [filterVendor, setFilterVendor] = useState('All');
-  const [filterStatus, setFilterStatus] = useState('All');
+    const [searchTerm, setSearchTerm] = useState("");
+    const [filterVendor, setFilterVendor] = useState("All");
+    const [filterStatus, setFilterStatus] = useState("All");
 
-  const inventoryData = [
-    {
-      id: 1,
-      name: 'Executive Leather Chair XL',
-      vendor: 'Comfort Seating Co.',
-      noStock: 95,
-      quantity: 145,
-      status: 'Healthy',
-      lastUpdated: 'Today, 10:30 AM'
-    },
-    {
-      id: 2,
-      name: 'Hydraulic Piston Class-B',
-      vendor: 'HydroTech Industries',
-      noStock: 200,
-      quantity: 45,
-      status: 'Low Stock',
-      lastUpdated: 'Yesterday, 4:15 PM'
-    },
-    {
-      id: 3,
-      name: 'Wheel Caster Set (5pcs)',
-      vendor: 'BuildPro Suppliers',
-      noStock: 500,
-      quantity: 1240,
-      status: 'Healthy',
-      lastUpdated: 'Oct 24, 2023'
-    },
-    {
-      id: 4,
-      name: 'Assembly Bolt M6',
-      vendor: 'Fastener Corp',
-      noStock: 1000,
-      quantity: 0,
-      status: 'Critical',
-      lastUpdated: '2 hours ago'
-    },
-    {
-      id: 5,
-      name: 'Mesh Ergonomic Chair',
-      vendor: 'OfficeComfort Inc.',
-      noStock: 40,
-      quantity: 85,
-      status: 'Healthy',
-      lastUpdated: 'Oct 22, 2023'
-    }
-  ];
+    /* MODAL STATE */
+    const [showForm, setShowForm] = useState(false);
+    const [editId, setEditId] = useState(null);
+    const [form, setForm] = useState({ chairType: "", quantity: "" });
 
-  const vendors = ['All', 'Comfort Seating Co.', 'HydroTech Industries', 'BuildPro Suppliers', 'Fastener Corp', 'OfficeComfort Inc.'];
-  const statuses = ['All', 'Healthy', 'Low Stock', 'Critical'];
+    const API = process.env.NEXT_PUBLIC_API_URL;
+    const token =
+      typeof window !== "undefined"
+        ? localStorage.getItem("accessToken")
+        : null;
 
-  const filteredData = inventoryData.filter(item => {
-    const matchesSearch = item.name.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesVendor = filterVendor === 'All' || item.vendor === filterVendor;
-    const matchesStatus = filterStatus === 'All' || item.status === filterStatus;
-    return matchesSearch && matchesVendor && matchesStatus;
-  });
+    const headers = token
+      ? { Authorization: `Bearer ${token}` }
+      : {};
 
-  const totalCount = inventoryData.reduce((sum, item) => sum + item.quantity, 0);
-  const spareParts = inventoryData.length;
-  const lowStockCount = inventoryData.filter(item => item.status === 'Low Stock' || item.status === 'Critical').length;
+    /* ================= FETCH ================= */
+    const fetchInventory = async () => {
+      try {
+        const res = await axios.get(`${API}/inventory`, { headers });
+        setInventory(res.data.inventory || res.data);
+      } catch (err) {
+        console.error("Fetch failed", err);
+      } finally {
+        setLoading(false);
+      }
+    };
 
-  return (
-    <div className="flex h-screen bg-neutral-900 text-neutral-100">
-      {/* Sidebar */}
+    useEffect(() => {
+      fetchInventory();
+    }, []);
 
-  <Sidebar  />
+    /* ================= CREATE / UPDATE ================= */
+    const submitInventory = async () => {
+      try {
+        if (!form.chairType || form.quantity === "") {
+          return alert("All fields required");
+        }
 
+        if (editId) {
+          await axios.patch(`${API}/inventory/update/${editId}`, form, { headers });
+        } else {
+          await axios.post(`${API}/inventory`, form, { headers });
+        }
 
+        setShowForm(false);
+        setForm({ chairType: "", quantity: "" });
+        setEditId(null);
+        fetchInventory();
+      } catch (err) {
+        console.error("Save failed", err);
+      }
+    };
 
-      {/* Main Content */}
-      <div className="flex-1 overflow-auto">
-        {/* Header */}
-        <div className="bg-neutral-800 border-b border-neutral-700 p-4 flex items-center justify-between">
-          <div className="flex-1 max-w-2xl relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-neutral-500 w-4 h-4" />
-            <input
-              type="text"
-              placeholder="Search products, orders, or alerts..."
-              className="w-full bg-neutral-900 border border-neutral-700 rounded-lg pl-10 pr-4 py-2 text-sm text-neutral-200 placeholder-neutral-500 focus:outline-none focus:border-amber-600"
-            />
-          </div>
-          <div className="flex items-center gap-3 ml-4">
-            <div className="w-9 h-9 bg-neutral-700 rounded-full flex items-center justify-center">
-              <User className="w-5 h-5 text-neutral-300" />
-            </div>
-          </div>
-        </div>
+    /* ================= DELETE ================= */
+    const deleteInventory = async (id) => {
+      if (!confirm("Delete this inventory item?")) return;
+      try {
+        await axios.delete(`${API}/inventory/delete/${id}`, { headers });
+        fetchInventory();
+      } catch (err) {
+        console.error("Delete failed", err);
+      }
+    };
 
-        {/* Page Content */}
-        <div className="p-6">
-          {/* Alert Banner */}
-          <div className="bg-amber-950 border border-amber-800 rounded-lg p-4 mb-6 flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <AlertCircle className="w-5 h-5 text-amber-500" />
-              <span className="text-sm text-amber-200">Warning: 2 items are below the minimum stock threshold.</span>
-            </div>
-            <button className="text-sm text-amber-400 hover:text-amber-300 font-medium">
-              View Critical Items
+    /* ================= TRANSFORM ================= */
+    const inventoryData = useMemo(() => {
+      return inventory.map((item) => {
+        let status = "Healthy";
+        if (item.quantity === 0) status = "Critical";
+        else if (item.quantity < 100) status = "Low Stock";
+
+        return {
+          id: item._id,
+          name: item.chairType,
+          vendor: item.createdByRole || "Internal",
+          noStock: 100,
+          quantity: item.quantity,
+          status,
+          lastUpdated: new Date(item.updatedAt).toLocaleString(),
+        };
+      });
+    }, [inventory]);
+
+    const filteredData = inventoryData.filter((i) => {
+      return (
+        i.name.toLowerCase().includes(searchTerm.toLowerCase()) &&
+        (filterVendor === "All" || i.vendor === filterVendor) &&
+        (filterStatus === "All" || i.status === filterStatus)
+      );
+    });
+
+    const totalCount = inventoryData.reduce((s, i) => s + i.quantity, 0);
+    const spareParts = inventoryData.length;
+    const lowStockCount = inventoryData.filter(
+      (i) => i.status !== "Healthy"
+    ).length;
+
+    const vendors = ["All", ...new Set(inventoryData.map((i) => i.vendor))];
+    const statuses = ["All", "Healthy", "Low Stock", "Critical"];
+
+    /* ================= UI ================= */
+    return (
+      <div className="flex h-screen bg-neutral-900 text-neutral-100">
+        <Sidebar />
+
+        <div className="flex-1 overflow-auto p-6">
+          <div className="flex justify-between mb-4">
+            <h1 className="text-2xl font-bold">Inventory Management</h1>
+            <button
+              onClick={() => setShowForm(true)}
+              className="bg-amber-600 px-4 py-2 rounded-lg flex gap-2"
+            >
+              <Plus size={16} /> Add Inventory
             </button>
           </div>
 
-          {/* Page Title */}
-          <div className="mb-6">
-            <h1 className="text-2xl font-bold text-white mb-2">Inventory Management</h1>
-            <p className="text-sm text-neutral-400">Track, add, update, manage and monitor your inventories.</p>
-          </div>
-
-          {/* Stats Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-            <div className="bg-neutral-800 border border-neutral-700 rounded-lg p-5">
-              <div className="text-sm text-neutral-400 mb-2">TOTAL COUNT</div>
-              <div className="text-3xl font-bold text-white mb-1">{totalCount.toLocaleString()}</div>
-              <div className="text-xs text-neutral-500">Nearly Stock ready</div>
+          {/* ALERT */}
+          {lowStockCount > 0 && (
+            <div className="bg-amber-950 border border-amber-800 p-4 mb-4 flex gap-3">
+              <AlertCircle className="text-amber-400" />
+              {lowStockCount} items are low or critical
             </div>
+          )}
 
-            <div className="bg-neutral-800 border border-neutral-700 rounded-lg p-5">
-              <div className="text-sm text-neutral-400 mb-2">SPARE PARTS</div>
-              <div className="text-3xl font-bold text-white mb-1">{spareParts.toLocaleString()}</div>
-              <div className="text-xs text-neutral-500">Across 3 warehouses</div>
-            </div>
-
-            <div className="bg-neutral-800 border border-neutral-700 rounded-lg p-5 relative">
-              <div className="text-sm text-neutral-400 mb-2">LOW STOCK ALERTS</div>
-              <div className="text-3xl font-bold text-red-500 mb-1">{lowStockCount}</div>
-              <div className="text-xs text-red-500">Action Required Immediately</div>
-              <div className="absolute top-4 right-4">
-                <AlertCircle className="w-5 h-5 text-red-500" />
-              </div>
-            </div>
-          </div>
-
-          {/* Filters and Actions */}
-          <div className="bg-neutral-800 border border-neutral-700 rounded-lg p-4 mb-4">
-            <div className="flex flex-wrap items-center gap-3">
-              <div className="relative flex-1 min-w-64">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-neutral-500 w-4 h-4" />
-                <input
-                  type="text"
-                  placeholder="Search by Project Name..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full bg-neutral-900 border border-neutral-700 rounded-lg pl-10 pr-4 py-2 text-sm text-neutral-200 placeholder-neutral-500 focus:outline-none focus:border-amber-600"
-                />
-              </div>
-
-              <select
-                value={filterVendor}
-                onChange={(e) => setFilterVendor(e.target.value)}
-                className="bg-neutral-900 border border-neutral-700 rounded-lg px-4 py-2 text-sm text-neutral-200 focus:outline-none focus:border-amber-600"
-              >
-                {vendors.map(vendor => (
-                  <option key={vendor} value={vendor}>Vendor: {vendor}</option>
-                ))}
-              </select>
-
-              <select
-                value={filterStatus}
-                onChange={(e) => setFilterStatus(e.target.value)}
-                className="bg-neutral-900 border border-neutral-700 rounded-lg px-4 py-2 text-sm text-neutral-200 focus:outline-none focus:border-amber-600"
-              >
-                {statuses.map(status => (
-                  <option key={status} value={status}>Status: {status}</option>
-                ))}
-              </select>
-
-              <button className="bg-neutral-900 border border-neutral-700 hover:border-neutral-600 text-neutral-200 px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-colors">
-                <Download className="w-4 h-4" />
-                Export
-              </button>
-
-              <button className="bg-amber-600 hover:bg-amber-700 text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-colors">
-                <Plus className="w-4 h-4" />
-                Add Stock
-              </button>
-            </div>
-          </div>
-
-          {/* Inventory Table */}
-          <div className="bg-neutral-800 border border-neutral-700 rounded-lg overflow-hidden">
-            <div className="p-5 border-b border-neutral-700">
-              <h2 className="text-lg font-semibold text-white">Inventory Details</h2>
-            </div>
-            <div className="overflow-x-auto">
+          {/* TABLE */}
+          <div className="bg-neutral-800 rounded-lg overflow-hidden">
+            {loading ? (
+              <div className="p-6 text-center">Loading...</div>
+            ) : (
               <table className="w-full">
-                <thead>
-                  <tr className="border-b border-neutral-700 bg-neutral-850">
-                    <th className="text-left p-4 text-xs font-semibold text-neutral-400 uppercase">Product Name</th>
-                    <th className="text-left p-4 text-xs font-semibold text-neutral-400 uppercase">Vendor</th>
-                    <th className="text-left p-4 text-xs font-semibold text-neutral-400 uppercase">No Stock</th>
-                    <th className="text-left p-4 text-xs font-semibold text-neutral-400 uppercase">Quantity</th>
-                    <th className="text-left p-4 text-xs font-semibold text-neutral-400 uppercase">Status</th>
-                    <th className="text-left p-4 text-xs font-semibold text-neutral-400 uppercase">Last Updated</th>
-                    <th className="text-left p-4 text-xs font-semibold text-neutral-400 uppercase">Actions</th>
+                <thead className="bg-neutral-850">
+                  <tr>
+                    {["Product", "Vendor", "Qty", "Status", "Actions"].map((h) => (
+                      <th key={h} className="p-4 text-left text-xs text-neutral-400">
+                        {h}
+                      </th>
+                    ))}
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredData.map((item) => (
-                    <tr key={item.id} className="border-b border-neutral-700 hover:bg-neutral-750 transition-colors">
+                  {filteredData.map((i) => (
+                    <tr key={i.id} className="border-b border-neutral-700">
+                      <td className="p-4">{i.name}</td>
+                      <td className="p-4">{i.vendor}</td>
+                      <td className="p-4">{i.quantity}</td>
                       <td className="p-4">
-                        <div className="text-sm font-medium text-white">{item.name}</div>
+                        <StatusBadge status={i.status} />
                       </td>
-                      <td className="p-4 text-sm text-neutral-300">{item.vendor}</td>
-                      <td className="p-4 text-sm text-neutral-300">{item.noStock}</td>
-                      <td className="p-4 text-sm text-neutral-300">{item.quantity}</td>
-                      <td className="p-4">
-                        <span className={`inline-block px-3 py-1 rounded-full text-xs font-medium ${
-                          item.status === 'Healthy' ? 'bg-green-900 text-green-300' :
-                          item.status === 'Low Stock' ? 'bg-amber-900 text-amber-300' :
-                          'bg-red-900 text-red-300'
-                        }`}>
-                          {item.status}
-                        </span>
-                      </td>
-                      <td className="p-4 text-sm text-neutral-400">{item.lastUpdated}</td>
-                      <td className="p-4">
-                        <button className="text-amber-500 hover:text-amber-400 text-sm font-medium">
-                          Edit
+                      <td className="p-4 flex gap-2">
+                        <button
+                          onClick={() => {
+                            setEditId(i.id);
+                            setForm({
+                              chairType: i.name,
+                              quantity: i.quantity,
+                            });
+                            setShowForm(true);
+                          }}
+                        >
+                          <Pencil size={16} />
+                        </button>
+                        <button onClick={() => deleteInventory(i.id)}>
+                          <Trash2 size={16} />
                         </button>
                       </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
-            </div>
+            )}
           </div>
+
+          {/* MODAL */}
+          {showForm && (
+            <div className="fixed inset-0 bg-black/60 flex items-center justify-center">
+              <div className="bg-neutral-900 p-6 rounded-lg w-96">
+                <h2 className="text-lg mb-4">
+                  {editId ? "Update Inventory" : "Add Inventory"}
+                </h2>
+
+                <input
+                  placeholder="Chair Type"
+                  value={form.chairType}
+                  onChange={(e) =>
+                    setForm({ ...form, chairType: e.target.value })
+                  }
+                  className="w-full mb-3 p-2 bg-neutral-800 rounded"
+                />
+
+                <input
+                  type="number"
+                  placeholder="Quantity"
+                  value={form.quantity}
+                  onChange={(e) =>
+                    setForm({ ...form, quantity: e.target.value })
+                  }
+                  className="w-full mb-4 p-2 bg-neutral-800 rounded"
+                />
+
+                <div className="flex justify-end gap-2">
+                  <button onClick={() => setShowForm(false)}>Cancel</button>
+                  <button
+                    onClick={submitInventory}
+                    className="bg-amber-600 px-4 py-2 rounded"
+                  >
+                    Save
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
+    );
+  }
 
-  </div>
-
-  );
-};
+  /* ================= COMPONENT ================= */
+  const StatusBadge = ({ status }) => {
+    const map = {
+      Healthy: "bg-green-900 text-green-300",
+      "Low Stock": "bg-amber-900 text-amber-300",
+      Critical: "bg-red-900 text-red-300",
+    };
+    return (
+      <span className={`px-3 py-1 rounded-full text-xs ${map[status]}`}>
+        {status}
+      </span>
+    );
+  };
