@@ -26,7 +26,7 @@ useEffect(() => {
 
 
   const [formData, setFormData] = useState({
-    ProductName: "",
+    productName: "",
     type: "",
     colour: "",
     setNo: "",
@@ -69,9 +69,9 @@ useEffect(() => {
 
   /* ================= ADD / UPDATE ================= */
   const saveRawMaterial = async () => {
-    const { ProductName, type, colour, setNo, company } = formData;
+    const { productName, type, colour, setNo, company } = formData;
 
-    if (!ProductName || !type || !colour || !setNo || !company) {
+    if (!productName || !type || !colour || !setNo || !company) {
       alert("All fields are required");
       return;
     }
@@ -80,7 +80,7 @@ useEffect(() => {
       if (editId) {
         // UPDATE
         await axios.patch(`${process.env.NEXT_PUBLIC_API_URL}/raw/update/${editId}`, {
-          ProductName,
+          productName,
           type,
           colour,
           setNo: Number(setNo),
@@ -89,7 +89,7 @@ useEffect(() => {
       } else {
         // CREATE
         await axios.post(`${process.env.NEXT_PUBLIC_API_URL}/raw`,{
-          ProductName,
+          productName,
           type,
           colour,
           setNo: Number(setNo),
@@ -100,7 +100,7 @@ useEffect(() => {
       setShowModal(false);
       setEditId(null);
       setFormData({
-        ProductName: "",
+        productName: "",
         type: "",
         colour: "",
         setNo: "",
@@ -132,7 +132,7 @@ useEffect(() => {
   const editRawMaterial = (item) => {
     setEditId(item._id);
     setFormData({
-      ProductName: item.ProductName,
+      productName: item.productName,
       type: item.type,
       colour: item.colour,
       setNo: item.setNo,
@@ -226,7 +226,7 @@ useEffect(() => {
                     className="border-b border-neutral-700 hover:bg-neutral-750"
                   >
                     <td className="p-4">
-                      <div className="text-white">{item.ProductName}</div>
+                      <div className="text-white">{item.productName}</div>
                       <div className="text-xs text-neutral-500">
                         {item.colour}
                       </div>
@@ -274,7 +274,7 @@ useEffect(() => {
             </h2>
 
             <div className="space-y-3">
-              {["ProductName", "type", "colour", "setNo", "company"].map(
+              {["productName", "type", "colour", "setNo", "company"].map(
                 (field) => (
                   <input
                     key={field}
