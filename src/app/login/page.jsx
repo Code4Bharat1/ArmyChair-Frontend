@@ -2,8 +2,11 @@
 import Login from "@/components/Login/login";
 import React from "react";
 
-export default function page() {
+const Page = () => {
   return (
-    <Login />
-  );
+    <div>
+      <Login/>
+    </div>
+  )
 }
+export default Page

@@ -1,17 +1,28 @@
 "use client";
+import React, { useState } from "react";
 import Link from "next/link";
 
-import React, { useState } from "react";
-import { Eye, EyeOff, Lock, Mail, AlertCircle, CheckCircle } from "lucide-react";
-import axios from "axios";
+import {
+  Eye,
+  EyeOff,
+  Lock,
+  Mail,
+  User,
+  AlertCircle,
+  CheckCircle,
+} from "lucide-react";
+// import api from "@/lib/api";
 import { useRouter } from "next/navigation";
 
-export default function Login() {
+ function Signup() {
   const router = useRouter();
 
+  const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [role, setRole] = useState("user");
+
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
@@ -22,34 +33,29 @@ export default function Login() {
     setError("");
     setSuccess("");
 
-    if (!email || !password) {
-      return setError("Email and password are required");
+    if (!name || !email || !password) {
+      return setError("All fields are required");
     }
 
     try {
       setIsLoading(true);
 
-      const res = await axios.post(
-        `${process.env.NEXT_PUBLIC_API_URL}/auth/login`,
-        { email, password }
-      );
-const accessToken = localStorage.getItem("token");
-      const { token, user } = res.data;
+      await api.post("/auth/signup", {
+        name,
+        email,
+        password,
+        role,
+      });
 
-      // 🔐 Store data in localStorage
-      localStorage.setItem("token", token);
-      localStorage.setItem("user", JSON.stringify(user));
+      setSuccess("Account created successfully. Redirecting to login...");
 
-      setSuccess("Login successful. Redirecting...");
-
-      // 🚀 Redirect to dashboard
       setTimeout(() => {
-        router.push("/dashboard");
-      }, 800);
+        router.push("/login");
+      }, 1000);
     } catch (err) {
       setError(
         err.response?.data?.message ||
-          "Invalid credentials. Please try again."
+          "Signup failed. Please try again."
       );
     } finally {
       setIsLoading(false);
@@ -65,7 +71,7 @@ const accessToken = localStorage.getItem("token");
             Army Industry
           </h1>
           <p className="text-neutral-400 text-sm">
-            Sign in to your account
+            Create a new account
           </p>
         </div>
 
@@ -88,6 +94,23 @@ const accessToken = localStorage.getItem("token");
           )}
 
           <form onSubmit={handleSubmit}>
+            {/* Name */}
+            <div className="mb-4">
+              <label className="block text-sm text-neutral-300 mb-2">
+                Full Name
+              </label>
+              <div className="relative">
+                <User className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-500 w-5 h-5" />
+                <input
+                  type="text"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="John Doe"
+                  className="w-full bg-neutral-900 border border-neutral-700 rounded-lg pl-10 pr-4 py-3 text-sm text-neutral-200 focus:border-amber-600 focus:outline-none"
+                />
+              </div>
+            </div>
+
             {/* Email */}
             <div className="mb-4">
               <label className="block text-sm text-neutral-300 mb-2">
@@ -106,7 +129,7 @@ const accessToken = localStorage.getItem("token");
             </div>
 
             {/* Password */}
-            <div className="mb-6">
+            <div className="mb-4">
               <label className="block text-sm text-neutral-300 mb-2">
                 Password
               </label>
@@ -133,18 +156,32 @@ const accessToken = localStorage.getItem("token");
               </div>
             </div>
 
-            <div className="mt-6 text-center">
-               <p className="text-sm text-neutral-400">
-                  New user?{" "}
-                  <Link
-                  href="/signup"
-                  className="text-amber-500 hover:text-amber-400 font-medium"
-                  >
-                  Create an account
-                </Link>
-              </p>  
+            {/* Role */}
+            <div className="mb-6">
+              <label className="block text-sm text-neutral-300 mb-2">
+                Role
+              </label>
+              <select
+                value={role}
+                onChange={(e) => setRole(e.target.value)}
+                className="w-full bg-neutral-900 border border-neutral-700 rounded-lg px-4 py-3 text-sm text-neutral-200 focus:border-amber-600 focus:outline-none"
+              >
+                <option value="user">User</option>
+                <option value="admin">Admin</option>
+              </select>
             </div>
 
+            <div className="mt-6 text-center">
+                <p className="text-sm text-neutral-400">
+                    Already have an account?{" "}
+                    <Link
+                     href="/login"
+                    className="text-amber-500 hover:text-amber-400 font-medium"
+                    >
+                    Sign in
+                    </Link>
+                </p>
+            </div>
 
 
             {/* Button */}
@@ -156,10 +193,10 @@ const accessToken = localStorage.getItem("token");
               {isLoading ? (
                 <>
                   <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                  Signing in...
+                  Creating account...
                 </>
               ) : (
-                "Sign In"
+                "Create Account"
               )}
             </button>
           </form>
@@ -173,3 +210,4 @@ const accessToken = localStorage.getItem("token");
     </div>
   );
 }
+export default Signup;

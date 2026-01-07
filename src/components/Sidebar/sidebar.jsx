@@ -28,6 +28,14 @@ export default function Sidebar() {
           <div className="px-5 mb-10 border-b border-amber-600">
 
           </div>
+          {/* Warehouse */}
+          <div className="mb-6">
+            <div className="px-6 mb-2">
+            <h2 className="text-xs font-bold text-white uppercase tracking-wider">
+              Warehouse
+            </h2>
+          </div>
+
 
           <Link href="/" className={menuItem("/")}>
             Dashboard
@@ -37,34 +45,44 @@ export default function Sidebar() {
             Inventory
           </Link>
 
+           <Link href="/rawmaterials" className={menuItem("/rawmaterials")}>
+            Raw Materials
+          </Link>
+
           <Link href="/order" className={menuItem("/order")}>
-            Sales Orders
+            Orders
           </Link>
-
-          <Link href="/vendors" className={menuItem("/vendors")}>
-            Vendors
-          </Link>
-        </div>
-
-        {/* OPERATIONS */}
-        <div className="mb-6">
-          <div className="px-6 mb-2">
-            <h2 className="text-xs font-semibold text-neutral-500 uppercase tracking-wider">
-              Operations
-            </h2>
-          </div>
-
-          <Link href="/returns" className={menuItem("/returns")}>
+           <Link href="/return" className={menuItem("/return")}>
             Returns
           </Link>
 
-          <Link href="/defects" className={menuItem("/defects")}>
+          <Link href="/defect" className={menuItem("/defect")}>
             Defects
           </Link>
-
-          <Link href="/reports" className={menuItem("/reports")}>
-            Reports
+          <Link href="/logistic" className={menuItem("/logistic")}>
+            Logistics
           </Link>
+        </div>
+        </div>
+
+
+
+        {/* SALES */}
+        <div className="mb-6">
+          <div className="px-6 mb-2">
+            <h2 className="text-xs font-bold text-white uppercase tracking-wider">
+              Sales
+            </h2>
+          </div>
+
+          <Link href="/chairsale" className={menuItem("/chairsale")}>
+            Chair
+          </Link>
+
+          <Link href="/partssale" className={menuItem("/partssale")}>
+            Spare Parts
+          </Link>
+          
         </div>
       </nav>
 

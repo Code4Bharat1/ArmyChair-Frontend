@@ -1,10 +1,10 @@
-import DefectsManagement from "@/components/Defect/Defect";
+import ChairSales from "@/components/Chairsale/Chairsale";
 import React from "react";
 
 const Page = () => {
   return (
     <div>
-      <DefectsManagement/>
+      <ChairSales/>
     </div>
   )
 }
