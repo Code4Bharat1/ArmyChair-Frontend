@@ -131,29 +131,30 @@ export default function SparePartsInventory() {
 
   /* ================= UI ================= */
   return (
-    <div className="flex h-screen bg-neutral-900 text-neutral-100">
+    <div className="flex h-screen bg-gradient-to-b from-amber-900 via-black to-neutral-900 text-neutral-100">
       <InventorySidebar />
 
       {/* MAIN */}
-      <div className="flex-1 overflow-auto p-6">
+      <div className="flex-1 overflow-auto">
         {/* HEADER */}
-        <div className="flex justify-between mb-5">
-          <div>
-            <h1 className="text-2xl font-bold">Spare Parts Inventory</h1>
-            <p className="text-sm text-neutral-400">
-              Manage spare parts by location & vendor
-            </p>
+    <div className="bg-neutral-800 border-b border-neutral-700 p-4 flex items-center justify-between ">
+            <div>
+              <h1 className="text-2xl font-bold">Spare Parts Inventory</h1>
+              <p className="text-sm mb-5 text-neutral-400">
+                Manage your spare parts stock levels and details
+              </p>
+            </div>
+  
+            <button
+              onClick={() => setShowForm(true)}
+              className="bg-amber-600 hover:bg-amber-700 px-4 py-2 rounded-lg flex items-center gap-2 shadow"
+            >
+              <Plus size={16} /> Add Inventory
+            </button>
           </div>
 
-          <button
-            onClick={() => setShowForm(true)}
-            className="bg-amber-600 hover:bg-amber-700 px-4 py-2 rounded-lg flex items-center gap-2"
-          >
-            <Plus size={16} /> Add Part
-          </button>
-        </div>
-
         {/* STATS */}
+        <div className="p-6">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
           <StatCard title="Total Parts" value={totalParts} icon={<Boxes />} />
           <StatCard
@@ -308,8 +309,10 @@ export default function SparePartsInventory() {
             </div>
           </div>
         </div>
+        
       )}
     </div>
+    </div>  
   );
 }
 
