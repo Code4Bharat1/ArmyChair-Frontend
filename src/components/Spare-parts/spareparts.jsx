@@ -3,7 +3,8 @@ import React, { useMemo, useState } from "react";
 import { Search, Download } from "lucide-react";
 import Sidebar from "@/components/Sidebar/sidebar";
 
-const SparePartsSales = () => {
+
+export default function SpareParts() {
   const [search, setSearch] = useState("");
   const [selectedPartType, setSelectedPartType] = useState("All");
   const [selectedPriority, setSelectedPriority] = useState("All");
@@ -120,7 +121,7 @@ const SparePartsSales = () => {
     <div className="flex h-screen bg-gradient-to-b from-amber-900 via-black to-neutral-900 text-neutral-100">
       <Sidebar />
 
-      <div className="flex-1 p-5 overflow-auto">
+      <div className="flex-1 overflow-auto">
         {/* ================= HEADER ================= */}
         <div className="bg-neutral-800 border-b border-neutral-700 mb-8 p-4 flex items-center justify-between">
           <div className="flex-1">
@@ -268,4 +269,3 @@ const SparePartsSales = () => {
   );
 };
 
-export default SparePartsSales;

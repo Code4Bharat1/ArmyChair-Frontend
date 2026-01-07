@@ -9,6 +9,8 @@ import {
   Warehouse,
   TrendingDown,
   Building2,
+  Search,
+  Filter,
 } from "lucide-react";
 import axios from "axios";
 import InventorySidebar from "./sidebar";
@@ -17,7 +19,7 @@ export default function InventoryPage() {
   const [inventory, setInventory] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  /* FILTERS (future ready) */
+  /* FILTERS */
   const [searchTerm, setSearchTerm] = useState("");
   const [filterVendor, setFilterVendor] = useState("All");
   const [filterStatus, setFilterStatus] = useState("All");
@@ -66,6 +68,7 @@ export default function InventoryPage() {
         chairType: form.chairType,
         vendor: form.vendor,
         quantity: Number(form.quantity),
+        type: "FULL",
       };
 
       if (editId) {
@@ -106,14 +109,21 @@ export default function InventoryPage() {
       return {
         id: item._id,
         name: item.chairType,
-        vendor: item.vendor || item.createdByRole || "Internal",
+        vendor: item.vendor || "Internal",
         quantity: item.quantity,
         status,
-        lastUpdated: new Date(item.updatedAt).toLocaleString(),
       };
     });
   }, [inventory]);
 
+  /* ===== FILTER OPTIONS ===== */
+  const vendors = useMemo(() => {
+    return ["All", ...new Set(inventoryData.map((i) => i.vendor))];
+  }, [inventoryData]);
+
+  const statuses = ["All", "Healthy", "Low Stock", "Critical"];
+
+  /* ================= FILTERED DATA ================= */
   const filteredData = inventoryData.filter((i) => {
     return (
       i.name.toLowerCase().includes(searchTerm.toLowerCase()) &&
@@ -122,7 +132,7 @@ export default function InventoryPage() {
     );
   });
 
-  /* ================= STATS (DYNAMIC) ================= */
+  /* ================= STATS ================= */
   const totalStock = inventoryData.reduce((s, i) => s + i.quantity, 0);
   const totalProducts = inventoryData.length;
   const lowStockCount = inventoryData.filter(
@@ -134,12 +144,12 @@ export default function InventoryPage() {
     <div className="flex h-screen bg-gradient-to-b from-amber-900 via-black to-neutral-900 text-neutral-100">
       <InventorySidebar />
 
-      <div className="flex-1 overflow-auto  ">
+      <div className="flex-1 overflow-auto">
         {/* HEADER */}
-        <div className="bg-neutral-800 border-b border-neutral-700 p-4 flex items-center justify-between ">
+        <div className="bg-neutral-800 border-b border-neutral-700 p-4 flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-bold">Inventory Management</h1>
-            <p className="text-sm mb-5 text-neutral-400">
+            <p className="text-sm text-neutral-400">
               Track stock, vendors and availability
             </p>
           </div>
@@ -152,99 +162,148 @@ export default function InventoryPage() {
           </button>
         </div>
 
-        {/* ===== TOP CARDS ===== */}
         <div className="p-6">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-10">
-          <StatCard
-            title="Total Stock"
-            value={totalStock}
-            icon={<Warehouse />}
-          />
-          <StatCard
-            title="Total Products"
-            value={totalProducts}
-            icon={<Boxes />}
-          />
-          <StatCard
-            title="Low / Critical"
-            value={lowStockCount}
-            danger
-            icon={<TrendingDown />}
-          />
-        </div>
-
-        {/* ALERT */}
-        {lowStockCount > 0 && (
-          <div className="bg-amber-950/60 border border-amber-800 p-4 mb-5 flex gap-3 rounded-lg">
-            <AlertCircle className="text-amber-400" />
-            <span className="text-sm">
-              {lowStockCount} items need immediate restocking
-            </span>
+          {/* ===== TOP CARDS ===== */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+            <StatCard
+              title="Total Stock"
+              value={totalStock}
+              icon={<Warehouse />}
+            />
+            <StatCard
+              title="Total Products"
+              value={totalProducts}
+              icon={<Boxes />}
+            />
+            <StatCard
+              title="Low / Critical"
+              value={lowStockCount}
+              danger
+              icon={<TrendingDown />}
+            />
           </div>
-        )}
 
-        {/* TABLE */}
-        <div className="bg-neutral-800 rounded-xl overflow-hidden border border-neutral-700">
-          {loading ? (
-            <div className="p-6 text-center">Loading...</div>
-          ) : (
-            <table className="w-full">
-              <thead className="bg-neutral-850 border-b border-neutral-700">
-                <tr>
-                  {["Product", "Vendor", "Qty", "Status", "Actions"].map((h) => (
-                    <th
-                      key={h}
-                      className="p-4 text-left text-xs text-neutral-400 uppercase tracking-wide"
-                    >
-                      {h}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
+          {/* ===== FILTER BAR ===== */}
+          <div className="bg-neutral-800 border border-neutral-700 rounded-xl p-4 mb-6 flex flex-col md:flex-row gap-4">
+            {/* Search */}
+            <div className="flex items-center gap-2 bg-neutral-900 px-3 py-2 rounded-lg flex-1">
+              <Search size={16} className="text-neutral-400" />
+              <input
+                placeholder="Search product..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="bg-transparent outline-none text-sm w-full"
+              />
+            </div>
 
-              <tbody>
-                {filteredData.map((i) => (
-                  <tr
-                    key={i.id}
-                    className="border-b border-neutral-700 hover:bg-neutral-850 transition"
-                  >
-                    <td className="p-4 font-medium">{i.name}</td>
-                    <td className="p-4 flex items-center gap-2 text-sm">
-                      <Building2 size={14} className="text-neutral-400" />
-                      {i.vendor}
-                    </td>
-                    <td className="p-4">{i.quantity}</td>
-                    <td className="p-4">
-                      <StatusBadge status={i.status} />
-                    </td>
-                    <td className="p-4 flex gap-3">
-                      <button
-                        onClick={() => {
-                          setEditId(i.id);
-                          setForm({
-                            chairType: i.name,
-                            vendor: i.vendor,
-                            quantity: i.quantity,
-                          });
-                          setShowForm(true);
-                        }}
-                        className="text-amber-400 hover:text-amber-300"
-                      >
-                        <Pencil size={16} />
-                      </button>
-
-                      <button
-                        onClick={() => deleteInventory(i.id)}
-                        className="text-red-400 hover:text-red-300"
-                      >
-                        <Trash2 size={16} />
-                      </button>
-                    </td>
-                  </tr>
+            {/* Vendor */}
+            <div className="flex items-center gap-2 bg-neutral-900 px-3 py-2 rounded-lg">
+              <Building2 size={16} className="text-neutral-400" />
+              <select
+                value={filterVendor}
+                onChange={(e) => setFilterVendor(e.target.value)}
+                className="bg-transparent outline-none text-sm"
+              >
+                {vendors.map((v) => (
+                  <option key={v} value={v} className="bg-neutral-900">
+                    {v}
+                  </option>
                 ))}
-              </tbody>
-            </table>
+              </select>
+            </div>
+
+            {/* Status */}
+            <div className="flex items-center gap-2 bg-neutral-900 px-3 py-2 rounded-lg">
+              <Filter size={16} className="text-neutral-400" />
+              <select
+                value={filterStatus}
+                onChange={(e) => setFilterStatus(e.target.value)}
+                className="bg-transparent outline-none text-sm"
+              >
+                {statuses.map((s) => (
+                  <option key={s} value={s} className="bg-neutral-900">
+                    {s}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          {/* ALERT */}
+          {lowStockCount > 0 && (
+            <div className="bg-amber-950/60 border border-amber-800 p-4 mb-5 flex gap-3 rounded-lg">
+              <AlertCircle className="text-amber-400" />
+              <span className="text-sm">
+                {lowStockCount} items need immediate restocking
+              </span>
+            </div>
           )}
+
+          {/* TABLE */}
+          <div className="bg-neutral-800 rounded-xl overflow-hidden border border-neutral-700">
+            {loading ? (
+              <div className="p-6 text-center">Loading...</div>
+            ) : (
+              <table className="w-full">
+                <thead className="bg-neutral-850 border-b border-neutral-700">
+                  <tr>
+                    {["Product", "Vendor", "Qty", "Status", "Actions"].map(
+                      (h) => (
+                        <th
+                          key={h}
+                          className="p-4 text-left text-xs text-neutral-400 uppercase tracking-wide"
+                        >
+                          {h}
+                        </th>
+                      )
+                    )}
+                  </tr>
+                </thead>
+
+                <tbody>
+                  {filteredData.map((i) => (
+                    <tr
+                      key={i.id}
+                      className="border-b border-neutral-700 hover:bg-neutral-850 transition"
+                    >
+                      <td className="p-4 font-medium">{i.name}</td>
+                      <td className="p-4 flex items-center gap-2 text-sm">
+                        <Building2 size={14} className="text-neutral-400" />
+                        {i.vendor}
+                      </td>
+                      <td className="p-4">{i.quantity}</td>
+                      <td className="p-4">
+                        <StatusBadge status={i.status} />
+                      </td>
+                      <td className="p-4 flex gap-3">
+                        <button
+                          onClick={() => {
+                            setEditId(i.id);
+                            setForm({
+                              chairType: i.name,
+                              vendor: i.vendor,
+                              quantity: i.quantity,
+                            });
+                            setShowForm(true);
+                          }}
+                          className="text-amber-400 hover:text-amber-300"
+                        >
+                          <Pencil size={16} />
+                        </button>
+
+                        <button
+                          onClick={() => deleteInventory(i.id)}
+                          className="text-red-400 hover:text-red-300"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
         </div>
 
         {/* MODAL */}
@@ -255,33 +314,24 @@ export default function InventoryPage() {
                 {editId ? "Update Inventory" : "Add Inventory"}
               </h2>
 
-              <label className="text-xs text-neutral-400">Chair Type</label>
-              <input
+              <Input
+                label="Chair Type"
                 value={form.chairType}
-                onChange={(e) =>
-                  setForm({ ...form, chairType: e.target.value })
-                }
-                className="w-full mb-3 mt-1 p-2 bg-neutral-800 rounded outline-none"
+                onChange={(v) => setForm({ ...form, chairType: v })}
               />
-
-              <label className="text-xs text-neutral-400">Vendor</label>
-              <input
+              <Input
+                label="Vendor"
                 value={form.vendor}
-                onChange={(e) => setForm({ ...form, vendor: e.target.value })}
-                className="w-full mb-3 mt-1 p-2 bg-neutral-800 rounded outline-none"
+                onChange={(v) => setForm({ ...form, vendor: v })}
               />
-
-              <label className="text-xs text-neutral-400">Quantity</label>
-              <input
+              <Input
+                label="Quantity"
                 type="number"
                 value={form.quantity}
-                onChange={(e) =>
-                  setForm({ ...form, quantity: e.target.value })
-                }
-                className="w-full mb-5 mt-1 p-2 bg-neutral-800 rounded outline-none"
+                onChange={(v) => setForm({ ...form, quantity: v })}
               />
 
-              <div className="flex justify-end gap-2">
+              <div className="flex justify-end gap-2 mt-4">
                 <button
                   onClick={() => {
                     setShowForm(false);
@@ -302,7 +352,6 @@ export default function InventoryPage() {
             </div>
           </div>
         )}
-      </div>
       </div>
     </div>
   );
@@ -338,3 +387,15 @@ const StatusBadge = ({ status }) => {
     </span>
   );
 };
+
+const Input = ({ label, value, onChange, type = "text" }) => (
+  <div className="mb-3">
+    <label className="text-xs text-neutral-400">{label}</label>
+    <input
+      type={type}
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      className="w-full mt-1 p-2 bg-neutral-800 rounded outline-none"
+    />
+  </div>
+);

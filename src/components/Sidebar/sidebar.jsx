@@ -79,7 +79,7 @@ export default function Sidebar() {
             Chair
           </Link>
 
-          <Link href="/partssale" className={menuItem("/partssale")}>
+          <Link href="/spare-parts" className={menuItem("/spare-parts")}>
             Spare Parts
           </Link>
           

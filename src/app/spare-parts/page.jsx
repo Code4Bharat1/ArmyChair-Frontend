@@ -1,10 +1,11 @@
-import SparePartsSales from "@/components/partssale/partssale";
+
+import SpareParts from "@/components/Spare-parts/spareparts";
 import React from "react";
 
 const Page = () => {
   return (
     <div>
-      <SparePartsSales/>
+      <SpareParts />
     </div>
   )
 }
