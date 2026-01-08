@@ -1,7 +1,7 @@
 "use client";
 import React, { useMemo, useState } from "react";
 import { Search, Download } from "lucide-react";
-import Sidebar from "@/components/Sidebar/sidebar";
+import Sidebar from "@/components/Superadmin/sidebar";
 
 const ChairSales = () => {
   const [search, setSearch] = useState("");

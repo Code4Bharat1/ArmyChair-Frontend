@@ -1,5 +1,5 @@
 
-import Dashboard from "@/components/Dashboard/dashboard";
+import Dashboard from "@/components/Superadmin/dashboard";
 import React from "react";
 
 const Page = () => {

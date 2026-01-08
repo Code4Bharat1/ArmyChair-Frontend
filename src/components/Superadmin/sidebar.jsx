@@ -37,31 +37,22 @@ export default function Sidebar() {
           </div>
 
 
-          <Link href="/" className={menuItem("/")}>
+          <Link href="/superadmin/dashboard" className={menuItem("/superadmin/dashboard")}>
             Dashboard
           </Link>
 
-          <Link href="/inventory" className={menuItem("/inventory")}>
+          <Link href="/superadmin/inventory" className={menuItem("/superadmin/inventory")}>
             Inventory
           </Link>
 
-           <Link href="/rawmaterials" className={menuItem("/rawmaterials")}>
-            Raw Materials
-          </Link>
 
-          <Link href="/order" className={menuItem("/order")}>
+          <Link href="/superadmin/order" className={menuItem("/superadmin/order")}>
             Orders
           </Link>
-           <Link href="/return" className={menuItem("/return")}>
+           <Link href="/superadmin/return" className={menuItem("/superadmin/return")}>
             Returns
           </Link>
 
-          <Link href="/defect" className={menuItem("/defect")}>
-            Defects
-          </Link>
-          <Link href="/logistic" className={menuItem("/logistic")}>
-            Logistics
-          </Link>
         </div>
         </div>
 
@@ -75,13 +66,13 @@ export default function Sidebar() {
             </h2>
           </div>
 
-          <Link href="/chairsale" className={menuItem("/chairsale")}>
+          <Link href="/superadmin/chairsale" className={menuItem("/chairsale")}>
             Chair
           </Link>
 
-          <Link href="/spare-parts" className={menuItem("/spare-parts")}>
+          {/* <Link href="/superadmin/spare-parts" className={menuItem("/spare-parts")}>
             Spare Parts
-          </Link>
+          </Link> */}
           
         </div>
       </nav>

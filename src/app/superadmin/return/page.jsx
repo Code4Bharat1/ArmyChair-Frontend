@@ -1,4 +1,4 @@
-import Return from "@/components/Return/Return";
+import Return from "@/components/Superadmin/Return";
 import Ract from "react";
 
 const Page = () => {
