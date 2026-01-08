@@ -13,35 +13,37 @@ export default function Orders() {
   const [showForm, setShowForm] = useState(false);
   const [editingOrderId, setEditingOrderId] = useState(null);
 
-
-  const [formData, setFormData] = useState({
+  const initialFormData = {
     orderId: "",
     dispatchedTo: "",
     chairModel: "",
     chairDetail: "",
     orderDate: "",
     deliveryDate: "",
-    quantity: "", // ✅ ADD THIS
+    quantity: "",
     onTime: true,
     assembly: "Unassembled",
     amount: "",
-  });
-const handleEditOrder = (order) => {
-  setEditingOrderId(order._id);
-  setFormData({
-    orderId: order.orderId,
-    dispatchedTo: order.dispatchedTo,
-    chairModel: order.chairModel,
-    chairDetail: order.chairDetail || "",
-    orderDate: order.orderDate.split("T")[0],
-    deliveryDate: order.deliveryDate.split("T")[0],
-    quantity: order.quantity,
-    onTime: order.onTime,
-    assembly: order.assembly,
-    amount: order.amount,
-  });
-  setShowForm(true);
-};
+  };
+
+  const [formData, setFormData] = useState(initialFormData);
+
+  const handleEditOrder = (order) => {
+    setEditingOrderId(order._id);
+    setFormData({
+      orderId: order.orderId,
+      dispatchedTo: order.dispatchedTo,
+      chairModel: order.chairModel,
+      chairDetail: order.chairDetail || "",
+      orderDate: order.orderDate.split("T")[0],
+      deliveryDate: order.deliveryDate.split("T")[0],
+      quantity: order.quantity,
+      onTime: order.onTime,
+      assembly: order.assembly,
+      amount: order.amount,
+    });
+    setShowForm(true);
+  };
 
   const handleFormChange = (e) => {
     const { name, value, type, checked } = e.target;
@@ -51,6 +53,7 @@ const handleEditOrder = (order) => {
       [name]: type === "checkbox" ? checked : value,
     }));
   };
+
   const API = process.env.NEXT_PUBLIC_API_URL;
   const token =
     typeof window !== "undefined" ? localStorage.getItem("token") : null;
@@ -58,49 +61,48 @@ const handleEditOrder = (order) => {
   const headers = token ? { Authorization: `Bearer ${token}` } : {};
 
   const handleCreateOrder = async (e) => {
-  e.preventDefault();
+    e.preventDefault();
 
-  try {
-    const payload = {
-      ...formData,
-      quantity: Number(formData.quantity),
-      amount: Number(formData.amount),
-    };
+    try {
+      const payload = {
+        ...formData,
+        quantity: Number(formData.quantity),
+        amount: Number(formData.amount),
+      };
 
-    if (editingOrderId) {
-      await axios.put(
-        `${API}/orders/${editingOrderId}`,
-        payload,
-        { headers }
-      );
-    } else {
-      await axios.post(`${API}/orders`, payload, { headers });
+      if (editingOrderId) {
+        await axios.put(`${API}/orders/${editingOrderId}`, payload, {
+          headers,
+        });
+      } else {
+        await axios.post(`${API}/orders`, payload, { headers });
+      }
+
+      setShowForm(false);
+      setEditingOrderId(null);
+      setFormData(initialFormData);
+      fetchOrders();
+    } catch (err) {
+      console.error("Save failed", err);
+      alert("Failed to save order");
     }
+  };
 
-    setShowForm(false);
-    setEditingOrderId(null);
-    fetchOrders();
-  } catch (err) {
-    console.error("Save failed", err);
-    alert("Failed to save order");
-  }
-};
-const handleDeleteOrder = async (orderId) => {
-  const confirmDelete = window.confirm(
-    "Are you sure you want to delete this order?"
-  );
+  const handleDeleteOrder = async (orderId) => {
+    const confirmDelete = window.confirm(
+      "Are you sure you want to delete this order?"
+    );
 
-  if (!confirmDelete) return;
+    if (!confirmDelete) return;
 
-  try {
-    await axios.delete(`${API}/orders/${orderId}`, { headers });
-    fetchOrders(); // refresh list
-  } catch (err) {
-    console.error("Delete failed", err);
-    alert("Failed to delete order");
-  }
-};
-
+    try {
+      await axios.delete(`${API}/orders/${orderId}`, { headers });
+      fetchOrders();
+    } catch (err) {
+      console.error("Delete failed", err);
+      alert("Failed to delete order");
+    }
+  };
 
   /* ================= FETCH ================= */
   const fetchOrders = async () => {
@@ -158,6 +160,7 @@ const handleDeleteOrder = async (orderId) => {
     assembly === "Assembled"
       ? "bg-amber-900 text-amber-300"
       : "bg-neutral-700 text-neutral-300";
+
   const ProgressTracker = ({ progress, orderId }) => {
     const steps = [
       "warehouse",
@@ -173,7 +176,6 @@ const handleDeleteOrder = async (orderId) => {
         : Math.max(steps.indexOf(progress), 0);
 
     const isExpanded = expandedOrderId === orderId;
-
 
     return (
       <div className="cursor-pointer">
@@ -196,7 +198,6 @@ const handleDeleteOrder = async (orderId) => {
           ))}
         </div>
 
-        {/* EXPANDED VIEW */}
         {/* EXPANDED VIEW */}
         <div
           className={`overflow-hidden transition-all duration-300 ease-in-out ${
@@ -331,7 +332,7 @@ const handleDeleteOrder = async (orderId) => {
                         "Order Date",
                         "Quantity",
                         "Progress",
-                        "Actions", // ✅ ADD
+                        "Actions",
                       ].map((h) => (
                         <th
                           key={h}
@@ -377,27 +378,24 @@ const handleDeleteOrder = async (orderId) => {
                             />
                           </div>
                         </td>
+
                         <td className="p-4">
                           <div className="flex items-center gap-3">
-                            {/* UPDATE */}
                             <button
-  onClick={() => handleEditOrder(order)}
-  className="text-amber-400 hover:text-amber-300 transition"
-  title="Edit Order"
->
-  <Pencil size={16} />
-</button>
+                              onClick={() => handleEditOrder(order)}
+                              className="text-amber-400 hover:text-amber-300 transition"
+                              title="Edit Order"
+                            >
+                              <Pencil size={16} />
+                            </button>
 
-
-                            {/* DELETE */}
                             <button
-  onClick={() => handleDeleteOrder(order._id)}
-  className="text-red-500 hover:text-red-400 transition"
-  title="Delete Order"
->
-  <Trash2 size={16} />
-</button>
-
+                              onClick={() => handleDeleteOrder(order._id)}
+                              className="text-red-500 hover:text-red-400 transition"
+                              title="Delete Order"
+                            >
+                              <Trash2 size={16} />
+                            </button>
                           </div>
                         </td>
                       </tr>
@@ -415,133 +413,224 @@ const handleDeleteOrder = async (orderId) => {
         </div>
       </div>
 
-      {/* FLOATING BUTTON
-      <button
-        onClick={() => setShowForm(true)}
-        className="fixed bottom-8 right-8 w-14 h-14 bg-neutral-950 border border-neutral-700 rounded-full text-2xl text-white hover:bg-neutral-800"
-      >
-        +
-      </button> */}
+      {/* FORM MODAL */}
       {showForm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
-          <div className="bg-neutral-900 border border-neutral-700 rounded-xl w-full max-w-xl p-6">
-            <h2 className="text-xl font-semibold text-white mb-4">
-              Create Dispatch Order
-            </h2>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
+          <div className="bg-neutral-800 border border-neutral-600 rounded-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto shadow-2xl">
+            {/* Header */}
+            <div className="sticky top-0 bg-neutral-800 border-b border-neutral-700 p-6 z-10">
+              <h2 className="text-2xl font-bold text-white">
+                {editingOrderId ? "Update Order" : "Create New Order"}
+              </h2>
+              <p className="text-sm text-neutral-400 mt-1">
+                {editingOrderId
+                  ? "Modify the order details below"
+                  : "Fill in the details to create a new dispatch order"}
+              </p>
+            </div>
 
-            <form onSubmit={handleCreateOrder} className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <input
-                  name="orderId"
-                  value={formData.orderId}
-                  onChange={handleFormChange}
-                  placeholder="Order ID"
-                  required
-                  className="input"
-                />
-                <input
-                  name="dispatchedTo"
-                  value={formData.dispatchedTo}
-                  onChange={handleFormChange}
-                  placeholder="Dispatched To"
-                  required
-                  className="input"
-                />
+            <form onSubmit={handleCreateOrder} className="p-6 space-y-6">
+              {/* Order Information */}
+              <div className="space-y-4">
+                <h3 className="text-sm font-semibold text-amber-500 uppercase tracking-wider">
+                  Order Information
+                </h3>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-neutral-300 mb-2">
+                      Order ID <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      name="orderId"
+                      value={formData.orderId}
+                      onChange={handleFormChange}
+                      placeholder="e.g., ORD-2024-001"
+                      required
+                      className="w-full bg-neutral-900 border border-neutral-600 rounded-lg px-4 py-2.5 text-neutral-100 placeholder-neutral-500 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500 transition"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-neutral-300 mb-2">
+                      Dispatched To <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      name="dispatchedTo"
+                      value={formData.dispatchedTo}
+                      onChange={handleFormChange}
+                      placeholder="e.g., Mumbai Warehouse"
+                      required
+                      className="w-full bg-neutral-900 border border-neutral-600 rounded-lg px-4 py-2.5 text-neutral-100 placeholder-neutral-500 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500 transition"
+                    />
+                  </div>
+                </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <input
-                  name="chairModel"
-                  value={formData.chairModel}
-                  onChange={handleFormChange}
-                  placeholder="Chair Model"
-                  required
-                  className="input"
-                />
-                <input
-                  name="chairDetail"
-                  value={formData.chairDetail}
-                  onChange={handleFormChange}
-                  placeholder="Chair Detail"
-                  className="input"
-                />
+              {/* Product Details */}
+              <div className="space-y-4">
+                <h3 className="text-sm font-semibold text-amber-500 uppercase tracking-wider">
+                  Product Details
+                </h3>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-neutral-300 mb-2">
+                      Chair Model <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      name="chairModel"
+                      value={formData.chairModel}
+                      onChange={handleFormChange}
+                      placeholder="e.g., Executive Pro X1"
+                      required
+                      className="w-full bg-neutral-900 border border-neutral-600 rounded-lg px-4 py-2.5 text-neutral-100 placeholder-neutral-500 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500 transition"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-neutral-300 mb-2">
+                      Chair Detail
+                    </label>
+                    <input
+                      name="chairDetail"
+                      value={formData.chairDetail}
+                      onChange={handleFormChange}
+                      placeholder="e.g., Black leather, adjustable"
+                      className="w-full bg-neutral-900 border border-neutral-600 rounded-lg px-4 py-2.5 text-neutral-100 placeholder-neutral-500 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500 transition"
+                    />
+                  </div>
+                </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <input
-                  type="date"
-                  name="orderDate"
-                  value={formData.orderDate}
-                  onChange={handleFormChange}
-                  required
-                  className="input"
-                />
-                <input
-                  type="date"
-                  name="deliveryDate"
-                  value={formData.deliveryDate}
-                  onChange={handleFormChange}
-                  required
-                  className="input"
-                />
+              {/* Dates */}
+              <div className="space-y-4">
+                <h3 className="text-sm font-semibold text-amber-500 uppercase tracking-wider">
+                  Scheduling
+                </h3>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-neutral-300 mb-2">
+                      Order Date <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="date"
+                      name="orderDate"
+                      value={formData.orderDate}
+                      onChange={handleFormChange}
+                      required
+                      className="w-full bg-neutral-900 border border-neutral-600 rounded-lg px-4 py-2.5 text-neutral-100 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500 transition"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-neutral-300 mb-2">
+                      Delivery Date <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="date"
+                      name="deliveryDate"
+                      value={formData.deliveryDate}
+                      onChange={handleFormChange}
+                      required
+                      className="w-full bg-neutral-900 border border-neutral-600 rounded-lg px-4 py-2.5 text-neutral-100 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500 transition"
+                    />
+                  </div>
+                </div>
               </div>
 
-              <div className="grid grid-cols-3 gap-4">
-                <input
-                  type="number"
-                  name="quantity"
-                  value={formData.quantity}
-                  onChange={handleFormChange}
-                  placeholder="Quantity"
-                  required
-                  min="1"
-                  className="input"
-                />
-                <select
-                  name="assembly"
-                  value={formData.assembly}
-                  onChange={handleFormChange}
-                  className="input"
-                >
-                  <option value="Assembled">Assembled</option>
-                  <option value="Unassembled">Unassembled</option>
-                </select>
+              {/* Order Details */}
+              <div className="space-y-4">
+                <h3 className="text-sm font-semibold text-amber-500 uppercase tracking-wider">
+                  Order Details
+                </h3>
 
-                <label className="flex items-center gap-2 text-sm text-neutral-300">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-neutral-300 mb-2">
+                      Quantity <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="number"
+                      name="quantity"
+                      value={formData.quantity}
+                      onChange={handleFormChange}
+                      placeholder="1"
+                      required
+                      min="1"
+                      className="w-full bg-neutral-900 border border-neutral-600 rounded-lg px-4 py-2.5 text-neutral-100 placeholder-neutral-500 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500 transition"
+                    />
+                  </div>
+
+                  {/* <div>
+                    <label className="block text-sm font-medium text-neutral-300 mb-2">
+                      Amount (₹) <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="number"
+                      name="amount"
+                      value={formData.amount}
+                      onChange={handleFormChange}
+                      placeholder="0"
+                      required
+                      min="0"
+                      className="w-full bg-neutral-900 border border-neutral-600 rounded-lg px-4 py-2.5 text-neutral-100 placeholder-neutral-500 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500 transition"
+                    />
+                  </div> */}
+
+                  {/* <div>
+                    <label className="block text-sm font-medium text-neutral-300 mb-2">
+                      Assembly Status
+                    </label>
+                    <select
+                      name="assembly"
+                      value={formData.assembly}
+                      onChange={handleFormChange}
+                      className="w-full bg-neutral-900 border border-neutral-600 rounded-lg px-4 py-2.5 text-neutral-100 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500 transition"
+                    >
+                      <option value="Assembled">Assembled</option>
+                      <option value="Unassembled">Unassembled</option>
+                    </select>
+                  </div> */}
+                </div>
+
+                <div className="flex items-center gap-3 p-4 bg-neutral-900 rounded-lg border border-neutral-600">
                   <input
                     type="checkbox"
                     name="onTime"
+                    id="onTimeCheckbox"
                     checked={formData.onTime}
                     onChange={handleFormChange}
-                    className="accent-amber-600"
+                    className="w-5 h-5 accent-amber-600 cursor-pointer"
                   />
-                  On Time
-                </label>
-
-                <input
-                  type="number"
-                  name="amount"
-                  value={formData.amount}
-                  onChange={handleFormChange}
-                  placeholder="Amount"
-                  required
-                  className="input"
-                />
+                  <label
+                    htmlFor="onTimeCheckbox"
+                    className="text-sm font-medium text-neutral-300 cursor-pointer"
+                  >
+                    Mark as On-Time Delivery
+                  </label>
+                </div>
               </div>
 
-              <div className="flex justify-end gap-3 pt-4">
+              {/* Action Buttons */}
+              <div className="flex justify-end gap-3 pt-6 border-t border-neutral-700">
                 <button
                   type="button"
-                  onClick={() => setShowForm(false)}
-                  className="px-4 py-2 text-sm border border-neutral-700 rounded-lg text-neutral-300"
+                  onClick={() => {
+                    setShowForm(false);
+                    setEditingOrderId(null);
+                    setFormData(initialFormData);
+                  }}
+                  className="px-6 py-2.5 text-sm font-medium border border-neutral-600 rounded-lg text-neutral-300 hover:bg-neutral-700 transition"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 text-sm bg-amber-600 hover:bg-amber-700 rounded-lg text-black font-medium"
+                  className="px-6 py-2.5 text-sm font-medium bg-amber-600 hover:bg-amber-700 rounded-lg text-black transition shadow-lg shadow-amber-600/20"
                 >
-                  Create Order
+                  {editingOrderId ? "Update Order" : "Create Order"}
                 </button>
               </div>
             </form>
@@ -550,6 +639,4 @@ const handleDeleteOrder = async (orderId) => {
       )}
     </div>
   );
-  
-  
 }
