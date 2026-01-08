@@ -34,6 +34,7 @@ export default function WarehouseOrders() {
           "WAREHOUSE_COLLECTED",
           "FITTING_COMPLETED",
           "READY_FOR_DISPATCH",
+          "COMPLETED",
         ].includes(o.progress)
       );
 
@@ -133,6 +134,8 @@ export default function WarehouseOrders() {
         return <span className="text-emerald-400">Returned from Fitting</span>;
       case "READY_FOR_DISPATCH":
         return <span className="text-emerald-500">Ready for Dispatch</span>;
+        case "COMPLETED":
+        return <span className="text-emerald-500">Completed</span>;
       default:
         return <span className="text-neutral-400">Processing</span>;
     }
@@ -176,6 +179,18 @@ export default function WarehouseOrders() {
         >
           <Truck size={16} />
           Dispatch
+        </button>
+      );
+    }
+        if (o.progress === "COMPLETED") {
+      return (
+        <button
+          disabled={isLoading}
+          onClick={() => handleDispatch(o._id)}
+          className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 px-4 py-2 rounded-lg text-black text-sm"
+        >
+          <Truck size={16} />
+          COMPLETED
         </button>
       );
     }
