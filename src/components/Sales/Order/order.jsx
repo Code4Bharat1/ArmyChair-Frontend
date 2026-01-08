@@ -7,7 +7,7 @@ export default function Orders() {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [expandedOrderId, setExpandedOrderId] = useState(null);
-
+  
   const [search, setSearch] = useState("");
   const [showForm, setShowForm] = useState(false);
   const [editingOrderId, setEditingOrderId] = useState(null);
@@ -142,11 +142,13 @@ export default function Orders() {
     );
   };
 const isOrderLocked = (progress) => {
-  return (
-    progress === "FITTING_COMPLETED" ||
-    progress === "READY_FOR_DISPATCH"
-  );
+  return [
+    "FITTING_COMPLETED",
+    "READY_FOR_DISPATCH",
+    "DISPATCHED",
+  ].includes(progress);
 };
+
 
   const ORDER_STEPS = [
     { key: "ORDER_PLACED", label: "Order Placed" },
@@ -154,6 +156,7 @@ const isOrderLocked = (progress) => {
     { key: "FITTING_IN_PROGRESS", label: "Fitting In Progress" },
     { key: "FITTING_COMPLETED", label: "Fitting Completed" },
     { key: "READY_FOR_DISPATCH", label: "Ready For Dispatch" },
+    { key: "DISPATCHED", label: "Dispatched" },
   ];
 
   return (
@@ -239,13 +242,16 @@ const isOrderLocked = (progress) => {
     <td colSpan={7} className="p-6">
       {(() => {
         const currentIndex = ORDER_STEPS.findIndex(
-          (s) => s.key === o.progress
-        );
+  (s) => s.key === o.progress
+);
 
-        const percent =
-          currentIndex <= 0
-            ? 0
-            : (currentIndex / (ORDER_STEPS.length - 1)) * 100;
+const safeIndex =
+  currentIndex === -1
+    ? ORDER_STEPS.length - 1
+    : currentIndex;
+
+const percent =
+  (safeIndex / (ORDER_STEPS.length - 1)) * 100;
 
         return (
           <div className="w-full space-y-6">
@@ -260,7 +266,7 @@ const isOrderLocked = (progress) => {
                 <span
                   key={step.key}
                   className={
-                    index <= currentIndex
+                    index <= safeIndex
                       ? "text-neutral-200"
                       : ""
                   }
@@ -271,32 +277,37 @@ const isOrderLocked = (progress) => {
             </div>
 
             {/* TRACK */}
-            <div className="relative w-full h-4">
-              {/* BASE LINE */}
-              <div className="absolute top-1/2 w-full h-[4px] bg-neutral-700 rounded-full -translate-y-1/2" />
+            {/* TRACK */}
+<div className="relative w-full h-10 flex items-center">
+  {/* BASE LINE */}
+  <div className="absolute left-0 right-0 h-[4px] bg-neutral-600 rounded-full" />
 
-              {/* PROGRESS LINE (GRADIENT) */}
-              <div
-                className="absolute top-1/2 h-[4px] rounded-full transition-all duration-500 -translate-y-1/2"
-                style={{
-                  width: `${percent}%`,
-                  background:
-                    "linear-gradient(90deg, #22c55e, #f59e0b)",
-                }}
-              />
+  {/* PROGRESS LINE */}
+  <div
+  className="absolute left-0 h-[4px] rounded-full transition-all duration-500"
+  style={{
+    width: `${percent}%`,
+    background:
+      percent === 100
+        ? "#22c55e" // ✅ solid green when completed
+        : "linear-gradient(90deg, #22c55e, #f59e0b)",
+  }}
+/>
 
-              {/* CURRENT DOT */}
-              <div
-                className="absolute top-1/2 w-4 h-4 rounded-full shadow border-2 border-black -translate-y-1/2"
-                style={{
-                  left: `calc(${percent}% - 8px)`,
-                  backgroundColor:
-                    currentIndex === ORDER_STEPS.length - 1
-                      ? "#22c55e"
-                      : "#f59e0b",
-                }}
-              />
-            </div>
+
+  {/* CURRENT DOT */}
+  <div
+    className="absolute w-4 h-4 rounded-full border-2 border-black shadow"
+    style={{
+      left: `calc(${percent}% - 8px)`,
+      backgroundColor:
+        safeIndex === ORDER_STEPS.length - 1
+          ? "#22c55e"
+          : "#f59e0b",
+    }}
+  />
+</div>
+
 
             {/* CURRENT STATUS */}
             <p className="text-sm">
