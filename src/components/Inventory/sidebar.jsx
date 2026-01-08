@@ -77,6 +77,15 @@ export default function InventorySidebar() {
             <Wrench size={18} />
             Spare Parts
           </Link>
+
+                    <Link
+            href="/inventory/order"
+            onClick={() => setOpen(false)}
+            className={itemClass("/inventory/order")}
+          >
+            <Wrench size={18} />
+            Incoming Sales Orders
+          </Link>
         </nav>
 
         {/* FOOTER */}

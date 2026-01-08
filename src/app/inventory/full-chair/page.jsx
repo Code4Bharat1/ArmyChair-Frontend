@@ -1,6 +1,4 @@
-
-
-import InventoryPage from "@/components/Inventory/inventory.jsx";
+import InventoryPage from "@/components/Inventory/fullChair";
 import React from "react";
 
 export default function page() {
