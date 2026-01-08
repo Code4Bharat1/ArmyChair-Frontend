@@ -2,7 +2,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Search, User, Wrench, CheckCircle } from "lucide-react";
 import axios from "axios";
-import Sidebar from "../Sidebar/sidebar"; // adjust path if needed
 
 export default function Fitting() {
   const [orders, setOrders] = useState([]);
@@ -113,7 +112,7 @@ export default function Fitting() {
   /* ================= UI ================= */
   return (
     <div className="flex h-screen bg-neutral-900 text-neutral-100">
-      <Sidebar />
+
 
       <div className="flex-1 overflow-auto">
         {/* HEADER */}
