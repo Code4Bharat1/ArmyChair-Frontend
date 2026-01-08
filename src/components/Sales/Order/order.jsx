@@ -1,29 +1,47 @@
 "use client";
 import React, { useEffect, useMemo, useState } from "react";
-import { Search, User, ChevronDown } from "lucide-react";
+import { Search, User, ChevronDown, Pencil, Trash2 } from "lucide-react";
 import axios from "axios";
 
 export default function Orders() {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [expandedOrderId, setExpandedOrderId] = useState(null);
 
   const [selectedOrders, setSelectedOrders] = useState([]);
   const [search, setSearch] = useState("");
   const [showForm, setShowForm] = useState(false);
+  const [editingOrderId, setEditingOrderId] = useState(null);
+
 
   const [formData, setFormData] = useState({
-  orderId: "",
-  dispatchedTo: "",
-  chairModel: "",
-  chairDetail: "",
-  orderDate: "",
-  deliveryDate: "",
-  quantity: "",       // ✅ ADD THIS
-  onTime: true,
-  assembly: "Unassembled",
-  amount: "",
-});
-
+    orderId: "",
+    dispatchedTo: "",
+    chairModel: "",
+    chairDetail: "",
+    orderDate: "",
+    deliveryDate: "",
+    quantity: "", // ✅ ADD THIS
+    onTime: true,
+    assembly: "Unassembled",
+    amount: "",
+  });
+const handleEditOrder = (order) => {
+  setEditingOrderId(order._id);
+  setFormData({
+    orderId: order.orderId,
+    dispatchedTo: order.dispatchedTo,
+    chairModel: order.chairModel,
+    chairDetail: order.chairDetail || "",
+    orderDate: order.orderDate.split("T")[0],
+    deliveryDate: order.deliveryDate.split("T")[0],
+    quantity: order.quantity,
+    onTime: order.onTime,
+    assembly: order.assembly,
+    amount: order.amount,
+  });
+  setShowForm(true);
+};
 
   const handleFormChange = (e) => {
     const { name, value, type, checked } = e.target;
@@ -32,13 +50,12 @@ export default function Orders() {
       ...prev,
       [name]: type === "checkbox" ? checked : value,
     }));
-  };  
+  };
   const API = process.env.NEXT_PUBLIC_API_URL;
   const token =
     typeof window !== "undefined" ? localStorage.getItem("token") : null;
 
   const headers = token ? { Authorization: `Bearer ${token}` } : {};
-
 
   const handleCreateOrder = async (e) => {
   e.preventDefault();
@@ -46,39 +63,44 @@ export default function Orders() {
   try {
     const payload = {
       ...formData,
+      quantity: Number(formData.quantity),
       amount: Number(formData.amount),
     };
 
-    await axios.post(`${API}/orders`, payload, { headers });
+    if (editingOrderId) {
+      await axios.put(
+        `${API}/orders/${editingOrderId}`,
+        payload,
+        { headers }
+      );
+    } else {
+      await axios.post(`${API}/orders`, payload, { headers });
+    }
 
     setShowForm(false);
-    setFormData({
-      orderId: "",
-      dispatchedTo: "",
-      chairModel: "",
-      chairDetail: "",
-      orderDate: "",
-      deliveryDate: "",
-      onTime: true,
-      assembly: "Unassembled",
-      amount: "",
-    });
-
+    setEditingOrderId(null);
     fetchOrders();
   } catch (err) {
-  if (axios.isAxiosError(err)) {
-    console.error(
-      "Create order failed:",
-      err.response?.data || err.message
-    );
-  } else {
-    console.error("Unexpected error:", err);
+    console.error("Save failed", err);
+    alert("Failed to save order");
   }
-  alert("Failed to create order");
-}
-
 };
-  
+const handleDeleteOrder = async (orderId) => {
+  const confirmDelete = window.confirm(
+    "Are you sure you want to delete this order?"
+  );
+
+  if (!confirmDelete) return;
+
+  try {
+    await axios.delete(`${API}/orders/${orderId}`, { headers });
+    fetchOrders(); // refresh list
+  } catch (err) {
+    console.error("Delete failed", err);
+    alert("Failed to delete order");
+  }
+};
+
 
   /* ================= FETCH ================= */
   const fetchOrders = async () => {
@@ -136,39 +158,79 @@ export default function Orders() {
     assembly === "Assembled"
       ? "bg-amber-900 text-amber-300"
       : "bg-neutral-700 text-neutral-300";
-const ProgressTracker = ({ progress }) => {
-  const steps = [
-    "warehouse",
-    "fitting",
-    "order_ready",
-    "dispatched",
-    "delivered",
-  ];
+  const ProgressTracker = ({ progress, orderId }) => {
+    const steps = [
+      "warehouse",
+      "fitting",
+      "order_ready",
+      "dispatched",
+      "delivered",
+    ];
 
-  const currentIndex =
-    typeof progress === "number"
-      ? progress - 1
-      : steps.indexOf(progress);
+    const currentIndex =
+      typeof progress === "number"
+        ? progress - 1
+        : Math.max(steps.indexOf(progress), 0);
 
-  return (
-    <div className="flex items-center gap-2">
-      {steps.map((step, index) => (
-        <div key={step} className="flex items-center gap-1">
-          <div
-            className={`w-3 h-3 rounded-full ${
-              index <= currentIndex
-                ? "bg-amber-500"
-                : "bg-neutral-700"
-            }`}
-          />
-          {index !== steps.length - 1 && (
-            <div className="w-4 h-[2px] bg-neutral-700" />
-          )}
+    const isExpanded = expandedOrderId === orderId;
+
+
+    return (
+      <div className="cursor-pointer">
+        {/* COMPACT VIEW */}
+        <div
+          onClick={() => setExpandedOrderId(isExpanded ? null : orderId)}
+          className="flex items-center gap-2"
+        >
+          {steps.map((_, index) => (
+            <div key={index} className="flex items-center gap-1">
+              <div
+                className={`w-3 h-3 rounded-full ${
+                  index <= currentIndex ? "bg-amber-500" : "bg-neutral-700"
+                }`}
+              />
+              {index !== steps.length - 1 && (
+                <div className="w-4 h-[2px] bg-neutral-700" />
+              )}
+            </div>
+          ))}
         </div>
-      ))}
-    </div>
-  );
-};
+
+        {/* EXPANDED VIEW */}
+        {/* EXPANDED VIEW */}
+        <div
+          className={`overflow-hidden transition-all duration-300 ease-in-out ${
+            isExpanded ? "max-h-40 opacity-100 mt-3" : "max-h-0 opacity-0"
+          }`}
+        >
+          <div
+            className={`space-y-2 transition-transform duration-300 ${
+              isExpanded ? "translate-y-0" : "-translate-y-2"
+            }`}
+          >
+            {steps.map((step, index) => (
+              <div key={step} className="flex items-center gap-3 text-sm">
+                <div
+                  className={`w-3 h-3 rounded-full ${
+                    index <= currentIndex ? "bg-amber-500" : "bg-neutral-700"
+                  }`}
+                />
+                <span
+                  className={
+                    index <= currentIndex
+                      ? "text-amber-400"
+                      : "text-neutral-400"
+                  }
+                >
+                  {step.replace("_", " ").toUpperCase()}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  };
 
   /* ================= UI ================= */
   return (
@@ -200,18 +262,17 @@ const ProgressTracker = ({ progress }) => {
               </p>
             </div>
             <div className="flex gap-3">
-  <button className="bg-neutral-700 hover:bg-neutral-600 px-4 py-2 rounded-lg text-sm">
-    Export CSV
-  </button>
+              <button className="bg-neutral-700 hover:bg-neutral-600 px-4 py-2 rounded-lg text-sm">
+                Export CSV
+              </button>
 
-  <button
-    onClick={() => setShowForm(true)}
-    className="bg-amber-600 hover:bg-amber-700 px-4 py-2 rounded-lg text-sm font-medium text-black"
-  >
-    Add Order
-  </button>
-</div>
-
+              <button
+                onClick={() => setShowForm(true)}
+                className="bg-amber-600 hover:bg-amber-700 px-4 py-2 rounded-lg text-sm font-medium text-black"
+              >
+                Add Order
+              </button>
+            </div>
           </div>
 
           {/* STATS CARDS */}
@@ -262,59 +323,86 @@ const ProgressTracker = ({ progress }) => {
               ) : (
                 <table className="w-full">
                   <thead>
-  <tr className="border-b border-neutral-700 bg-neutral-850">
-    {[
-      "Order ID",
-      "Dispatched To",
-      "Chairs",
-      "Order Date",
-      "Quantity",
-      "Progress",
-    ].map((h) => (
-      <th
-        key={h}
-        className="p-4 text-xs text-neutral-400 uppercase text-left"
-      >
-        {h}
-      </th>
-    ))}
-  </tr>
-</thead>
-
+                    <tr className="border-b border-neutral-700 bg-neutral-850">
+                      {[
+                        "Order ID",
+                        "Dispatched To",
+                        "Chairs",
+                        "Order Date",
+                        "Quantity",
+                        "Progress",
+                        "Actions", // ✅ ADD
+                      ].map((h) => (
+                        <th
+                          key={h}
+                          className="p-4 text-xs text-neutral-400 uppercase text-left"
+                        >
+                          {h}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
 
                   <tbody>
-  {filteredOrders.map((order) => (
-    <tr
-      key={order._id}
-      className="border-b border-neutral-700 hover:bg-neutral-750"
-    >
-      <td className="p-4 text-sm text-neutral-300">
-        {order.orderId}
-      </td>
+                    {filteredOrders.map((order) => (
+                      <tr
+                        key={order._id}
+                        className="border-b border-neutral-700 hover:bg-neutral-750"
+                      >
+                        <td className="p-4 text-sm text-neutral-300">
+                          {order.orderId}
+                        </td>
 
-      <td className="p-4 text-sm text-neutral-300">
-        {order.dispatchedTo}
-      </td>
+                        <td className="p-4 text-sm text-neutral-300">
+                          {order.dispatchedTo}
+                        </td>
 
-      <td className="p-4 text-sm text-white">
-        {order.chairModel}
-      </td>
+                        <td className="p-4 text-sm text-white">
+                          {order.chairModel}
+                        </td>
 
-      <td className="p-4 text-sm text-neutral-300">
-        {new Date(order.orderDate).toLocaleDateString()}
-      </td>
+                        <td className="p-4 text-sm text-neutral-300">
+                          {new Date(order.orderDate).toLocaleDateString()}
+                        </td>
 
-      <td className="p-4 text-sm text-neutral-300">
-        {order.quantity}
-      </td>
+                        <td className="p-4 text-sm text-neutral-300">
+                          {order.quantity}
+                        </td>
 
-      <td className="p-4">
-        <ProgressTracker progress={order.progress} />
-      </td>
-    </tr>
-  ))}
-</tbody>
+                        <td className="p-4 align-top">
+                          <div className="relative">
+                            <ProgressTracker
+                              progress={order.progress}
+                              orderId={order._id}
+                            />
+                          </div>
+                        </td>
+                        <td className="p-4">
+                          <div className="flex items-center gap-3">
+                            {/* UPDATE */}
+                            <button
+  onClick={() => handleEditOrder(order)}
+  className="text-amber-400 hover:text-amber-300 transition"
+  title="Edit Order"
+>
+  <Pencil size={16} />
+</button>
 
+
+                            {/* DELETE */}
+                            <button
+  onClick={() => handleDeleteOrder(order._id)}
+  className="text-red-500 hover:text-red-400 transition"
+  title="Delete Order"
+>
+  <Trash2 size={16} />
+</button>
+
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
                 </table>
               )}
             </div>
@@ -399,16 +487,16 @@ const ProgressTracker = ({ progress }) => {
               </div>
 
               <div className="grid grid-cols-3 gap-4">
-                 <input
-    type="number"
-    name="quantity"
-    value={formData.quantity}
-    onChange={handleFormChange}
-    placeholder="Quantity"
-    required
-    min="1"
-    className="input"
-  />
+                <input
+                  type="number"
+                  name="quantity"
+                  value={formData.quantity}
+                  onChange={handleFormChange}
+                  placeholder="Quantity"
+                  required
+                  min="1"
+                  className="input"
+                />
                 <select
                   name="assembly"
                   value={formData.assembly}
@@ -462,4 +550,6 @@ const ProgressTracker = ({ progress }) => {
       )}
     </div>
   );
+  
+  
 }
