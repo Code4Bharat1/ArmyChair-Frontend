@@ -36,7 +36,7 @@ export default function InventoryPage() {
   const API = process.env.NEXT_PUBLIC_API_URL;
   const token =
     typeof window !== "undefined"
-      ? localStorage.getItem("accessToken")
+      ? localStorage.getItem("token")
       : null;
 
   const headers = token ? { Authorization: `Bearer ${token}` } : {};
@@ -73,10 +73,10 @@ export default function InventoryPage() {
 
       if (editId) {
         await axios.patch(`${API}/inventory/update/${editId}`, payload, {
-          headers,
+          headers: headers,
         });
       } else {
-        await axios.post(`${API}/inventory`, payload, { headers });
+        await axios.post(`${API}/inventory`, payload, { headers: headers });
       }
 
       setShowForm(false);

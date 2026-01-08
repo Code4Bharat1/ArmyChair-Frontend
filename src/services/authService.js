@@ -6,14 +6,14 @@ class AuthService {
   async login(credentials) {
     const res = await axiosInstance.post("/auth/login", credentials);
 
-    const { accessToken, user } = res.data;
+    const { tokenToken, user } = res.data;
 
-    if (accessToken) {
-      localStorage.setItem("accessToken", accessToken);
+    if (tokenToken) {
+      localStorage.setItem("tokenToken", tokenToken);
       localStorage.setItem("user", JSON.stringify(user));
     }
 
-    return { accessToken, user };
+    return { tokenToken, user };
   }
 
   /* ---------------- LOGOUT ---------------- */
@@ -25,7 +25,7 @@ class AuthService {
       // Even if API fails, client state must be cleared
       console.error("Logout error:", err);
     } finally {
-      localStorage.removeItem("accessToken");
+      localStorage.removeItem("tokenToken");
       localStorage.removeItem("user");
     }
   }
