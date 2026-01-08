@@ -189,8 +189,8 @@ export default function SparePartsInventory() {
                   {[
                     "Part",
                     "Vendor",
-                    "Location",
                     "Qty",
+                    "Location",
                     "Status",
                     "Actions",
                   ].map((h) => (
@@ -217,12 +217,13 @@ export default function SparePartsInventory() {
                       {i.vendor}
                     </td>
 
-                    <td className="p-4 flex items-center gap-2 text-sm">
+              
+
+                    <td className="p-4">{i.quantity}</td>
+                          <td className="p-4 flex items-center gap-2 text-sm">
                       <MapPin size={14} className="text-neutral-400" />
                       {i.location}
                     </td>
-
-                    <td className="p-4">{i.quantity}</td>
 
                     <td className="p-4">
                       <StatusBadge status={i.status} />
