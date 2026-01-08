@@ -58,7 +58,9 @@ export default function Orders() {
       };
 
       if (editingOrderId) {
-        await axios.put(`${API}/orders/${editingOrderId}`, payload, { headers });
+        await axios.put(`${API}/orders/${editingOrderId}`, payload, {
+          headers,
+        });
       } else {
         await axios.post(`${API}/orders`, payload, { headers });
       }
@@ -115,39 +117,44 @@ export default function Orders() {
 
   /* ================= PROGRESS ================= */
   const ProgressTracker = ({ progress, orderId }) => {
-    const steps = [
-      "ORDER_PLACED",
-      "WAREHOUSE_COLLECTED",
-      "FITTING_IN_PROGRESS",
-      "FITTING_COMPLETED",
-      "READY_FOR_DISPATCH",
-    ];
-
-    const currentIndex = Math.max(steps.indexOf(progress), 0);
-    const isExpanded = expandedOrderId === orderId;
+    const currentIndex = ORDER_STEPS.findIndex((s) => s.key === progress);
 
     return (
-      <div className="cursor-pointer">
-        <div
-          onClick={() => setExpandedOrderId(isExpanded ? null : orderId)}
-          className="flex items-center gap-2"
-        >
-          {steps.map((_, i) => (
-            <div key={i} className="flex items-center gap-1">
-              <div
-                className={`w-3 h-3 rounded-full ${
-                  i <= currentIndex ? "bg-amber-500" : "bg-neutral-700"
-                }`}
-              />
-              {i !== steps.length - 1 && (
-                <div className="w-4 h-[2px] bg-neutral-700" />
-              )}
-            </div>
-          ))}
-        </div>
+      <div
+        onClick={() =>
+          setExpandedOrderId(expandedOrderId === orderId ? null : orderId)
+        }
+        className="flex items-center gap-2 cursor-pointer"
+      >
+        {ORDER_STEPS.map((_, i) => (
+          <div key={i} className="flex items-center gap-1">
+            <div
+              className={`w-3 h-3 rounded-full ${
+                i <= currentIndex ? "bg-amber-500" : "bg-neutral-700"
+              }`}
+            />
+            {i !== ORDER_STEPS.length - 1 && (
+              <div className="w-4 h-[2px] bg-neutral-700" />
+            )}
+          </div>
+        ))}
       </div>
     );
   };
+const isOrderLocked = (progress) => {
+  return (
+    progress === "FITTING_COMPLETED" ||
+    progress === "READY_FOR_DISPATCH"
+  );
+};
+
+  const ORDER_STEPS = [
+    { key: "ORDER_PLACED", label: "Order Placed" },
+    { key: "WAREHOUSE_COLLECTED", label: "Warehouse Collected" },
+    { key: "FITTING_IN_PROGRESS", label: "Fitting In Progress" },
+    { key: "FITTING_COMPLETED", label: "Fitting Completed" },
+    { key: "READY_FOR_DISPATCH", label: "Ready For Dispatch" },
+  ];
 
   return (
     <div className="flex h-screen bg-neutral-900 text-neutral-100">
@@ -186,26 +193,132 @@ export default function Orders() {
 
             <tbody>
               {filteredOrders.map((o) => (
-                <tr key={o._id} className="border-t border-neutral-700">
-                  <td className="p-3">{o.orderId}</td>
-                  <td className="p-3">{o.dispatchedTo}</td>
-                  <td className="p-3">{o.chairModel}</td>
-                  <td className="p-3">
-                    {new Date(o.orderDate).toLocaleDateString()}
-                  </td>
-                  <td className="p-3">{o.quantity}</td>
-                  <td className="p-3">
-                    <ProgressTracker progress={o.progress} orderId={o._id} />
-                  </td>
-                  <td className="p-3 flex gap-3">
-                    <button onClick={() => handleEditOrder(o)}>
-                      <Pencil size={16} />
-                    </button>
-                    <button onClick={() => handleDeleteOrder(o._id)}>
-                      <Trash2 size={16} />
-                    </button>
-                  </td>
-                </tr>
+                <React.Fragment key={o._id}>
+                  {/* MAIN ROW */}
+                  <tr className="border-t border-neutral-700">
+                    <td className="p-3">{o.orderId}</td>
+                    <td className="p-3">{o.dispatchedTo}</td>
+                    <td className="p-3">{o.chairModel}</td>
+                    <td className="p-3">
+                      {new Date(o.orderDate).toLocaleDateString()}
+                    </td>
+                    <td className="p-3">{o.quantity}</td>
+                    <td className="p-3">
+                      <ProgressTracker progress={o.progress} orderId={o._id} />
+                    </td>
+                    <td className="p-3 flex gap-3">
+                      <button
+                        onClick={() => handleEditOrder(o)}
+                        disabled={isOrderLocked(o.progress)}
+                        className={
+                          isOrderLocked(o.progress)
+                            ? "opacity-40 cursor-not-allowed"
+                            : ""
+                        }
+                      >
+                        <Pencil size={16} />
+                      </button>
+
+                      <button
+                        onClick={() => handleDeleteOrder(o._id)}
+                        disabled={isOrderLocked(o.progress)}
+                        className={
+                          isOrderLocked(o.progress)
+                            ? "opacity-40 cursor-not-allowed"
+                            : ""
+                        }
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    </td>
+                  </tr>
+
+                  {/* EXPANDED PROGRESS ROW */}
+                    {expandedOrderId === o._id && (
+  <tr className="bg-neutral-850">
+    <td colSpan={7} className="p-6">
+      {(() => {
+        const currentIndex = ORDER_STEPS.findIndex(
+          (s) => s.key === o.progress
+        );
+
+        const percent =
+          currentIndex <= 0
+            ? 0
+            : (currentIndex / (ORDER_STEPS.length - 1)) * 100;
+
+        return (
+          <div className="w-full space-y-6">
+            {/* TITLE */}
+            <p className="text-sm text-neutral-300">
+              Order Progress
+            </p>
+
+            {/* STEP LABELS */}
+            <div className="flex justify-between text-xs text-neutral-400">
+              {ORDER_STEPS.map((step, index) => (
+                <span
+                  key={step.key}
+                  className={
+                    index <= currentIndex
+                      ? "text-neutral-200"
+                      : ""
+                  }
+                >
+                  {step.label}
+                </span>
+              ))}
+            </div>
+
+            {/* TRACK */}
+            <div className="relative w-full h-4">
+              {/* BASE LINE */}
+              <div className="absolute top-1/2 w-full h-[4px] bg-neutral-700 rounded-full -translate-y-1/2" />
+
+              {/* PROGRESS LINE (GRADIENT) */}
+              <div
+                className="absolute top-1/2 h-[4px] rounded-full transition-all duration-500 -translate-y-1/2"
+                style={{
+                  width: `${percent}%`,
+                  background:
+                    "linear-gradient(90deg, #22c55e, #f59e0b)",
+                }}
+              />
+
+              {/* CURRENT DOT */}
+              <div
+                className="absolute top-1/2 w-4 h-4 rounded-full shadow border-2 border-black -translate-y-1/2"
+                style={{
+                  left: `calc(${percent}% - 8px)`,
+                  backgroundColor:
+                    currentIndex === ORDER_STEPS.length - 1
+                      ? "#22c55e"
+                      : "#f59e0b",
+                }}
+              />
+            </div>
+
+            {/* CURRENT STATUS */}
+            <p className="text-sm">
+              <span className="text-neutral-400">
+                Current Stage:
+              </span>{" "}
+              <span className="text-amber-400 font-medium">
+                {
+                  ORDER_STEPS.find(
+                    (s) => s.key === o.progress
+                  )?.label
+                }
+              </span>
+            </p>
+          </div>
+        );
+      })()}
+    </td>
+  </tr>
+)}
+
+                </React.Fragment>
               ))}
             </tbody>
           </table>
