@@ -1,6 +1,5 @@
 "use client";
 import Link from "next/link";
-
 import React, { useState } from "react";
 import { Eye, EyeOff, Lock, Mail, AlertCircle, CheckCircle } from "lucide-react";
 import axios from "axios";
@@ -33,18 +32,37 @@ export default function Login() {
         `${process.env.NEXT_PUBLIC_API_URL}/auth/login`,
         { email, password }
       );
-const accessToken = localStorage.getItem("token");
-      const { token, user } = res.data;
 
-      // 🔐 Store data in localStorage
+      const { token, user } = res.data; // user must contain role
+
+      // 🔐 Store in localStorage
       localStorage.setItem("token", token);
       localStorage.setItem("user", JSON.stringify(user));
 
       setSuccess("Login successful. Redirecting...");
 
-      // 🚀 Redirect to dashboard
+      // 🚀 ROLE BASED REDIRECT
       setTimeout(() => {
-        router.push("/dashboard");
+        switch (user.role) {
+          case "admin":
+            router.push("/dashboard");
+            break;
+
+          case "fitting":
+            router.push("/fitting");
+            break;
+            
+          case "sales":
+            router.push("/sales");
+            break;
+
+          case "warehouse":
+            router.push("/warehouse/full-chair");
+            break;
+
+          default:
+            router.push("/dashboard"); // normal user / supervisor
+        }
       }, 800);
     } catch (err) {
       setError(
@@ -133,25 +151,23 @@ const accessToken = localStorage.getItem("token");
               </div>
             </div>
 
-            <div className="mt-6 text-center">
-               <p className="text-sm text-neutral-400">
-                  New user?{" "}
-                  <Link
+            <div className="mt-6 text-center mb-4">
+              <p className="text-sm text-neutral-400">
+                New user?{" "}
+                <Link
                   href="/signup"
                   className="text-amber-500 hover:text-amber-400 font-medium"
-                  >
+                >
                   Create an account
                 </Link>
-              </p>  
+              </p>
             </div>
-
-
 
             {/* Button */}
             <button
               type="submit"
               disabled={isLoading}
-              className="w-full bg-amber-600 hover:bg-amber-700 text-white py-3 rounded-lg font-medium flex justify-center items-center gap-2"
+              className="w-full bg-amber-600 hover:bg-amber-700 disabled:opacity-60 text-white py-3 rounded-lg font-medium flex justify-center items-center gap-2"
             >
               {isLoading ? (
                 <>
