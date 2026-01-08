@@ -1,64 +1,126 @@
 "use client";
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Search, User, Users } from "lucide-react";
 import Sidebar from "../Sidebar/sidebar";
+import axios from "axios";
 
 /* ================= TIMELINE COMPONENT ================= */
 function OrderTimeline({ timeline }) {
+  const activeIndex = timeline.findIndex((t) => t.status === "active");
+  const safeIndex = activeIndex === -1 ? timeline.length - 1 : activeIndex;
+
   return (
-    <div className="relative pl-6 mt-4">
-      <div className="absolute left-2 top-0 bottom-0 w-px bg-neutral-700" />
+    <div className="relative pl-8 mt-">
+      {timeline.map((step, index) => {
+        const completed = index < safeIndex;
+        const active = index === safeIndex;
 
-      {timeline.map((step, index) => (
-        <div key={index} className="mb-8 relative">
-          <div
-            className={`absolute -left-[2px] w-4 h-4 rounded-full border-2
-              ${
-                step.status === "completed"
-                  ? "bg-emerald-500 border-emerald-500"
-                  : step.status === "active"
-                  ? "bg-amber-500 border-amber-500"
-                  : "bg-neutral-900 border-neutral-600"
-              }
-            `}
-          />
+        return (
+          <div key={index} className="relative flex gap-6 pb-8 last:pb-0">
+            {/* LINE */}
+            {index !== timeline.length - 1 && (
+              <div
+                className={`absolute  top-2 h-full w-[2px]
+                  ${
+                    completed
+                      ? "bg-emerald-500"
+                      : active
+                      ? "bg-amber-500"
+                      : "bg-neutral-700"
+                  }`}
+              />
+            )}
 
-          <div className="ml-6">
-            <h3
-              className={`text-sm font-semibold
+            {/* DOT
+            <div
+              className={`relative z-10 mt-1 w-4 h-4 rounded-full border-2
                 ${
-                  step.status === "completed"
-                    ? "text-emerald-400"
-                    : step.status === "active"
-                    ? "text-amber-400"
-                    : "text-neutral-400"
-                }
-              `}
-            >
-              {step.title}
-            </h3>
+                  completed
+                    ? "bg-emerald-500 border-emerald-500"
+                    : active
+                    ? "bg-amber-500 border-amber-500"
+                    : "bg-neutral-900 border-neutral-600"
+                }`}
+            /> */}
 
-            <div className="mt-2 space-y-2">
-              {step.events.length ? (
-                step.events.map((event, i) => (
-                  <div key={i} className="text-xs text-neutral-400">
-                    <div>{event.text}</div>
-                    <div className="text-neutral-500">{event.time}</div>
+            {/* CONTENT */}
+            <div>
+              <h3
+                className={`text-sm font-semibold
+                  ${
+                    completed
+                      ? "text-emerald-400"
+                      : active
+                      ? "text-amber-400"
+                      : "text-neutral-400"
+                  }`}
+              >
+                {step.title}
+              </h3>
+
+              <div className="mt-2 space-y-2">
+                {step.events.length ? (
+                  step.events.map((event, i) => (
+                    <div key={i} className="text-xs text-neutral-400">
+                      <div>{event.text}</div>
+                      <div className="text-neutral-500">{event.time}</div>
+                    </div>
+                  ))
+                ) : (
+                  <div className="text-xs text-neutral-500 italic">
+                    Pending
                   </div>
-                ))
-              ) : (
-                <div className="text-xs text-neutral-500 italic">Pending</div>
-              )}
+                )}
+              </div>
             </div>
           </div>
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 }
 
+
+/* ================= PROGRESS → TIMELINE ================= */
+const PROGRESS_ORDER = [
+  "ORDER_PLACED",
+  "WAREHOUSE_COLLECTED",
+  "FITTING_IN_PROGRESS",
+  "FITTING_COMPLETED",
+  "READY_FOR_DISPATCH",
+  "DISPATCHED",
+];
+
+const PROGRESS_LABELS = {
+  ORDER_PLACED: "Order Placed",
+  WAREHOUSE_COLLECTED: "Warehouse Collected",
+  FITTING_IN_PROGRESS: "Fitting In Progress",
+  FITTING_COMPLETED: "Fitting Completed",
+  READY_FOR_DISPATCH: "Ready For Dispatch",
+  DISPATCHED: "Dispatched",
+};
+
+function buildTimeline(progress) {
+  const activeIndex = PROGRESS_ORDER.indexOf(progress);
+
+  return PROGRESS_ORDER.map((step, index) => ({
+    title: PROGRESS_LABELS[step],
+    status:
+      index < activeIndex
+        ? "completed"
+        : index === activeIndex
+        ? "active"
+        : "pending",
+    events:
+      index <= activeIndex
+        ? [{ text: PROGRESS_LABELS[step], time: "Updated" }]
+        : [],
+  }));
+}
+
 export default function Dashboard() {
   const [expandedOrder, setExpandedOrder] = useState(null);
+  const [timeline, setTimeline] = useState([]);
 
   /* ================= ADD USER STATE ================= */
   const [newUser, setNewUser] = useState({
@@ -80,54 +142,32 @@ export default function Dashboard() {
     }
 
     console.log("New User Added:", newUser);
-
     setNewUser({ role: "admin", phone: "", password: "" });
   };
 
-  /* ================= ORDERS ================= */
-  const orders = [
-    { id: "ORD-201", orderDate: "22 Sep 2025", deliveryDate: "30 Sep 2025" },
-    { id: "ORD-202", orderDate: "23 Sep 2025", deliveryDate: "01 Oct 2025" },
-  ];
+  /* ================= ORDERS FROM BACKEND ================= */
+  const [orders, setOrders] = useState([]);
 
-  const orderTimelines = {
-    "ORD-201": [
-      {
-        title: "Order Accepted",
-        status: "completed",
-        events: [{ text: "Order confirmed", time: "22 Sep • 10:30 AM" }],
-      },
-      {
-        title: "Inventory Status",
-        status: "active",
-        events: [{ text: "Lack of inventory detected", time: "22 Sep • 11:00 AM" }],
-      },
-      { title: "Inventory Movement", status: "pending", events: [] },
-      { title: "Fitting", status: "pending", events: [] },
-      { title: "Stock Ready", status: "pending", events: [] },
-      { title: "Dispatch", status: "pending", events: [] },
-    ],
-    "ORD-202": [
-      {
-        title: "Order Accepted",
-        status: "completed",
-        events: [{ text: "Order placed", time: "23 Sep • 9:00 AM" }],
-      },
-      {
-        title: "Inventory Status",
-        status: "completed",
-        events: [{ text: "Inventory available", time: "23 Sep • 9:20 AM" }],
-      },
-      {
-        title: "Inventory Movement",
-        status: "active",
-        events: [{ text: "Warehouse → Factory", time: "23 Sep • 12:00 PM" }],
-      },
-      { title: "Fitting", status: "pending", events: [] },
-      { title: "Stock Ready", status: "pending", events: [] },
-      { title: "Dispatch", status: "pending", events: [] },
-    ],
+  /* ================= PAGINATION ================= */
+  const [currentPage, setCurrentPage] = useState(1);
+  const pageSize = 10;
+
+  useEffect(() => {
+    fetchOrders();
+  }, []);
+
+  const fetchOrders = async () => {
+    const res = await axios.get("http://localhost:5000/api/orders", {
+      withCredentials: true,
+    });
+    setOrders(res.data.orders || []);
   };
+
+  const totalPages = Math.ceil(orders.length / pageSize);
+  const paginatedOrders = orders.slice(
+    (currentPage - 1) * pageSize,
+    currentPage * pageSize
+  );
 
   return (
     <div className="flex h-screen bg-gradient-to-b from-amber-900 via-black to-neutral-900 text-neutral-100">
@@ -155,7 +195,6 @@ export default function Dashboard() {
 
         {/* CONTENT */}
         <div className="p-6">
-          {/* NEW ORDERS TABLE */}
           <div className="bg-neutral-800 border border-neutral-700 rounded-lg">
             <div className="p-5 border-b border-neutral-700">
               <h2 className="text-lg font-semibold">New Orders</h2>
@@ -172,47 +211,139 @@ export default function Dashboard() {
               </thead>
 
               <tbody>
-                {orders.map((order) => (
-                  <React.Fragment key={order.id}>
+                {paginatedOrders.map((order) => (
+                  <React.Fragment key={order._id}>
                     <tr className="border-b border-neutral-700">
-                      <td className="p-4">{order.id}</td>
-                      <td className="p-4">{order.orderDate}</td>
-                      <td className="p-4">{order.deliveryDate}</td>
+                      <td className="p-4">{order.orderId}</td>
+                      <td className="p-4">
+                        {new Date(order.orderDate).toLocaleDateString()}
+                      </td>
+                      <td className="p-4">—</td>
                       <td className="p-4">
                         <button
-                          onClick={() =>
-                            setExpandedOrder(
-                              expandedOrder === order.id ? null : order.id
-                            )
-                          }
+                          onClick={() => {
+                            if (expandedOrder === order._id) {
+                              setExpandedOrder(null);
+                              return;
+                            }
+                            setTimeline(buildTimeline(order.progress));
+                            setExpandedOrder(order._id);
+                          }}
                           className="text-xs text-amber-400 hover:underline"
                         >
-                          {expandedOrder === order.id ? "Hide Tracking" : "View Tracking"}
+                          {expandedOrder === order._id
+                            ? "Hide Tracking"
+                            : "View Tracking"}
                         </button>
                       </td>
                     </tr>
 
-                    {expandedOrder === order.id && (
-                      <tr className="bg-neutral-900">
-                        <td colSpan={4} className="p-6">
-                          <OrderTimeline timeline={orderTimelines[order.id]} />
-                        </td>
-                      </tr>
-                    )}
+                    {expandedOrder === order._id && (
+  <tr className="bg-neutral-900">
+    <td colSpan={4} className="p-6 space-y-8">
+
+      {/* ================= HORIZONTAL PROGRESS BAR ================= */}
+      {(() => {
+        const steps = PROGRESS_ORDER;
+        const currentIndex = steps.indexOf(order.progress);
+        const safeIndex = currentIndex === -1 ? 0 : currentIndex;
+        const percent = (safeIndex / (steps.length - 1)) * 100;
+
+        return (
+          <div className="space-y-3">
+            <p className="text-sm font-medium text-neutral-300">
+              Order Progress
+            </p>
+
+            {/* Step labels */}
+            <div className="flex justify-between text-xs text-neutral-500">
+              {steps.map((s, i) => (
+                <span
+                  key={s}
+                  className={i <= safeIndex ? "text-neutral-200" : ""}
+                >
+                  {PROGRESS_LABELS[s]}
+                </span>
+              ))}
+            </div>
+
+            {/* Progress line */}
+            <div className="relative h-2 rounded-full bg-neutral-700">
+              <div
+                className="absolute left-0 top-0 h-2 rounded-full transition-all duration-300"
+                style={{
+                  width: `${percent}%`,
+                  background:
+                    percent === 100
+                      ? "#22c55e"
+                      : "linear-gradient(90deg,#22c55e,#f59e0b)",
+                }}
+              />
+
+              {/* Active dot */}
+              <div
+                className="absolute -top-1 w-4 h-4 rounded-full border-2 border-black"
+                style={{
+                  left: `calc(${percent}% - 8px)`,
+                  backgroundColor:
+                    percent === 100 ? "#22c55e" : "#f59e0b",
+                }}
+              />
+            </div>
+
+            <p className="text-sm text-neutral-400">
+              Current Stage:{" "}
+              <span className="text-amber-400 font-medium">
+                {PROGRESS_LABELS[order.progress]}
+              </span>
+            </p>
+          </div>
+        );
+      })()} 
+    </td>
+  </tr>
+)}
+
                   </React.Fragment>
                 ))}
               </tbody>
             </table>
+
+            {/* PAGINATION */}
+            <div className="flex justify-end items-center gap-3 p-4">
+              <button
+                disabled={currentPage === 1}
+                onClick={() => setCurrentPage((p) => p - 1)}
+                className="px-3 py-1 bg-neutral-700 rounded disabled:opacity-50"
+              >
+                Prev
+              </button>
+
+              <span className="text-sm">
+                Page {currentPage} of {totalPages}
+              </span>
+
+              <button
+                disabled={currentPage === totalPages}
+                onClick={() => setCurrentPage((p) => p + 1)}
+                className="px-3 py-1 bg-neutral-700 rounded disabled:opacity-50"
+              >
+                Next
+              </button>
+            </div>
           </div>
 
-          {/* ADD NEW USER */}
+          {/* ADD NEW USER (UNCHANGED) */}
           <div className="mt-8 bg-neutral-800 border border-neutral-700 rounded-lg">
             <div className="p-5 border-b border-neutral-700 flex items-center gap-2">
               <Users className="w-5 h-5 text-amber-400" />
               <h2 className="text-lg font-semibold">Add New User</h2>
             </div>
 
-            <form onSubmit={handleAddUser} className="p-6 grid grid-cols-1 md:grid-cols-3 gap-4">
+            <form
+              onSubmit={handleAddUser}
+              className="p-6 grid grid-cols-1 md:grid-cols-3 gap-4"
+            >
               <select
                 name="role"
                 value={newUser.role}
