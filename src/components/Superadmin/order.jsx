@@ -2,46 +2,34 @@
 import React, { useEffect, useMemo, useState } from "react";
 import {
   Search,
-  PackageCheck,
+  Package,
+  Clock,
   CheckCircle,
-  Truck,
+  Pencil,
+  Trash2,
 } from "lucide-react";
 import axios from "axios";
 import Sidebar from "./sidebar";
-
 
 export default function SalesOrders() {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
-  const [processingId, setProcessingId] = useState(null);
+  const [expandedOrderId, setExpandedOrderId] = useState(null);
 
   /* ================= API ================= */
   const API = process.env.NEXT_PUBLIC_API_URL;
   const token =
     typeof window !== "undefined" ? localStorage.getItem("token") : null;
-
   const headers = token ? { Authorization: `Bearer ${token}` } : {};
 
   /* ================= FETCH ================= */
   const fetchOrders = async () => {
     try {
       const res = await axios.get(`${API}/orders`, { headers });
-
-      // 🔥 Warehouse handles both incoming & dispatch
-      const warehouseOrders = (res.data.orders || res.data).filter((o) =>
-        [
-          "ORDER_PLACED",
-          "WAREHOUSE_COLLECTED",
-          "FITTING_COMPLETED",
-          "READY_FOR_DISPATCH",
-          "COMPLETED",
-        ].includes(o.progress)
-      );
-
-      setOrders(warehouseOrders);
+      setOrders(res.data.orders || res.data);
     } catch (err) {
-      console.error("Fetch failed", err);
+      console.error(err);
     } finally {
       setLoading(false);
     }
@@ -51,95 +39,62 @@ export default function SalesOrders() {
     fetchOrders();
   }, []);
 
-  /* ================= COLLECT PARTS ================= */
-  const handleCollectParts = async (id) => {
-    if (!window.confirm("Confirm all parts collected from inventory?")) return;
-
-    try {
-      setProcessingId(id);
-
-      await axios.patch(
-        `${API}/orders/${id}/progress`,
-        { progress: "WAREHOUSE_COLLECTED" },
-        { headers }
-      );
-
-      fetchOrders();
-    } catch (err) {
-      alert(err?.response?.data?.message || "Failed to collect parts");
-    } finally {
-      setProcessingId(null);
-    }
-  };
-
-  /* ================= MARK READY ================= */
-  const handleMarkReady = async (id) => {
-    try {
-      setProcessingId(id);
-
-      await axios.patch(
-        `${API}/orders/${id}/progress`,
-        { progress: "READY_FOR_DISPATCH" },
-        { headers }
-      );
-
-      fetchOrders();
-    } catch (err) {
-      alert("Failed to mark ready");
-    } finally {
-      setProcessingId(null);
-    }
-  };
-
-  /* ================= DISPATCH ================= */
-  const handleDispatch = async (id) => {
-    if (!window.confirm("Confirm dispatch of this order?")) return;
-
-    try {
-      setProcessingId(id);
-
-      await axios.patch(
-        `${API}/orders/${id}/progress`,
-        { progress: "DISPATCHED" },
-        { headers }
-      );
-
-      fetchOrders();
-    } catch (err) {
-      alert("Failed to dispatch order");
-    } finally {
-      setProcessingId(null);
-    }
-  };
-
   /* ================= FILTER ================= */
   const filteredOrders = useMemo(() => {
-    return orders.filter((o) => {
-      const q = search.toLowerCase();
-      return (
+    const q = search.toLowerCase();
+    return orders.filter(
+      (o) =>
         o.orderId?.toLowerCase().includes(q) ||
         o.dispatchedTo?.toLowerCase().includes(q) ||
         o.chairModel?.toLowerCase().includes(q)
-      );
-    });
+    );
   }, [orders, search]);
 
-  /* ================= STATUS LABEL ================= */
-  const getStatusLabel = (progress) => {
-    switch (progress) {
-      case "ORDER_PLACED":
-        return <span className="text-amber-400">Pending Collection</span>;
-      case "WAREHOUSE_COLLECTED":
-        return <span className="text-blue-400">Sent to Fitting</span>;
-      case "FITTING_COMPLETED":
-        return <span className="text-emerald-400">Returned from Fitting</span>;
-      case "READY_FOR_DISPATCH":
-        return <span className="text-emerald-500">Ready for Dispatch</span>;
-        case "COMPLETED":
-        return <span className="text-emerald-500">Completed</span>;
-      default:
-        return <span className="text-neutral-400">Processing</span>;
-    }
+  /* ================= COUNTS ================= */
+  const totalOrders = orders.length;
+  const completed = orders.filter((o) => o.progress === "DISPATCHED").length;
+  const inProgress = totalOrders - completed;
+
+  /* ================= ORDER STEPS ================= */
+  const ORDER_STEPS = [
+    { key: "ORDER_PLACED", label: "Order Placed" },
+    { key: "WAREHOUSE_COLLECTED", label: "Warehouse Collected" },
+    { key: "FITTING_IN_PROGRESS", label: "Fitting In Progress" },
+    { key: "FITTING_COMPLETED", label: "Fitting Completed" },
+    { key: "READY_FOR_DISPATCH", label: "Ready For Dispatch" },
+    { key: "DISPATCHED", label: "Dispatched" },
+    // { key: "COMPLETED", label: "Completed" },
+  ];
+
+  /* ================= MINI DOT TRACKER ================= */
+  const ProgressTracker = ({ progress, orderId }) => {
+    const currentIndex = ORDER_STEPS.findIndex((s) => s.key === progress);
+
+    return (
+      <div
+        onClick={() =>
+          setExpandedOrderId(expandedOrderId === orderId ? null : orderId)
+        }
+        className="flex items-center gap-2 cursor-pointer"
+      >
+        {ORDER_STEPS.map((_, i) => (
+          <div key={i} className="flex items-center gap-1">
+            <div
+              className={`w-3 h-3 rounded-full ${
+                i <= currentIndex
+                  ? progress === "COMPLETED"
+                    ? "bg-green-500"
+                    : "bg-amber-500"
+                  : "bg-neutral-600"
+              }`}
+            />
+            {i !== ORDER_STEPS.length - 1 && (
+              <div className="w-4 h-[2px] bg-neutral-700" />
+            )}
+          </div>
+        ))}
+      </div>
+    );
   };
 
   /* ================= UI ================= */
@@ -147,65 +102,176 @@ export default function SalesOrders() {
     <div className="flex h-screen bg-neutral-900 text-neutral-100">
       <Sidebar />
 
-      <div className="flex-1 overflow-auto">
+      <div className="flex-1 overflow-auto p-6 space-y-6">
         {/* HEADER */}
-        <div className="bg-neutral-800 border-b border-neutral-700 p-4 flex justify-between">
+        <div className="flex justify-between items-center">
           <div>
-            <h1 className="text-2xl font-bold">Warehouse Orders</h1>
+            <h1 className="text-2xl font-bold">Orders Management</h1>
             <p className="text-sm text-neutral-400">
-              Incoming sales & returned fitting orders
+              Create, track and manage all orders
             </p>
           </div>
+        </div>
 
+        {/* STATS */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <StatCard
+            title="Total Orders"
+            value={totalOrders}
+            icon={<Package />}
+          />
+          <StatCard
+            title="In Progress"
+            value={inProgress}
+            icon={<Clock />}
+            highlight
+          />
+          <StatCard
+            title="Completed"
+            value={completed}
+            icon={<CheckCircle />}
+          />
+        </div>
+
+        {/* SEARCH */}
+        <div className="relative">
+          <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-neutral-400 w-4 h-4" />
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search orders..."
-            className="bg-neutral-900 border border-neutral-700 px-4 py-2 rounded-lg"
+            className="w-full bg-neutral-800 border border-neutral-700 rounded-lg pl-10 pr-4 py-2 text-sm"
           />
         </div>
 
         {/* TABLE */}
-        {loading ? (
-          <p className="p-6">Loading...</p>
-        ) : filteredOrders.length === 0 ? (
-          <div className="text-center text-neutral-400 py-10">
-            No warehouse orders available
-          </div>
-        ) : (
-          <table className="w-full border border-neutral-700">
-            <thead>
-              <tr className="bg-neutral-800">
-                <th className="p-3 text-left">Order ID</th>
-                <th className="p-3 text-left">Dispatched To</th>
-                <th className="p-3 text-left">Chair</th>
-                <th className="p-3 text-left">Order Date</th>
-                <th className="p-3 text-left">Qty</th>
-                <th className="p-3 text-left">Status</th>
-              </tr>
-            </thead>
-
-            <tbody>
-              {filteredOrders.map((o) => (
-                <tr
-                  key={o._id}
-                  className="border-t border-neutral-700 hover:bg-neutral-800/40"
-                >
-                  <td className="p-3">{o.orderId}</td>
-                  <td className="p-3">{o.dispatchedTo}</td>
-                  <td className="p-3">{o.chairModel}</td>
-                  <td className="p-3">
-                    {new Date(o.orderDate).toLocaleDateString()}
-                  </td>
-                  <td className="p-3">{o.quantity}</td>
-                  <td className="p-3">{getStatusLabel(o.progress)}</td>
-                 
+        <div className="bg-neutral-800 border border-neutral-700 rounded-xl overflow-hidden">
+          {loading ? (
+            <p className="p-6">Loading...</p>
+          ) : (
+            <table className="w-full text-center">
+              <thead className="bg-neutral-900 text-neutral-400 text-sm text-center">
+                <tr>
+                  <th className="p-4 text-left text-center">ORDER ID</th>
+                  <th className="p-4 text-left">DISPATCHED TO</th>
+                  <th className="p-4 text-left">CHAIR</th>
+                  <th className="p-4 text-left">DATE</th>
+                  <th className="p-4 text-left">QTY</th>
+                  <th className="p-4 text-left">PROGRESS</th>
+                  {/* <th className="p-4 text-right">ACTIONS</th> */}
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
+              </thead>
+
+              <tbody>
+                {filteredOrders.map((o) => {
+                  const currentIndex = ORDER_STEPS.findIndex(
+                    (s) => s.key === o.progress
+                  );
+                  const safeIndex =
+                    currentIndex === -1 ? ORDER_STEPS.length - 1 : currentIndex;
+                  const percent = (safeIndex / (ORDER_STEPS.length - 1)) * 100;
+
+                  return (
+                    <React.Fragment key={o._id}>
+                      {/* MAIN ROW */}
+                      <tr className="border-t border-neutral-700 hover:bg-neutral-700/30">
+                        <td className="p-4">{o.orderId}</td>
+                        <td className="p-4">{o.dispatchedTo}</td>
+                        <td className="p-4">{o.chairModel}</td>
+                        <td className="p-4">
+                          {new Date(o.orderDate).toLocaleDateString()}
+                        </td>
+                        <td className="p-4">{o.quantity}</td>
+                        <td className="p-4">
+                          <ProgressTracker
+                            progress={o.progress}
+                            orderId={o._id}
+                          />
+                        </td>
+                      </tr>
+
+                      {/* EXPANDED ROW */}
+                      {expandedOrderId === o._id && (
+                        <tr className="bg-neutral-850">
+                          <td colSpan={7} className="p-6 space-y-6">
+                            <div className="flex justify-between text-xs text-neutral-400">
+                              {ORDER_STEPS.map((step, i) => (
+                                <span
+                                  key={step.key}
+                                  className={
+                                    i <= safeIndex
+                                      ? "text-neutral-200 font-medium"
+                                      : ""
+                                  }
+                                >
+                                  {step.label}
+                                </span>
+                              ))}
+                            </div>
+
+                            <div className="relative w-full h-10 flex items-center">
+                              <div className="absolute left-0 right-0 h-[4px] bg-neutral-600 rounded-full" />
+                              <div
+                                className="absolute left-0 h-[4px] rounded-full transition-all duration-500"
+                                style={{
+                                  width: `${percent}%`,
+                                  background:
+                                    percent === 100
+                                      ? "#22c55e"
+                                      : "linear-gradient(90deg,#22c55e,#f59e0b)",
+                                }}
+                              />
+                              <div
+                                className="absolute w-4 h-4 rounded-full border-2 border-black"
+                                style={{
+                                  left: `calc(${percent}% - 8px)`,
+                                  backgroundColor:
+                                    percent === 100 ? "#22c55e" : "#f59e0b",
+                                }}
+                              />
+                            </div>
+
+                            <p className="text-sm">
+                              <span className="text-neutral-400">
+                                Current Stage:
+                              </span>{" "}
+                              <span className="text-amber-400 font-medium">
+                                {
+                                  ORDER_STEPS.find((s) => s.key === o.progress)
+                                    ?.label
+                                }
+                              </span>
+                            </p>
+                          </td>
+                        </tr>
+                      )}
+                    </React.Fragment>
+                  );
+                })}
+              </tbody>
+            </table>
+          )}
+        </div>
       </div>
+    </div>
+  );
+}
+
+/* ================= STAT CARD ================= */
+function StatCard({ title, value, icon, highlight }) {
+  return (
+    <div
+      className={`rounded-xl p-5 border ${
+        highlight
+          ? "bg-gradient-to-r from-amber-900/60 to-black border-amber-700"
+          : "bg-neutral-800 border-neutral-700"
+      }`}
+    >
+      <div className="flex justify-between items-center text-neutral-400">
+        <span className="text-sm">{title}</span>
+        {icon}
+      </div>
+      <p className="text-2xl font-bold mt-2">{value}</p>
     </div>
   );
 }

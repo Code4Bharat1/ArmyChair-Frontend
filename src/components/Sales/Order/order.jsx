@@ -20,11 +20,21 @@ export default function Orders() {
   const [editingOrderId, setEditingOrderId] = useState(null);
 
   const initialFormData = {
-    dispatchedTo: "",
-    chairModel: "",
-    orderDate: "",
-    quantity: "",
-  };
+  dispatchedTo: "",
+  chairModel: "",
+  orderDate: "",
+  quantity: "",
+  orderType: "", // 👈 NEW
+};
+
+const CHAIR_MODELS = [
+  "Army Chair - Basic",
+  "Army Chair - Premium",
+  "Office Chair",
+  "Folding Chair",
+  "Plastic Chair",
+  "Metal Chair",
+];
 
   const [formData, setFormData] = useState(initialFormData);
 
@@ -148,31 +158,20 @@ export default function Orders() {
   };
 
   /* ================= PROGRESS ================= */
-  const ProgressTracker = ({ progress, orderId }) => {
-    const currentIndex = ORDER_STEPS.findIndex((s) => s.key === progress);
+  const ProgressTracker = ({ progress }) => {
+  const currentIndex = ORDER_STEPS.findIndex((s) => s.key === progress);
+  const safeIndex = currentIndex === -1 ? ORDER_STEPS.length - 1 : currentIndex;
 
-    return (
-      <div
-        onClick={() =>
-          setExpandedOrderId(expandedOrderId === orderId ? null : orderId)
-        }
-        className="flex items-center gap-2 cursor-pointer"
-      >
-        {ORDER_STEPS.map((_, i) => (
-          <div key={i} className="flex items-center gap-1">
-            <div
-              className={`w-3 h-3 rounded-full ${
-                i <= currentIndex ? "bg-amber-500" : "bg-neutral-700"
-              }`}
-            />
-            {i !== ORDER_STEPS.length - 1 && (
-              <div className="w-4 h-[2px] bg-neutral-700" />
-            )}
-          </div>
-        ))}
-      </div>
-    );
-  };
+  return (
+    <span className="text-sm font-medium text-amber-400">
+      {ORDER_STEPS[safeIndex]?.label}
+    </span>
+  );
+};
+
+const handleRowClick = (orderId) => {
+  setExpandedOrderId((prev) => (prev === orderId ? null : orderId));
+};
 
   return (
     <div className="flex h-screen bg-gradient-to-b from-amber-900 via-black to-neutral-900 text-neutral-100">
@@ -262,7 +261,11 @@ export default function Orders() {
                   {filteredOrders.map((o) => (
                     <React.Fragment key={o._id}>
                       {/* MAIN ROW */}
-                      <tr className="border-b border-neutral-700 hover:bg-neutral-850 transition">
+                      <tr
+  onClick={() => handleRowClick(o._id)}
+  className="border-b border-neutral-700 hover:bg-neutral-850 transition cursor-pointer"
+>
+
                         <td className="p-4 font-medium">{o.orderId}</td>
                         <td className="p-4">{o.dispatchedTo}</td>
                         <td className="p-4">{o.chairModel}</td>
@@ -278,26 +281,35 @@ export default function Orders() {
                         </td>
                         <td className="p-4 flex gap-3">
                           <button
-                            onClick={() => handleEditOrder(o)}
-                            disabled={isOrderLocked(o.progress)}
-                            className={`text-amber-400 hover:text-amber-300 ${
-                              isOrderLocked(o.progress)
-                                ? "opacity-40 cursor-not-allowed"
-                                : ""
-                            }`}
-                          >
+  onClick={(e) => {
+    e.stopPropagation(); // ⛔ prevent row click
+    handleEditOrder(o);
+  }}
+  disabled={isOrderLocked(o.progress)}
+  className={`text-amber-400 hover:text-amber-300 ${
+    isOrderLocked(o.progress)
+      ? "opacity-40 cursor-not-allowed"
+      : ""
+  }`}
+>
+
+                          
                             <Pencil size={16} />
                           </button>
 
                           <button
-                            onClick={() => handleDeleteOrder(o._id)}
-                            disabled={isOrderLocked(o.progress)}
-                            className={`text-red-400 hover:text-red-300 ${
-                              isOrderLocked(o.progress)
-                                ? "opacity-40 cursor-not-allowed"
-                                : ""
-                            }`}
-                          >
+  onClick={(e) => {
+    e.stopPropagation();
+    handleDeleteOrder(o._id);
+  }}
+  disabled={isOrderLocked(o.progress)}
+  className={`text-red-400 hover:text-red-300 ${
+    isOrderLocked(o.progress)
+      ? "opacity-40 cursor-not-allowed"
+      : ""
+  }`}
+>
+
                             <Trash2 size={16} />
                           </button>
                         </td>
@@ -401,66 +413,104 @@ export default function Orders() {
         </div>
       </div>
 
+      
       {/* MODAL */}
-      {showForm && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
-          <form
-            onSubmit={handleCreateOrder}
-            className="bg-neutral-900 p-6 rounded-xl w-[380px] border border-neutral-700"
-          >
-            <h2 className="text-lg font-semibold mb-4">
-              {editingOrderId ? "Update Order" : "Create Order"}
-            </h2>
+{showForm && (
+  <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
+    <form
+      onSubmit={handleCreateOrder}
+      className="bg-neutral-900 p-6 rounded-xl w-[380px] border border-neutral-700"
+    >
+      <h2 className="text-lg font-semibold mb-4">
+        {editingOrderId ? "Update Order" : "Create Order"}
+      </h2>
 
-            <Input
-              label="Dispatched To"
-              name="dispatchedTo"
-              value={formData.dispatchedTo}
-              onChange={handleFormChange}
-            />
-            <Input
-              label="Chair Model"
-              name="chairModel"
-              value={formData.chairModel}
-              onChange={handleFormChange}
-            />
-            <Input
-              label="Order Date"
-              name="orderDate"
-              type="date"
-              value={formData.orderDate}
-              onChange={handleFormChange}
-            />
-            <Input
-              label="Quantity"
-              name="quantity"
-              type="number"
-              value={formData.quantity}
-              onChange={handleFormChange}
-            />
+      <Input
+        label="Dispatched To"
+        name="dispatchedTo"
+        value={formData.dispatchedTo}
+        onChange={handleFormChange}
+      />
 
-            <div className="flex justify-end gap-2 mt-4">
-              <button
-                type="button"
-                onClick={() => {
-                  setShowForm(false);
-                  setEditingOrderId(null);
-                  setFormData(initialFormData);
-                }}
-                className="px-4 py-2 text-neutral-300"
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                className="bg-amber-600 hover:bg-amber-700 px-4 py-2 rounded"
-              >
-                {editingOrderId ? "Update" : "Create"}
-              </button>
-            </div>
-          </form>
-        </div>
-      )}
+      {/* CHAIR MODEL DROPDOWN */}
+      <div className="mb-3">
+        <label className="block text-sm text-neutral-400 mb-1">
+          Chair Model
+        </label>
+        <select
+          name="chairModel"
+          value={formData.chairModel}
+          onChange={handleFormChange}
+          className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded"
+          required
+        >
+          <option value="">Select Chair Model</option>
+          {CHAIR_MODELS.map((model) => (
+            <option key={model} value={model}>
+              {model}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      <Input
+        label="Order Date"
+        name="orderDate"
+        type="date"
+        value={formData.orderDate}
+        onChange={handleFormChange}
+      />
+
+      <Input
+        label="Quantity"
+        name="quantity"
+        type="number"
+        value={formData.quantity}
+        onChange={handleFormChange}
+      />
+
+      {/* ORDER TYPE */}
+      <div className="mb-3">
+        <label className="block text-sm text-neutral-400 mb-1">
+          Order Type
+        </label>
+        <select
+          name="orderType"
+          value={formData.orderType}
+          onChange={handleFormChange}
+          className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded"
+          required
+        >
+          <option value="">Select Order Type</option>
+          <option value="partial">Partial</option>
+          <option value="completed">Completed</option>
+        </select>
+      </div>
+
+      <div className="flex justify-end gap-2 mt-4">
+        <button
+          type="button"
+          onClick={() => {
+            setShowForm(false);
+            setEditingOrderId(null);
+            setFormData(initialFormData);
+          }}
+          className="px-4 py-2 text-neutral-300"
+        >
+          Cancel
+        </button>
+
+        <button
+          type="submit"
+          className="bg-amber-600 hover:bg-amber-700 px-4 py-2 rounded"
+        >
+          {editingOrderId ? "Update" : "Create"}
+        </button>
+      </div>
+    </form>
+  </div>
+)}
+
     </div>
   );
 }
