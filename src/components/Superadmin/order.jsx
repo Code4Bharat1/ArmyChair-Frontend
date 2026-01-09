@@ -65,35 +65,16 @@ export default function SalesOrders() {
     { key: "DISPATCHED", label: "Dispatched" },
     // { key: "COMPLETED", label: "Completed" },
   ];
-
-  /* ================= MINI DOT TRACKER ================= */
-  const ProgressTracker = ({ progress, orderId }) => {
+  /* ================= PROGRESS TEXT ================= */
+  const ProgressTracker = ({ progress }) => {
     const currentIndex = ORDER_STEPS.findIndex((s) => s.key === progress);
+    const safeIndex =
+      currentIndex === -1 ? ORDER_STEPS.length - 1 : currentIndex;
 
     return (
-      <div
-        onClick={() =>
-          setExpandedOrderId(expandedOrderId === orderId ? null : orderId)
-        }
-        className="flex items-center gap-2 cursor-pointer"
-      >
-        {ORDER_STEPS.map((_, i) => (
-          <div key={i} className="flex items-center gap-1">
-            <div
-              className={`w-3 h-3 rounded-full ${
-                i <= currentIndex
-                  ? progress === "COMPLETED"
-                    ? "bg-green-500"
-                    : "bg-amber-500"
-                  : "bg-neutral-600"
-              }`}
-            />
-            {i !== ORDER_STEPS.length - 1 && (
-              <div className="w-4 h-[2px] bg-neutral-700" />
-            )}
-          </div>
-        ))}
-      </div>
+      <span className="text-sm font-medium text-amber-400">
+        {ORDER_STEPS[safeIndex]?.label}
+      </span>
     );
   };
 
@@ -155,7 +136,8 @@ export default function SalesOrders() {
                   <th className="p-4 text-left text-center">ORDER ID</th>
                   <th className="p-4 text-left">DISPATCHED TO</th>
                   <th className="p-4 text-left">CHAIR</th>
-                  <th className="p-4 text-left">DATE</th>
+                  <th className="p-4 text-left">ORDER DATE</th>
+                  <th className="p-4 text-left">DELIVERY DATE</th>
                   <th className="p-4 text-left">QTY</th>
                   <th className="p-4 text-left">PROGRESS</th>
                   {/* <th className="p-4 text-right">ACTIONS</th> */}
@@ -174,14 +156,29 @@ export default function SalesOrders() {
                   return (
                     <React.Fragment key={o._id}>
                       {/* MAIN ROW */}
-                      <tr className="border-t border-neutral-700 hover:bg-neutral-700/30">
+                      <tr
+                        onClick={() =>
+                          setExpandedOrderId(
+                            expandedOrderId === o._id ? null : o._id
+                          )
+                        }
+                        className="border-t border-neutral-700 hover:bg-neutral-700/30 cursor-pointer"
+                      >
                         <td className="p-4">{o.orderId}</td>
                         <td className="p-4">{o.dispatchedTo}</td>
                         <td className="p-4">{o.chairModel}</td>
                         <td className="p-4">
                           {new Date(o.orderDate).toLocaleDateString()}
                         </td>
+
+                        <td className="p-4">
+                          {o.deliveryDate
+                            ? new Date(o.deliveryDate).toLocaleDateString()
+                            : "-"}
+                        </td>
+
                         <td className="p-4">{o.quantity}</td>
+
                         <td className="p-4">
                           <ProgressTracker
                             progress={o.progress}

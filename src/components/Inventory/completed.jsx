@@ -51,8 +51,11 @@ export default function CompletedOrders() {
 
   /* ================= STATS ================= */
   const totalOrders = filteredOrders.length;
-  const totalQuantity = filteredOrders.reduce((sum, o) => sum + (o.quantity || 0), 0);
-  const uniqueModels = new Set(filteredOrders.map(o => o.chairModel)).size;
+  const totalQuantity = filteredOrders.reduce(
+    (sum, o) => sum + (o.quantity || 0),
+    0
+  );
+  const uniqueModels = new Set(filteredOrders.map((o) => o.chairModel)).size;
 
   /* ================= CSV EXPORT ================= */
   const exportCSV = () => {
@@ -116,10 +119,10 @@ export default function CompletedOrders() {
         {/* STATS */}
         <div className="p-6">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-            <StatCard 
-              title="Total Orders" 
-              value={totalOrders} 
-              icon={<Package />} 
+            <StatCard
+              title="Total Orders"
+              value={totalOrders}
+              icon={<Package />}
             />
             <StatCard
               title="Total Quantity"
@@ -160,6 +163,7 @@ export default function CompletedOrders() {
                       "Dispatched To",
                       "Chair",
                       "Order Date",
+                      "Delivery Date",
                       "Qty",
                       "Completed On",
                     ].map((h) => (
@@ -185,10 +189,17 @@ export default function CompletedOrders() {
                       <td className="p-4">
                         {new Date(o.orderDate).toLocaleDateString()}
                       </td>
+                      <td className="p-4">
+                        {o.deliveryDate
+                          ? new Date(o.deliveryDate).toLocaleDateString()
+                          : "-"}
+                      </td>
                       <td className="p-4">{o.quantity}</td>
                       <td className="p-4">
                         <span className="px-3 py-1 rounded-full text-xs font-medium bg-green-900 text-green-300">
-                          {new Date(o.updatedAt || o.createdAt).toLocaleDateString()}
+                          {new Date(
+                            o.updatedAt || o.createdAt
+                          ).toLocaleDateString()}
                         </span>
                       </td>
                     </tr>

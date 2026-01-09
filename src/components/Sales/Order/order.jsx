@@ -465,116 +465,113 @@ export default function Orders() {
       </div>
 
       {/* MODAL */}
-      {showForm && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
-          <form
-            onSubmit={handleCreateOrder}
-            className="bg-neutral-900 p-6 rounded-xl w-[380px] border border-neutral-700"
+{showForm && (
+  <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+    <div className="bg-neutral-900 p-8 rounded-2xl w-full max-w-[520px] border-2 border-amber-600 shadow-2xl">
+      <h2 className="text-2xl font-bold mb-6 text-amber-400">
+        {editingOrderId ? "Update Order" : "Create Order"}
+      </h2>
+
+      <div className="space-y-4">
+        <Input
+          label="Dispatched To"
+          name="dispatchedTo"
+          value={formData.dispatchedTo}
+          onChange={handleFormChange}
+        />
+
+        {/* CHAIR MODEL DROPDOWN */}
+        <div>
+          <label className="block text-base text-neutral-300 mb-2 font-semibold">
+            Chair Model
+          </label>
+          <select
+            name="chairModel"
+            value={formData.chairModel}
+            onChange={handleFormChange}
+            className="w-full px-4 py-3 bg-neutral-800 border-2 border-neutral-600 rounded-lg text-base text-neutral-100 focus:border-amber-600 focus:ring-2 focus:ring-amber-600/50 outline-none"
+            required
           >
-            <h2 className="text-lg font-semibold mb-4">
-              {editingOrderId ? "Update Order" : "Create Order"}
-            </h2>
-
-            <Input
-              label="Dispatched To"
-              name="dispatchedTo"
-              value={formData.dispatchedTo}
-              onChange={handleFormChange}
-            />
-
-            {/* CHAIR MODEL DROPDOWN */}
-            <div className="mb-3">
-              <label className="block text-sm text-neutral-400 mb-1">
-                Chair Model
-              </label>
-              <select
-                name="chairModel"
-                value={formData.chairModel}
-                onChange={handleFormChange}
-                className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded"
-                required
-              >
-                <option value="">Select Chair Model</option>
-                {CHAIR_MODELS.map((model) => (
-                  <option key={model} value={model}>
-                    {model}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <Input
-              label="Order Date"
-              name="orderDate"
-              type="date"
-              value={formData.orderDate}
-              onChange={handleFormChange}
-            />
-
-            <Input
-              label="Quantity"
-              name="quantity"
-              type="number"
-              value={formData.quantity}
-              onChange={handleFormChange}
-            />
-
-            {/* ORDER TYPE */}
-            {/* DELIVERY DATE */}
-            <Input
-              label="Delivery Date"
-              name="deliveryDate"
-              type="date"
-              value={formData.deliveryDate}
-              onChange={handleFormChange}
-            />
-
-            {/* PARTIAL ORDER CHECKBOX */}
-            <div className="flex items-center gap-3 mt-2">
-              <input
-                type="checkbox"
-                id="isPartial"
-                checked={formData.isPartial}
-                onChange={(e) =>
-                  setFormData((prev) => ({
-                    ...prev,
-                    isPartial: e.target.checked,
-                  }))
-                }
-                className="w-4 h-4 accent-amber-600"
-              />
-
-              <label
-                htmlFor="isPartial"
-                className="text-sm text-neutral-300 cursor-pointer"
-              >
-                Is this a partial order?
-              </label>
-            </div>
-
-            <div className="flex justify-end gap-2 mt-4">
-              <button
-                type="button"
-                onClick={() => {
-                  setShowForm(false);
-                  setEditingOrderId(null);
-                  setFormData(initialFormData);
-                }}
-                className="px-4 py-2 text-neutral-300"
-              >
-                Cancel
-              </button>
-
-              <button
-                type="submit"
-                className="bg-amber-600 hover:bg-amber-700 px-4 py-2 rounded"
-              >
-                {editingOrderId ? "Update" : "Create"}
-              </button>
-            </div>
-          </form>
+            <option value="" className="bg-neutral-800">Select Chair Model</option>
+            {CHAIR_MODELS.map((model) => (
+              <option key={model} value={model} className="bg-neutral-800">
+                {model}
+              </option>
+            ))}
+          </select>
         </div>
-      )}
+
+        <Input
+          label="Order Date"
+          name="orderDate"
+          type="date"
+          value={formData.orderDate}
+          onChange={handleFormChange}
+        />
+
+        <Input
+          label="Quantity"
+          name="quantity"
+          type="number"
+          value={formData.quantity}
+          onChange={handleFormChange}
+        />
+
+        <Input
+          label="Delivery Date"
+          name="deliveryDate"
+          type="date"
+          value={formData.deliveryDate}
+          onChange={handleFormChange}
+        />
+
+        {/* PARTIAL ORDER CHECKBOX */}
+        <div className="flex items-center gap-3 mt-2 bg-neutral-800 p-4 rounded-lg border-2 border-neutral-700">
+          <input
+            type="checkbox"
+            id="isPartial"
+            checked={formData.isPartial}
+            onChange={(e) =>
+              setFormData((prev) => ({
+                ...prev,
+                isPartial: e.target.checked,
+              }))
+            }
+            className="w-5 h-5 accent-amber-600"
+          />
+
+          <label
+            htmlFor="isPartial"
+            className="text-base text-neutral-200 cursor-pointer font-semibold"
+          >
+            Is this a partial order?
+          </label>
+        </div>
+      </div>
+
+      <div className="flex justify-end gap-3 mt-8">
+        <button
+          type="button"
+          onClick={() => {
+            setShowForm(false);
+            setEditingOrderId(null);
+            setFormData(initialFormData);
+          }}
+          className="px-6 py-2.5 text-base text-neutral-300 hover:text-neutral-100 hover:bg-neutral-800 rounded-lg transition font-medium border-2 border-neutral-700"
+        >
+          Cancel
+        </button>
+
+        <button
+          onClick={handleCreateOrder}
+          className="bg-amber-600 hover:bg-amber-700 text-white px-6 py-2.5 rounded-lg transition font-semibold shadow-lg text-base border-2 border-amber-500"
+        >
+          {editingOrderId ? "Update" : "Create"}
+        </button>
+      </div>
+    </div>
+  </div>
+)}
     </div>
   );
 }
@@ -598,14 +595,14 @@ const StatCard = ({ title, value, icon, danger }) => (
 );
 
 const Input = ({ label, name, value, onChange, type = "text" }) => (
-  <div className="mb-3">
-    <label className="text-xs text-neutral-400">{label}</label>
+  <div>
+    <label className="text-base text-neutral-300 font-semibold block mb-2">{label}</label>
     <input
       type={type}
       name={name}
       value={value}
       onChange={onChange}
-      className="w-full mt-1 p-2 bg-neutral-800 rounded outline-none border border-neutral-700 focus:border-amber-600"
+      className="w-full px-4 py-3 bg-neutral-800 rounded-lg outline-none border-2 border-neutral-600 focus:border-amber-600 focus:ring-2 focus:ring-amber-600/50 text-base text-neutral-100"
     />
   </div>
 );
