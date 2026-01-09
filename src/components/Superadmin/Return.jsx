@@ -1,86 +1,113 @@
 "use client";
-import React, { useMemo, useState } from "react";
-import { Search, Download } from "lucide-react";
+import React, { useEffect, useMemo, useState } from "react";
+import { Search, Download, Plus, X } from "lucide-react";
 import Sidebar from "@/components/Superadmin/sidebar";
+import axios from "axios";
+
+const API = process.env.NEXT_PUBLIC_API_URL;
+const headers = { "Content-Type": "application/json" };
 
 const Return = () => {
   const [search, setSearch] = useState("");
   const [selectedType, setSelectedType] = useState("All");
-  const [selectedStatus, setSelectedStatus] = useState("All");
 
-  const returns = [
-    {
-      id: "RT-201",
-      product: "Ergonomic Office Chair",
-      subtext: "Mesh back, black",
-      date: "Sep 18, 2023",
-      type: "Functional",
-      status: "Approved",
-      action: "Add to Inventory",
-    },
-    {
-      id: "RT-202",
-      product: "Hydraulic Pump V2",
-      subtext: "Chair height mechanism",
-      date: "Sep 19, 2023",
-      type: "Non-Functional",
-      status: "Inspected",
-      action: "Move to Defects",
-    },
-    {
-      id: "RT-203",
-      product: "Leather Armrest",
-      subtext: "Right armrest",
-      date: "Sep 21, 2023",
-      type: "Functional",
-      status: "Pending",
-      action: "Await Inspection",
-    },
-    {
-      id: "RT-204",
-      product: "Conference Chair",
-      subtext: "Broken wheel",
-      date: "Sep 22, 2023",
-      type: "Non-Functional",
-      status: "Approved",
-      action: "Move to Defects",
-    },
-    {
-      id: "RT-205",
-      product: "Meeting Table - Oak",
-      subtext: "Minor surface scratch",
-      date: "Sep 24, 2023",
-      type: "Functional",
-      status: "Approved",
-      action: "Add to Inventory",
-    },
-  ];
+  // 🔥 RETURNS FROM API
+  const [returns, setReturns] = useState([]);
+  const [loading, setLoading] = useState(false);
+
+  // 🔥 MODAL STATE
+  const [openModal, setOpenModal] = useState(false);
+
+  // 🔥 FORM STATE (✅ FIXED)
+  const [form, setForm] = useState({
+    orderId: "",
+    chairType: "",
+    description: "",
+    quantity: 1,
+    returnDate: "",
+    category: "Functional",
+    vendor: "",
+    location: "",
+  });
+
+  /* ================= FETCH RETURNS ================= */
+  const fetchReturns = async () => {
+    try {
+      setLoading(true);
+      const res = await axios.get(`${API}/returns`, { headers });
+      setReturns(res.data.data);
+    } catch (error) {
+      console.error("Failed to fetch returns", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchReturns();
+  }, []);
 
   /* ================= FILTER LOGIC ================= */
   const filteredReturns = useMemo(() => {
     return returns.filter((r) => {
       const matchSearch =
-        r.id.toLowerCase().includes(search.toLowerCase()) ||
-        r.product.toLowerCase().includes(search.toLowerCase());
+        r.orderId?.toLowerCase().includes(search.toLowerCase()) ||
+        r.chairType?.toLowerCase().includes(search.toLowerCase());
 
       const matchType =
-        selectedType === "All" || r.type === selectedType;
+        selectedType === "All" || r.category === selectedType;
 
-      const matchStatus =
-        selectedStatus === "All" || r.status === selectedStatus;
-
-      return matchSearch && matchType && matchStatus;
+      return matchSearch && matchType && !r.movedToInventory;
     });
-  }, [search, selectedType, selectedStatus]);
+  }, [search, selectedType, returns]);
+
+  /* ================= MOVE TO INVENTORY ================= */
+  const moveToInventory = async (id) => {
+    try {
+      await axios.post(`${API}/returns/${id}/move-to-inventory`);
+      fetchReturns();
+    } catch (error) {
+      console.error("Failed to move to inventory", error);
+    }
+  };
+
+  /* ================= ADD RETURN ================= */
+  const submitReturn = async () => {
+    try {
+      await axios.post(`${API}/returns`, form, { headers });
+      setOpenModal(false);
+      setForm({
+        orderId: "",
+        chairType: "",
+        description: "",
+        quantity: 1,
+        returnDate: "",
+        category: "Functional",
+        vendor: "",
+        location: "",
+      });
+      fetchReturns();
+    } catch (error) {
+      console.error("Failed to add return", error);
+    }
+  };
 
   /* ================= EXPORT ================= */
   const exportCSV = () => {
-    const headers = Object.keys(returns[0]).join(",");
-    const rows = returns.map((r) => Object.values(r).join(",")).join("\n");
+    if (returns.length === 0) return;
 
-    const blob = new Blob([headers + "\n" + rows], {
-      type: "text/csv",
-    });
+    const headers = ["Order ID", "Product", "Return Date", "Category"].join(",");
+
+    const rows = filteredReturns
+      .map(
+        (r) =>
+          `${r.orderId},${r.chairType},${new Date(
+            r.returnDate
+          ).toLocaleDateString()},${r.category}`
+      )
+      .join("\n");
+
+    const blob = new Blob([headers + "\n" + rows], { type: "text/csv" });
 
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -93,7 +120,7 @@ const Return = () => {
     <div className="flex h-screen bg-gradient-to-b from-amber-900 via-black to-neutral-900 text-neutral-100">
       <Sidebar />
 
-      <div className="flex-1  overflow-auto">
+      <div className="flex-1 overflow-auto">
         {/* ================= HEADER ================= */}
         <div className="bg-neutral-800 border-b border-neutral-700 mb-8 p-4 flex items-center justify-between">
           <div className="flex-1">
@@ -106,13 +133,23 @@ const Return = () => {
             </p>
           </div>
 
-          <button
-            onClick={exportCSV}
-            className="flex items-center gap-2 bg-amber-600 hover:bg-amber-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors"
-          >
-            <Download size={16} />
-            Export Report
-          </button>
+          <div className="flex gap-3">
+            <button
+              onClick={() => setOpenModal(true)}
+              className="flex items-center gap-2 bg-neutral-700 hover:bg-neutral-600 px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+            >
+              <Plus size={16} />
+              Add Returns
+            </button>
+
+            <button
+              onClick={exportCSV}
+              className="flex items-center gap-2 bg-amber-600 hover:bg-amber-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+            >
+              <Download size={16} />
+              Export Report
+            </button>
+          </div>
         </div>
 
         {/* ================= FILTERS ================= */}
@@ -127,25 +164,20 @@ const Return = () => {
             />
           </div>
 
-          {[
-            ["Type", selectedType, setSelectedType, ["All", "Functional", "Non-Functional"]],
-            ["Status", selectedStatus, setSelectedStatus, ["All", "Pending", "Inspected", "Approved"]],
-          ].map(([label, value, setter, options]) => (
-            <div key={label}>
-              <label className="block text-xs text-neutral-400 mb-1">
-                {label}
-              </label>
-              <select
-                value={value}
-                onChange={(e) => setter(e.target.value)}
-                className="px-4 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-sm text-neutral-200 focus:outline-none focus:border-amber-600"
-              >
-                {options.map((o) => (
-                  <option key={o}>{o}</option>
-                ))}
-              </select>
-            </div>
-          ))}
+          <div>
+            <label className="block text-xs text-neutral-400 mb-1">
+              Type
+            </label>
+            <select
+              value={selectedType}
+              onChange={(e) => setSelectedType(e.target.value)}
+              className="px-4 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-sm text-neutral-200 focus:outline-none focus:border-amber-600"
+            >
+              {["All", "Functional", "Non-Functional"].map((o) => (
+                <option key={o}>{o}</option>
+              ))}
+            </select>
+          </div>
         </div>
 
         {/* ================= TABLE ================= */}
@@ -153,53 +185,47 @@ const Return = () => {
           <table className="w-full">
             <thead className="border-b border-neutral-700">
               <tr>
-                {[
-                  "Return ID",
-                  "Product",
-                  "Return Date",
-                  "Category",
-                  "Status",
-                  "Action",
-                ].map((h) => (
-                  <th
-                    key={h}
-                    className="text-left p-4 text-xs font-medium text-neutral-400 uppercase"
-                  >
-                    {h}
-                  </th>
-                ))}
+                {["Order ID", "Product", "Return Date", "Category", "Action"].map(
+                  (h) => (
+                    <th
+                      key={h}
+                      className="text-left p-4 text-xs font-medium text-neutral-400 uppercase"
+                    >
+                      {h}
+                    </th>
+                  )
+                )}
               </tr>
             </thead>
 
             <tbody>
-              {filteredReturns.length === 0 && (
-                <tr>
-                  <td
-                    colSpan={6}
-                    className="text-center py-10 text-neutral-400"
-                  >
-                    No return orders found
-                  </td>
-                </tr>
-              )}
-
               {filteredReturns.map((r) => (
                 <tr
-                  key={r.id}
+                  key={r._id}
                   className="border-b border-neutral-700 hover:bg-neutral-750"
                 >
-                  <td className="px-6 py-4 text-white">{r.id}</td>
+                  <td className="px-6 py-4 text-white">{r.orderId}</td>
+
                   <td className="px-6 py-4">
-                    <div className="text-white">{r.product}</div>
+                    <div className="text-white">{r.chairType}</div>
                     <div className="text-xs text-neutral-500">
-                      {r.subtext}
+                      {r.description}
                     </div>
                   </td>
-                  <td className="px-6 py-4 text-neutral-300">{r.date}</td>
-                  <td className="px-6 py-4 text-neutral-300">{r.type}</td>
-                  <td className="px-6 py-4 text-neutral-300">{r.status}</td>
-                  <td className="px-6 py-4 font-medium text-amber-500">
-                    {r.action}
+
+                  <td className="px-6 py-4 text-neutral-300">
+                    {new Date(r.returnDate).toLocaleDateString()}
+                  </td>
+
+                  <td className="px-6 py-4 text-neutral-300">
+                    {r.category}
+                  </td>
+
+                  <td
+                    onClick={() => moveToInventory(r._id)}
+                    className="px-6 py-4 font-medium text-amber-500 cursor-pointer hover:underline"
+                  >
+                    Move to Inventory
                   </td>
                 </tr>
               ))}
@@ -207,6 +233,88 @@ const Return = () => {
           </table>
         </div>
       </div>
+
+      {/* ================= MODAL ================= */}
+      {openModal && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50">
+          <div className="bg-neutral-900 w-full max-w-lg rounded-lg p-6 border border-neutral-700">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-lg font-semibold text-white">
+                Add Return Order
+              </h2>
+              <X
+                className="cursor-pointer text-neutral-400"
+                onClick={() => setOpenModal(false)}
+              />
+            </div>
+
+            <div className="space-y-4">
+              <input
+                placeholder="Order ID"
+                value={form.orderId}
+                onChange={(e) =>
+                  setForm({ ...form, orderId: e.target.value })
+                }
+                className="w-full px-4 py-2 bg-neutral-800 border border-neutral-700 rounded"
+              />
+
+              <input
+                placeholder="Product"
+                value={form.chairType}
+                onChange={(e) =>
+                  setForm({ ...form, chairType: e.target.value })
+                }
+                className="w-full px-4 py-2 bg-neutral-800 border border-neutral-700 rounded"
+              />
+
+              <input
+                placeholder="Vendor"
+                value={form.vendor}
+                onChange={(e) =>
+                  setForm({ ...form, vendor: e.target.value })
+                }
+                className="w-full px-4 py-2 bg-neutral-800 border border-neutral-700 rounded"
+              />
+
+              <input
+                placeholder="Location"
+                value={form.location}
+                onChange={(e) =>
+                  setForm({ ...form, location: e.target.value })
+                }
+                className="w-full px-4 py-2 bg-neutral-800 border border-neutral-700 rounded"
+              />
+
+              <input
+                type="date"
+                value={form.returnDate}
+                onChange={(e) =>
+                  setForm({ ...form, returnDate: e.target.value })
+                }
+                className="w-full px-4 py-2 bg-neutral-800 border border-neutral-700 rounded"
+              />
+
+              <select
+                value={form.category}
+                onChange={(e) =>
+                  setForm({ ...form, category: e.target.value })
+                }
+                className="w-full px-4 py-2 bg-neutral-800 border border-neutral-700 rounded"
+              >
+                <option>Functional</option>
+                <option>Non-Functional</option>
+              </select>
+
+              <button
+                onClick={submitReturn}
+                className="w-full bg-amber-600 hover:bg-amber-700 py-2 rounded font-medium"
+              >
+                Add Return
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

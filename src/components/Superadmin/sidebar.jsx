@@ -52,6 +52,9 @@ export default function Sidebar() {
            <Link href="/superadmin/return" className={menuItem("/superadmin/return")}>
             Returns
           </Link>
+           <Link href="/superadmin/staff" className={menuItem("/superadmin/staff")}>
+            Staff
+          </Link>
 
         </div>
         </div>

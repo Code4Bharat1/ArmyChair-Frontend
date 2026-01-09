@@ -45,7 +45,7 @@ export default function Login() {
       setTimeout(() => {
         switch (user.role) {
           case "admin":
-            router.push("/supaeradmin/dashboard");
+            router.push("/superadmin/dashboard");
             break;
 
           case "fitting":
