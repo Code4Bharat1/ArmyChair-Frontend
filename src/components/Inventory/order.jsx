@@ -10,8 +10,11 @@ import {
 } from "lucide-react";
 import axios from "axios";
 import InventorySidebar from "./sidebar";
+import { useRouter } from "next/navigation";
 
 export default function WarehouseOrders() {
+  const router = useRouter();
+
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -36,6 +39,7 @@ export default function WarehouseOrders() {
           "FITTING_IN_PROGRESS",
           "FITTING_COMPLETED",
           "READY_FOR_DISPATCH",
+          "DISPATCHED",
           "COMPLETED",
         ].includes(o.progress)
       );
@@ -52,29 +56,9 @@ export default function WarehouseOrders() {
     fetchOrders();
   }, []);
 
-  /* ================= COLLECT PARTS ================= */
-  const handleCollectParts = async (id) => {
-    if (!window.confirm("Confirm all parts collected from inventory?")) return;
-
-    try {
-      setProcessingId(id);
-
-      await axios.patch(
-        `${API}/orders/${id}/progress`,
-        { progress: "WAREHOUSE_COLLECTED" },
-        { headers }
-      );
-
-      fetchOrders();
-    } catch (err) {
-      alert(err?.response?.data?.message || "Failed to collect parts");
-    } finally {
-      setProcessingId(null);
-    }
-  };
-  /* ================= COLLECT PARTS ================= */
+  /* ================= FITTING START ================= */
   const fittingStarted = async (id) => {
-    if (!window.confirm("Confirm all parts collected from inventory?")) return;
+    if (!window.confirm("Confirm fitting has started?")) return;
 
     try {
       setProcessingId(id);
@@ -87,7 +71,7 @@ export default function WarehouseOrders() {
 
       fetchOrders();
     } catch (err) {
-      alert(err?.response?.data?.message || "Failed to collect parts");
+      alert(err?.response?.data?.message || "Failed to update status");
     } finally {
       setProcessingId(null);
     }
@@ -135,8 +119,9 @@ export default function WarehouseOrders() {
 
   /* ================= FILTER ================= */
   const filteredOrders = useMemo(() => {
+    const q = (search || "").toLowerCase();
+
     return orders.filter((o) => {
-      const q = search.toLowerCase();
       return (
         o.orderId?.toLowerCase().includes(q) ||
         o.dispatchedTo?.toLowerCase().includes(q) ||
@@ -147,25 +132,56 @@ export default function WarehouseOrders() {
 
   /* ================= STATS ================= */
   const totalOrders = filteredOrders.length;
-  const pendingCollection = filteredOrders.filter(o => o.progress === "ORDER_PLACED").length;
-  const readyForDispatch = filteredOrders.filter(o => o.progress === "READY_FOR_DISPATCH").length;
+  const pendingPicking = filteredOrders.filter(
+    (o) => o.progress === "ORDER_PLACED"
+  ).length;
+  const readyForDispatch = filteredOrders.filter(
+    (o) => o.progress === "READY_FOR_DISPATCH"
+  ).length;
 
   /* ================= STATUS BADGE ================= */
   const getStatusBadge = (progress) => {
     const statusMap = {
-      ORDER_PLACED: { label: "Pending Collection", color: "bg-amber-900 text-amber-300" },
-      WAREHOUSE_COLLECTED: { label: "Sent to Fitting", color: "bg-blue-900 text-blue-300" },
-      FITTING_IN_PROGRESS: { label: "Fitting Started", color: "bg-blue-900 text-blue-300" },
-
-      FITTING_COMPLETED: { label: "Returned from Fitting", color: "bg-emerald-900 text-emerald-300" },
-      READY_FOR_DISPATCH: { label: "Ready for Dispatch", color: "bg-green-900 text-green-300" },
-      COMPLETED: { label: "Completed", color: "bg-green-900 text-green-300" },
+      ORDER_PLACED: {
+        label: "Pending Picking",
+        color: "bg-amber-900 text-amber-300",
+      },
+      WAREHOUSE_COLLECTED: {
+        label: "Sent to Fitting",
+        color: "bg-blue-900 text-blue-300",
+      },
+      FITTING_IN_PROGRESS: {
+        label: "Fitting In Progress",
+        color: "bg-blue-900 text-blue-300",
+      },
+      FITTING_COMPLETED: {
+        label: "Returned from Fitting",
+        color: "bg-emerald-900 text-emerald-300",
+      },
+      READY_FOR_DISPATCH: {
+        label: "Ready for Dispatch",
+        color: "bg-green-900 text-green-300",
+      },
+      DISPATCHED: {
+        label: "Dispatched",
+        color: "bg-green-900 text-green-300",
+      },
+      COMPLETED: {
+        label: "Completed",
+        color: "bg-green-900 text-green-300",
+      },
     };
 
-    const status = statusMap[progress] || { label: "Processing", color: "bg-neutral-700 text-neutral-300" };
+    const status =
+      statusMap[progress] || {
+        label: "Processing",
+        color: "bg-neutral-700 text-neutral-300",
+      };
 
     return (
-      <span className={`px-3 py-1 rounded-full text-xs font-medium ${status.color}`}>
+      <span
+        className={`px-3 py-1 rounded-full text-xs font-medium ${status.color}`}
+      >
         {status.label}
       </span>
     );
@@ -175,30 +191,31 @@ export default function WarehouseOrders() {
   const renderAction = (o) => {
     const isLoading = processingId === o._id;
 
+    // 🔥 MANUAL PICKING FLOW
     if (o.progress === "ORDER_PLACED") {
       return (
         <button
-          disabled={isLoading}
-          onClick={() => handleCollectParts(o._id)}
-          className="flex items-center gap-2 bg-amber-600 hover:bg-amber-700 px-4 py-2 rounded-lg text-black text-sm disabled:opacity-50"
+          onClick={() => router.push(`/inventory/order/${o._id}`)}
+          className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 px-4 py-2 rounded-lg text-white text-sm"
         >
           <PackageCheck size={16} />
-          {isLoading ? "Processing..." : "Collect Parts"}
+          Pick Parts
         </button>
       );
     }
 
-    if (o.progress === "FITTING_IN_PROGRESS") {
+    if (o.progress === "WAREHOUSE_COLLECTED") {
       return (
         <button
           disabled={isLoading}
-          onClick={() => handleMarkReady(o._id)}
+          onClick={() => fittingStarted(o._id)}
           className="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded-lg text-sm disabled:opacity-50"
         >
-          {isLoading ? "Processing..." : "Mark Ready"}
+          {isLoading ? "Processing..." : "Start Fitting"}
         </button>
       );
     }
+
     if (o.progress === "FITTING_COMPLETED") {
       return (
         <button
@@ -224,7 +241,7 @@ export default function WarehouseOrders() {
       );
     }
 
-    if (o.progress === "COMPLETED") {
+    if (o.progress === "DISPATCHED" || o.progress === "COMPLETED") {
       return (
         <span className="inline-flex items-center gap-1 text-green-400 text-sm">
           <CheckCircle size={14} />
@@ -253,24 +270,21 @@ export default function WarehouseOrders() {
           <div>
             <h1 className="text-2xl font-bold">Warehouse Orders</h1>
             <p className="text-sm mb-5 text-neutral-400">
-              Incoming sales & returned fitting orders
+              Manual picking & dispatch workflow
             </p>
           </div>
         </div>
 
-        {/* STATS */}
+        {/* CONTENT */}
         <div className="p-6">
+          {/* STATS */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-            <StatCard 
-              title="Total Orders" 
-              value={totalOrders} 
-              icon={<Package />} 
-            />
+            <StatCard title="Total Orders" value={totalOrders} icon={<Package />} />
             <StatCard
-              title="Pending Collection"
-              value={pendingCollection}
+              title="Pending Picking"
+              value={pendingPicking}
               icon={<Clock />}
-              danger={pendingCollection > 0}
+              danger={pendingPicking > 0}
             />
             <StatCard
               title="Ready for Dispatch"
