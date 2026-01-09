@@ -20,21 +20,22 @@ export default function Orders() {
   const [editingOrderId, setEditingOrderId] = useState(null);
 
   const initialFormData = {
-  dispatchedTo: "",
-  chairModel: "",
-  orderDate: "",
-  quantity: "",
-  orderType: "", // 👈 NEW
-};
+    dispatchedTo: "",
+    chairModel: "",
+    orderDate: "",
+    deliveryDate: "", // ✅ NEW
+    quantity: "",
+    isPartial: false, // ✅ NEW (checkbox)
+  };
 
-const CHAIR_MODELS = [
-  "Army Chair - Basic",
-  "Army Chair - Premium",
-  "Office Chair",
-  "Folding Chair",
-  "Plastic Chair",
-  "Metal Chair",
-];
+  const CHAIR_MODELS = [
+    "Army Chair - Basic",
+    "Army Chair - Premium",
+    "Office Chair",
+    "Folding Chair",
+    "Plastic Chair",
+    "Metal Chair",
+  ];
 
   const [formData, setFormData] = useState(initialFormData);
 
@@ -59,6 +60,18 @@ const CHAIR_MODELS = [
   useEffect(() => {
     fetchOrders();
   }, []);
+  const markInventoryReady = async (orderId) => {
+    try {
+      await axios.put(
+        `${API}/orders/${orderId}`,
+        { isPartial: false },
+        { headers }
+      );
+      fetchOrders();
+    } catch (err) {
+      alert("Failed to mark order as complete");
+    }
+  };
 
   /* ================= EDIT ================= */
   const handleEditOrder = (order) => {
@@ -87,7 +100,9 @@ const CHAIR_MODELS = [
         dispatchedTo: formData.dispatchedTo,
         chairModel: formData.chairModel,
         orderDate: formData.orderDate,
+        deliveryDate: formData.deliveryDate, // ✅
         quantity: Number(formData.quantity),
+        isPartial: formData.isPartial, // ✅
       };
 
       if (editingOrderId) {
@@ -159,19 +174,20 @@ const CHAIR_MODELS = [
 
   /* ================= PROGRESS ================= */
   const ProgressTracker = ({ progress }) => {
-  const currentIndex = ORDER_STEPS.findIndex((s) => s.key === progress);
-  const safeIndex = currentIndex === -1 ? ORDER_STEPS.length - 1 : currentIndex;
+    const currentIndex = ORDER_STEPS.findIndex((s) => s.key === progress);
+    const safeIndex =
+      currentIndex === -1 ? ORDER_STEPS.length - 1 : currentIndex;
 
-  return (
-    <span className="text-sm font-medium text-amber-400">
-      {ORDER_STEPS[safeIndex]?.label}
-    </span>
-  );
-};
+    return (
+      <span className="text-sm font-medium text-amber-400">
+        {ORDER_STEPS[safeIndex]?.label}
+      </span>
+    );
+  };
 
-const handleRowClick = (orderId) => {
-  setExpandedOrderId((prev) => (prev === orderId ? null : orderId));
-};
+  const handleRowClick = (orderId) => {
+    setExpandedOrderId((prev) => (prev === orderId ? null : orderId));
+  };
 
   return (
     <div className="flex h-screen bg-gradient-to-b from-amber-900 via-black to-neutral-900 text-neutral-100">
@@ -243,8 +259,10 @@ const handleRowClick = (orderId) => {
                       "Dispatched To",
                       "Chair",
                       "Date",
+                      "Delivery Date",
                       "Qty",
                       "Progress",
+                      "Order Status", // ✅ NEW
                       "Actions",
                     ].map((h) => (
                       <th
@@ -262,15 +280,19 @@ const handleRowClick = (orderId) => {
                     <React.Fragment key={o._id}>
                       {/* MAIN ROW */}
                       <tr
-  onClick={() => handleRowClick(o._id)}
-  className="border-b border-neutral-700 hover:bg-neutral-850 transition cursor-pointer"
->
-
+                        onClick={() => handleRowClick(o._id)}
+                        className="border-b border-neutral-700 hover:bg-neutral-850 transition cursor-pointer"
+                      >
                         <td className="p-4 font-medium">{o.orderId}</td>
                         <td className="p-4">{o.dispatchedTo}</td>
                         <td className="p-4">{o.chairModel}</td>
                         <td className="p-4">
                           {new Date(o.orderDate).toLocaleDateString()}
+                        </td>
+                        <td className="p-4">
+                          {o.deliveryDate
+                            ? new Date(o.deliveryDate).toLocaleDateString()
+                            : "-"}
                         </td>
                         <td className="p-4">{o.quantity}</td>
                         <td className="p-4">
@@ -279,46 +301,75 @@ const handleRowClick = (orderId) => {
                             orderId={o._id}
                           />
                         </td>
+                        <td className="p-4">
+                          {o.isPartial ? (
+                            <span className="px-3 py-1 rounded-full text-xs bg-amber-900/40 text-amber-400 border border-amber-700">
+                              Inventory Incomplete
+                            </span>
+                          ) : o.progress === "READY_FOR_DISPATCH" ? (
+                            <span className="px-3 py-1 rounded-full text-xs bg-green-900/40 text-green-400 border border-green-700">
+                              Inventory Ready
+                            </span>
+                          ) : o.progress === "DISPATCHED" ? (
+                            <span className="px-3 py-1 rounded-full text-xs bg-emerald-900/40 text-emerald-400 border border-emerald-700">
+                              Dispatched
+                            </span>
+                          ) : (
+                            <span className="px-3 py-1 rounded-full text-xs bg-blue-900/40 text-blue-400 border border-blue-700">
+                              Inventory Ready – Processing
+                            </span>
+                          )}
+                        </td>
+
                         <td className="p-4 flex gap-3">
                           <button
-  onClick={(e) => {
-    e.stopPropagation(); // ⛔ prevent row click
-    handleEditOrder(o);
-  }}
-  disabled={isOrderLocked(o.progress)}
-  className={`text-amber-400 hover:text-amber-300 ${
-    isOrderLocked(o.progress)
-      ? "opacity-40 cursor-not-allowed"
-      : ""
-  }`}
->
-
-                          
+                            onClick={(e) => {
+                              e.stopPropagation(); // ⛔ prevent row click
+                              handleEditOrder(o);
+                            }}
+                            disabled={isOrderLocked(o.progress)}
+                            className={`text-amber-400 hover:text-amber-300 ${
+                              isOrderLocked(o.progress)
+                                ? "opacity-40 cursor-not-allowed"
+                                : ""
+                            }`}
+                          >
                             <Pencil size={16} />
                           </button>
 
                           <button
-  onClick={(e) => {
-    e.stopPropagation();
-    handleDeleteOrder(o._id);
-  }}
-  disabled={isOrderLocked(o.progress)}
-  className={`text-red-400 hover:text-red-300 ${
-    isOrderLocked(o.progress)
-      ? "opacity-40 cursor-not-allowed"
-      : ""
-  }`}
->
-
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDeleteOrder(o._id);
+                            }}
+                            disabled={isOrderLocked(o.progress)}
+                            className={`text-red-400 hover:text-red-300 ${
+                              isOrderLocked(o.progress)
+                                ? "opacity-40 cursor-not-allowed"
+                                : ""
+                            }`}
+                          >
                             <Trash2 size={16} />
                           </button>
+                          {o.isPartial && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                markInventoryReady(o._id);
+                              }}
+                              title="Mark inventory ready"
+                              className="text-green-400 hover:text-green-300 transition"
+                            >
+                              <CheckCircle size={18} />
+                            </button>
+                          )}
                         </td>
                       </tr>
 
                       {/* EXPANDED PROGRESS ROW */}
                       {expandedOrderId === o._id && (
                         <tr className="bg-neutral-850">
-                          <td colSpan={7} className="p-6">
+                          <td colSpan={9} className="p-6">
                             {(() => {
                               const currentIndex = ORDER_STEPS.findIndex(
                                 (s) => s.key === o.progress
@@ -413,104 +464,117 @@ const handleRowClick = (orderId) => {
         </div>
       </div>
 
-      
       {/* MODAL */}
-{showForm && (
-  <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
-    <form
-      onSubmit={handleCreateOrder}
-      className="bg-neutral-900 p-6 rounded-xl w-[380px] border border-neutral-700"
-    >
-      <h2 className="text-lg font-semibold mb-4">
-        {editingOrderId ? "Update Order" : "Create Order"}
-      </h2>
+      {showForm && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
+          <form
+            onSubmit={handleCreateOrder}
+            className="bg-neutral-900 p-6 rounded-xl w-[380px] border border-neutral-700"
+          >
+            <h2 className="text-lg font-semibold mb-4">
+              {editingOrderId ? "Update Order" : "Create Order"}
+            </h2>
 
-      <Input
-        label="Dispatched To"
-        name="dispatchedTo"
-        value={formData.dispatchedTo}
-        onChange={handleFormChange}
-      />
+            <Input
+              label="Dispatched To"
+              name="dispatchedTo"
+              value={formData.dispatchedTo}
+              onChange={handleFormChange}
+            />
 
-      {/* CHAIR MODEL DROPDOWN */}
-      <div className="mb-3">
-        <label className="block text-sm text-neutral-400 mb-1">
-          Chair Model
-        </label>
-        <select
-          name="chairModel"
-          value={formData.chairModel}
-          onChange={handleFormChange}
-          className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded"
-          required
-        >
-          <option value="">Select Chair Model</option>
-          {CHAIR_MODELS.map((model) => (
-            <option key={model} value={model}>
-              {model}
-            </option>
-          ))}
-        </select>
-      </div>
+            {/* CHAIR MODEL DROPDOWN */}
+            <div className="mb-3">
+              <label className="block text-sm text-neutral-400 mb-1">
+                Chair Model
+              </label>
+              <select
+                name="chairModel"
+                value={formData.chairModel}
+                onChange={handleFormChange}
+                className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded"
+                required
+              >
+                <option value="">Select Chair Model</option>
+                {CHAIR_MODELS.map((model) => (
+                  <option key={model} value={model}>
+                    {model}
+                  </option>
+                ))}
+              </select>
+            </div>
 
-      <Input
-        label="Order Date"
-        name="orderDate"
-        type="date"
-        value={formData.orderDate}
-        onChange={handleFormChange}
-      />
+            <Input
+              label="Order Date"
+              name="orderDate"
+              type="date"
+              value={formData.orderDate}
+              onChange={handleFormChange}
+            />
 
-      <Input
-        label="Quantity"
-        name="quantity"
-        type="number"
-        value={formData.quantity}
-        onChange={handleFormChange}
-      />
+            <Input
+              label="Quantity"
+              name="quantity"
+              type="number"
+              value={formData.quantity}
+              onChange={handleFormChange}
+            />
 
-      {/* ORDER TYPE */}
-      <div className="mb-3">
-        <label className="block text-sm text-neutral-400 mb-1">
-          Order Type
-        </label>
-        <select
-          name="orderType"
-          value={formData.orderType}
-          onChange={handleFormChange}
-          className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded"
-          required
-        >
-          <option value="">Select Order Type</option>
-          <option value="partial">Partial</option>
-          <option value="completed">Completed</option>
-        </select>
-      </div>
+            {/* ORDER TYPE */}
+            {/* DELIVERY DATE */}
+            <Input
+              label="Delivery Date"
+              name="deliveryDate"
+              type="date"
+              value={formData.deliveryDate}
+              onChange={handleFormChange}
+            />
 
-      <div className="flex justify-end gap-2 mt-4">
-        <button
-          type="button"
-          onClick={() => {
-            setShowForm(false);
-            setEditingOrderId(null);
-            setFormData(initialFormData);
-          }}
-          className="px-4 py-2 text-neutral-300"
-        >
-          Cancel
-        </button>
+            {/* PARTIAL ORDER CHECKBOX */}
+            <div className="flex items-center gap-3 mt-2">
+              <input
+                type="checkbox"
+                id="isPartial"
+                checked={formData.isPartial}
+                onChange={(e) =>
+                  setFormData((prev) => ({
+                    ...prev,
+                    isPartial: e.target.checked,
+                  }))
+                }
+                className="w-4 h-4 accent-amber-600"
+              />
 
-        <button
-          type="submit"
-          className="bg-amber-600 hover:bg-amber-700 px-4 py-2 rounded"
-        >
-          {editingOrderId ? "Update" : "Create"}
-        </button>
-      </div>
-    </form>
-  </div>
-)}
+              <label
+                htmlFor="isPartial"
+                className="text-sm text-neutral-300 cursor-pointer"
+              >
+                Is this a partial order?
+              </label>
+            </div>
 
+            <div className="flex justify-end gap-2 mt-4">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowForm(false);
+                  setEditingOrderId(null);
+                  setFormData(initialFormData);
+                }}
+                className="px-4 py-2 text-neutral-300"
+              >
+                Cancel
+              </button>
+
+              <button
+                type="submit"
+                className="bg-amber-600 hover:bg-amber-700 px-4 py-2 rounded"
+              >
+                {editingOrderId ? "Update" : "Create"}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
     </div>
   );
 }

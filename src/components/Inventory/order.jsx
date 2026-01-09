@@ -29,15 +29,17 @@ export default function WarehouseOrders() {
     try {
       const res = await axios.get(`${API}/orders`, { headers });
 
-      const warehouseOrders = (res.data.orders || res.data).filter((o) =>
-        [
-          "ORDER_PLACED",
-          "WAREHOUSE_COLLECTED",
-          "FITTING_IN_PROGRESS",
-          "FITTING_COMPLETED",
-          "READY_FOR_DISPATCH",
-          "COMPLETED",
-        ].includes(o.progress)
+      const warehouseOrders = (res.data.orders || res.data).filter(
+        (o) =>
+          !o.isPartial && // 🔒 hide partial orders
+          [
+            "ORDER_PLACED",
+            "WAREHOUSE_COLLECTED",
+            "FITTING_IN_PROGRESS",
+            "FITTING_COMPLETED",
+            "READY_FOR_DISPATCH",
+            "COMPLETED",
+          ].includes(o.progress)
       );
 
       setOrders(warehouseOrders);
@@ -147,25 +149,49 @@ export default function WarehouseOrders() {
 
   /* ================= STATS ================= */
   const totalOrders = filteredOrders.length;
-  const pendingCollection = filteredOrders.filter(o => o.progress === "ORDER_PLACED").length;
-  const readyForDispatch = filteredOrders.filter(o => o.progress === "READY_FOR_DISPATCH").length;
+  const pendingCollection = filteredOrders.filter(
+    (o) => o.progress === "ORDER_PLACED"
+  ).length;
+  const readyForDispatch = filteredOrders.filter(
+    (o) => o.progress === "READY_FOR_DISPATCH"
+  ).length;
 
   /* ================= STATUS BADGE ================= */
   const getStatusBadge = (progress) => {
     const statusMap = {
-      ORDER_PLACED: { label: "Pending Collection", color: "bg-amber-900 text-amber-300" },
-      WAREHOUSE_COLLECTED: { label: "Sent to Fitting", color: "bg-blue-900 text-blue-300" },
-      FITTING_IN_PROGRESS: { label: "Fitting Started", color: "bg-blue-900 text-blue-300" },
+      ORDER_PLACED: {
+        label: "Pending Collection",
+        color: "bg-amber-900 text-amber-300",
+      },
+      WAREHOUSE_COLLECTED: {
+        label: "Sent to Fitting",
+        color: "bg-blue-900 text-blue-300",
+      },
+      FITTING_IN_PROGRESS: {
+        label: "Fitting Started",
+        color: "bg-blue-900 text-blue-300",
+      },
 
-      FITTING_COMPLETED: { label: "Returned from Fitting", color: "bg-emerald-900 text-emerald-300" },
-      READY_FOR_DISPATCH: { label: "Ready for Dispatch", color: "bg-green-900 text-green-300" },
+      FITTING_COMPLETED: {
+        label: "Returned from Fitting",
+        color: "bg-emerald-900 text-emerald-300",
+      },
+      READY_FOR_DISPATCH: {
+        label: "Ready for Dispatch",
+        color: "bg-green-900 text-green-300",
+      },
       COMPLETED: { label: "Completed", color: "bg-green-900 text-green-300" },
     };
 
-    const status = statusMap[progress] || { label: "Processing", color: "bg-neutral-700 text-neutral-300" };
+    const status = statusMap[progress] || {
+      label: "Processing",
+      color: "bg-neutral-700 text-neutral-300",
+    };
 
     return (
-      <span className={`px-3 py-1 rounded-full text-xs font-medium ${status.color}`}>
+      <span
+        className={`px-3 py-1 rounded-full text-xs font-medium ${status.color}`}
+      >
         {status.label}
       </span>
     );
@@ -261,10 +287,10 @@ export default function WarehouseOrders() {
         {/* STATS */}
         <div className="p-6">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-            <StatCard 
-              title="Total Orders" 
-              value={totalOrders} 
-              icon={<Package />} 
+            <StatCard
+              title="Total Orders"
+              value={totalOrders}
+              icon={<Package />}
             />
             <StatCard
               title="Pending Collection"
@@ -306,6 +332,7 @@ export default function WarehouseOrders() {
                       "Dispatched To",
                       "Chair",
                       "Order Date",
+                      "Delivery Date",
                       "Qty",
                       "Status",
                       "Action",
@@ -331,6 +358,11 @@ export default function WarehouseOrders() {
                       <td className="p-4">{o.chairModel}</td>
                       <td className="p-4">
                         {new Date(o.orderDate).toLocaleDateString()}
+                      </td>
+                      <td className="p-4">
+                        {o.deliveryDate
+                          ? new Date(o.deliveryDate).toLocaleDateString()
+                          : "-"}
                       </td>
                       <td className="p-4">{o.quantity}</td>
                       <td className="p-4">{getStatusBadge(o.progress)}</td>
