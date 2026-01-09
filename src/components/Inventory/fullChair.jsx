@@ -35,9 +35,7 @@ export default function InventoryPage() {
 
   const API = process.env.NEXT_PUBLIC_API_URL;
   const token =
-    typeof window !== "undefined"
-      ? localStorage.getItem("token")
-      : null;
+    typeof window !== "undefined" ? localStorage.getItem("token") : null;
 
   const headers = token ? { Authorization: `Bearer ${token}` } : {};
 
@@ -45,7 +43,16 @@ export default function InventoryPage() {
   const fetchInventory = async () => {
     try {
       const res = await axios.get(`${API}/inventory`, { headers });
-      setInventory(res.data.inventory || res.data);
+
+      const data = res.data.inventory || res.data || [];
+
+      // 🔥 normalize quantity immediately
+      const safeData = data.map((i) => ({
+        ...i,
+        quantity: Number(i.quantity || 0),
+      }));
+
+      setInventory(safeData);
     } catch (err) {
       console.error("Fetch failed", err);
     } finally {
@@ -73,10 +80,10 @@ export default function InventoryPage() {
 
       if (editId) {
         await axios.patch(`${API}/inventory/update/${editId}`, payload, {
-          headers: headers,
+          headers,
         });
       } else {
-        await axios.post(`${API}/inventory`, payload, { headers: headers });
+        await axios.post(`${API}/inventory`, payload, { headers });
       }
 
       setShowForm(false);
@@ -102,15 +109,17 @@ export default function InventoryPage() {
   /* ================= TRANSFORM ================= */
   const inventoryData = useMemo(() => {
     return inventory.map((item) => {
+      const qty = Number(item.quantity || 0);
+
       let status = "Healthy";
-      if (item.quantity === 0) status = "Critical";
-      else if (item.quantity < 100) status = "Low Stock";
+      if (qty === 0) status = "Critical";
+      else if (qty < 100) status = "Low Stock";
 
       return {
         id: item._id,
-        name: item.chairType,
+        name: item.chairType || "",
         vendor: item.vendor || "Internal",
-        quantity: item.quantity,
+        quantity: qty,
         status,
       };
     });
@@ -118,26 +127,40 @@ export default function InventoryPage() {
 
   /* ===== FILTER OPTIONS ===== */
   const vendors = useMemo(() => {
-    return ["All", ...new Set(inventoryData.map((i) => i.vendor))];
+    return ["All", ...new Set(inventoryData.map((i) => i.vendor || "Internal"))];
   }, [inventoryData]);
 
   const statuses = ["All", "Healthy", "Low Stock", "Critical"];
 
-  /* ================= FILTERED DATA ================= */
-  const filteredData = inventoryData.filter((i) => {
-    return (
-      i.name.toLowerCase().includes(searchTerm.toLowerCase()) &&
-      (filterVendor === "All" || i.vendor === filterVendor) &&
-      (filterStatus === "All" || i.status === filterStatus)
-    );
-  });
+  /* ================= FILTER ================= */
+  const filteredData = useMemo(() => {
+    const term = (searchTerm || "").toLowerCase();
+
+    return inventoryData.filter((i) => {
+      const name = (i.name || "").toLowerCase();
+      const vendor = i.vendor || "";
+      const status = i.status || "";
+
+      return (
+        name.includes(term) &&
+        (filterVendor === "All" || vendor === filterVendor) &&
+        (filterStatus === "All" || status === filterStatus)
+      );
+    });
+  }, [inventoryData, searchTerm, filterVendor, filterStatus]);
 
   /* ================= STATS ================= */
-  const totalStock = inventoryData.reduce((s, i) => s + i.quantity, 0);
+  const totalStock = useMemo(
+    () => inventoryData.reduce((s, i) => s + Number(i.quantity || 0), 0),
+    [inventoryData]
+  );
+
   const totalProducts = inventoryData.length;
-  const lowStockCount = inventoryData.filter(
-    (i) => i.status !== "Healthy"
-  ).length;
+
+  const lowStockCount = useMemo(
+    () => inventoryData.filter((i) => i.status !== "Healthy").length,
+    [inventoryData]
+  );
 
   /* ================= UI ================= */
   return (
@@ -165,11 +188,7 @@ export default function InventoryPage() {
         <div className="p-6">
           {/* ===== TOP CARDS ===== */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-            <StatCard
-              title="Total Stock"
-              value={totalStock}
-              icon={<Warehouse />}
-            />
+            <StatCard title="Total Stock" value={totalStock} icon={<Warehouse />} />
             <StatCard
               title="Total Products"
               value={totalProducts}
@@ -247,16 +266,14 @@ export default function InventoryPage() {
               <table className="w-full">
                 <thead className="bg-neutral-850 border-b border-neutral-700">
                   <tr>
-                    {["Product", "Vendor", "Qty", "Status", "Actions"].map(
-                      (h) => (
-                        <th
-                          key={h}
-                          className="p-4 text-left text-xs text-neutral-400 uppercase tracking-wide"
-                        >
-                          {h}
-                        </th>
-                      )
-                    )}
+                    {["Product", "Vendor", "Qty", "Status", "Actions"].map((h) => (
+                      <th
+                        key={h}
+                        className="p-4 text-left text-xs text-neutral-400 uppercase tracking-wide"
+                      >
+                        {h}
+                      </th>
+                    ))}
                   </tr>
                 </thead>
 
@@ -300,6 +317,17 @@ export default function InventoryPage() {
                       </td>
                     </tr>
                   ))}
+
+                  {filteredData.length === 0 && (
+                    <tr>
+                      <td
+                        colSpan={5}
+                        className="p-6 text-center text-neutral-400"
+                      >
+                        No inventory found
+                      </td>
+                    </tr>
+                  )}
                 </tbody>
               </table>
             )}
@@ -359,21 +387,26 @@ export default function InventoryPage() {
 
 /* ================= SMALL COMPONENTS ================= */
 
-const StatCard = ({ title, value, icon, danger }) => (
-  <div
-    className={`p-5 rounded-xl border transition hover:shadow-md ${
-      danger
-        ? "bg-red-950/40 border-red-800"
-        : "bg-neutral-800 border-neutral-700"
-    }`}
-  >
-    <div className="flex items-center justify-between mb-3">
-      <p className="text-sm text-neutral-400">{title}</p>
-      <span className="text-neutral-400">{icon}</span>
+const StatCard = ({ title, value, icon, danger }) => {
+  const safeValue =
+    typeof value === "number" && !Number.isNaN(value) ? value : 0;
+
+  return (
+    <div
+      className={`p-5 rounded-xl border transition hover:shadow-md ${
+        danger
+          ? "bg-red-950/40 border-red-800"
+          : "bg-neutral-800 border-neutral-700"
+      }`}
+    >
+      <div className="flex items-center justify-between mb-3">
+        <p className="text-sm text-neutral-400">{title}</p>
+        <span className="text-neutral-400">{icon}</span>
+      </div>
+      <p className="text-3xl font-bold">{safeValue}</p>
     </div>
-    <p className="text-3xl font-bold">{value}</p>
-  </div>
-);
+  );
+};
 
 const StatusBadge = ({ status }) => {
   const map = {
