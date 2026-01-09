@@ -55,26 +55,6 @@ export default function Sidebar() {
 
         </div>
         </div>
-
-
-
-        {/* SALES */}
-        <div className="mb-6">
-          <div className="px-6 mb-2">
-            <h2 className="text-xs font-bold text-white uppercase tracking-wider">
-              Sales
-            </h2>
-          </div>
-
-          <Link href="/superadmin/chairsale" className={menuItem("/chairsale")}>
-            Chair
-          </Link>
-
-          {/* <Link href="/superadmin/spare-parts" className={menuItem("/spare-parts")}>
-            Spare Parts
-          </Link> */}
-          
-        </div>
       </nav>
 
       {/* Footer */}

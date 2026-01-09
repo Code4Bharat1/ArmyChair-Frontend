@@ -124,7 +124,7 @@ export default function Dashboard() {
 
   /* ================= ADD USER STATE ================= */
   const [newUser, setNewUser] = useState({
-    role: "admin",
+    role: "sales",
     phone: "",
     password: "",
   });
@@ -142,7 +142,7 @@ export default function Dashboard() {
     }
 
     console.log("New User Added:", newUser);
-    setNewUser({ role: "admin", phone: "", password: "" });
+    setNewUser({ role: "sales", phone: "", password: "" });
   };
 
   /* ================= ORDERS FROM BACKEND ================= */
@@ -350,7 +350,7 @@ export default function Dashboard() {
                 onChange={handleUserChange}
                 className="bg-neutral-900 border border-neutral-700 rounded-lg px-3 py-2 text-sm"
               >
-                <option value="admin">Admin</option>
+                <option value="sales">sales</option>
                 <option value="warehouse">Warehouse</option>
                 <option value="fitting">Fitting</option>
               </select>

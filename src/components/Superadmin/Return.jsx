@@ -93,7 +93,7 @@ const Return = () => {
     <div className="flex h-screen bg-gradient-to-b from-amber-900 via-black to-neutral-900 text-neutral-100">
       <Sidebar />
 
-      <div className="flex-1 p-5 overflow-auto">
+      <div className="flex-1  overflow-auto">
         {/* ================= HEADER ================= */}
         <div className="bg-neutral-800 border-b border-neutral-700 mb-8 p-4 flex items-center justify-between">
           <div className="flex-1">
