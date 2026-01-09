@@ -33,7 +33,7 @@ export default function SparePartsInventory() {
   const API = process.env.NEXT_PUBLIC_API_URL;
   const token =
     typeof window !== "undefined"
-      ? localStorage.getItem("accessToken")
+      ? localStorage.getItem("token")
       : null;
 
   const headers = token ? { Authorization: `Bearer ${token}` } : {};
