@@ -7,6 +7,7 @@ import {
   Package,
   Clock,
   CheckCircle,
+  Truck,
 } from "lucide-react";
 import axios from "axios";
 
@@ -23,9 +24,9 @@ export default function Orders() {
     dispatchedTo: "",
     chairModel: "",
     orderDate: "",
-    deliveryDate: "", // ✅ NEW
+    deliveryDate: "",
     quantity: "",
-    isPartial: false, // ✅ NEW (checkbox)
+    isPartial: false,
   };
 
   const CHAIR_MODELS = [
@@ -60,18 +61,6 @@ export default function Orders() {
   useEffect(() => {
     fetchOrders();
   }, []);
-  const markInventoryReady = async (orderId) => {
-    try {
-      await axios.put(
-        `${API}/orders/${orderId}`,
-        { isPartial: false },
-        { headers }
-      );
-      fetchOrders();
-    } catch (err) {
-      alert("Failed to mark order as complete");
-    }
-  };
 
   /* ================= EDIT ================= */
   const handleEditOrder = (order) => {
@@ -80,7 +69,9 @@ export default function Orders() {
       dispatchedTo: order.dispatchedTo,
       chairModel: order.chairModel,
       orderDate: order.orderDate?.split("T")[0],
+      deliveryDate: order.deliveryDate?.split("T")[0] || "",
       quantity: order.quantity,
+      isPartial: order.progress === "PARTIAL",
     });
     setShowForm(true);
   };
@@ -100,15 +91,13 @@ export default function Orders() {
         dispatchedTo: formData.dispatchedTo,
         chairModel: formData.chairModel,
         orderDate: formData.orderDate,
-        deliveryDate: formData.deliveryDate, // ✅
+        deliveryDate: formData.deliveryDate,
         quantity: Number(formData.quantity),
-        isPartial: formData.isPartial, // ✅
+        progress: formData.isPartial ? "PARTIAL" : "ORDER_PLACED",
       };
 
       if (editingOrderId) {
-        await axios.put(`${API}/orders/${editingOrderId}`, payload, {
-          headers,
-        });
+        await axios.put(`${API}/orders/${editingOrderId}`, payload, { headers });
       } else {
         await axios.post(`${API}/orders`, payload, { headers });
       }
@@ -135,22 +124,38 @@ export default function Orders() {
     }
   };
 
+  /* ================= DISPATCH ================= */
+  const handleDispatch = async (orderId) => {
+    if (!window.confirm("Confirm dispatch of this order?")) return;
+
+    try {
+      await axios.patch(
+        `${API}/orders/${orderId}/progress`,
+        { progress: "DISPATCHED" },
+        { headers }
+      );
+      fetchOrders();
+    } catch (err) {
+      alert("Dispatch failed");
+    }
+  };
+
   /* ================= FILTER ================= */
   const filteredOrders = useMemo(() => {
-    return orders.filter((o) => {
-      const q = search.toLowerCase();
-      return (
+    const q = search.toLowerCase();
+    return orders.filter(
+      (o) =>
         o.orderId?.toLowerCase().includes(q) ||
         o.dispatchedTo?.toLowerCase().includes(q) ||
         o.chairModel?.toLowerCase().includes(q)
-      );
-    });
+    );
   }, [orders, search]);
 
   /* ================= STATS ================= */
   const totalOrders = filteredOrders.length;
   const inProgress = filteredOrders.filter(
-    (o) => !["DISPATCHED", "COMPLETED"].includes(o.progress)
+    (o) =>
+      !["DISPATCHED", "COMPLETED", "PARTIAL"].includes(o.progress)
   ).length;
   const completed = filteredOrders.filter(
     (o) => o.progress === "DISPATCHED"
@@ -167,13 +172,25 @@ export default function Orders() {
   ];
 
   const isOrderLocked = (progress) => {
-    return ["FITTING_COMPLETED", "READY_FOR_DISPATCH", "DISPATCHED"].includes(
-      progress
-    );
+    return [
+      "WAREHOUSE_COLLECTED",
+      "FITTING_IN_PROGRESS",
+      "FITTING_COMPLETED",
+      "READY_FOR_DISPATCH",
+      "DISPATCHED",
+      "PARTIAL",
+    ].includes(progress);
   };
 
   /* ================= PROGRESS ================= */
   const ProgressTracker = ({ progress }) => {
+    if (progress === "PARTIAL")
+      return (
+        <span className="text-sm font-medium text-amber-400">
+          Partial / On Hold
+        </span>
+      );
+
     const currentIndex = ORDER_STEPS.findIndex((s) => s.key === progress);
     const safeIndex =
       currentIndex === -1 ? ORDER_STEPS.length - 1 : currentIndex;
@@ -191,13 +208,12 @@ export default function Orders() {
 
   return (
     <div className="flex h-screen bg-gradient-to-b from-amber-900 via-black to-neutral-900 text-neutral-100">
-      {/* MAIN */}
       <div className="flex-1 overflow-auto">
         {/* HEADER */}
         <div className="bg-neutral-800 border-b border-neutral-700 p-4 flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-bold">Orders Management</h1>
-            <p className="text-sm mb-5 text-neutral-400">
+            <p className="text-sm mb-1 text-neutral-400">
               Create, track and manage all orders
             </p>
           </div>
@@ -214,11 +230,7 @@ export default function Orders() {
         {/* STATS */}
         <div className="p-6">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-            <StatCard
-              title="Total Orders"
-              value={totalOrders}
-              icon={<Package />}
-            />
+            <StatCard title="Total Orders" value={totalOrders} icon={<Package />} />
             <StatCard
               title="In Progress"
               value={inProgress}
@@ -258,11 +270,11 @@ export default function Orders() {
                       "Order ID",
                       "Dispatched To",
                       "Chair",
-                      "Date",
+                      "Order Date",
                       "Delivery Date",
                       "Qty",
                       "Progress",
-                      "Order Status", // ✅ NEW
+                      "Order Status",
                       "Actions",
                     ].map((h) => (
                       <th
@@ -295,20 +307,20 @@ export default function Orders() {
                             : "-"}
                         </td>
                         <td className="p-4">{o.quantity}</td>
+
                         <td className="p-4">
-                          <ProgressTracker
-                            progress={o.progress}
-                            orderId={o._id}
-                          />
+                          <ProgressTracker progress={o.progress} />
                         </td>
+
+                        {/* ORDER STATUS */}
                         <td className="p-4">
-                          {o.isPartial ? (
+                          {o.progress === "PARTIAL" ? (
                             <span className="px-3 py-1 rounded-full text-xs bg-amber-900/40 text-amber-400 border border-amber-700">
-                              Inventory Incomplete
+                              Partial / On Hold
                             </span>
                           ) : o.progress === "READY_FOR_DISPATCH" ? (
                             <span className="px-3 py-1 rounded-full text-xs bg-green-900/40 text-green-400 border border-green-700">
-                              Inventory Ready
+                              Ready for Dispatch
                             </span>
                           ) : o.progress === "DISPATCHED" ? (
                             <span className="px-3 py-1 rounded-full text-xs bg-emerald-900/40 text-emerald-400 border border-emerald-700">
@@ -316,17 +328,19 @@ export default function Orders() {
                             </span>
                           ) : (
                             <span className="px-3 py-1 rounded-full text-xs bg-blue-900/40 text-blue-400 border border-blue-700">
-                              Inventory Ready – Processing
+                              Processing
                             </span>
                           )}
                         </td>
 
-                        <td className="p-4 flex gap-3">
+                        {/* ACTIONS */}
+                        <td
+                          className="p-4 flex gap-3"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          {/* EDIT */}
                           <button
-                            onClick={(e) => {
-                              e.stopPropagation(); // ⛔ prevent row click
-                              handleEditOrder(o);
-                            }}
+                            onClick={() => handleEditOrder(o)}
                             disabled={isOrderLocked(o.progress)}
                             className={`text-amber-400 hover:text-amber-300 ${
                               isOrderLocked(o.progress)
@@ -337,11 +351,9 @@ export default function Orders() {
                             <Pencil size={16} />
                           </button>
 
+                          {/* DELETE */}
                           <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleDeleteOrder(o._id);
-                            }}
+                            onClick={() => handleDeleteOrder(o._id)}
                             disabled={isOrderLocked(o.progress)}
                             className={`text-red-400 hover:text-red-300 ${
                               isOrderLocked(o.progress)
@@ -351,23 +363,22 @@ export default function Orders() {
                           >
                             <Trash2 size={16} />
                           </button>
-                          {o.isPartial && (
+
+                          {/* DISPATCH — ONLY IF READY */}
+                          {o.progress === "READY_FOR_DISPATCH" && (
                             <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                markInventoryReady(o._id);
-                              }}
-                              title="Mark inventory ready"
+                              onClick={() => handleDispatch(o._id)}
+                              title="Dispatch Order"
                               className="text-green-400 hover:text-green-300 transition"
                             >
-                              <CheckCircle size={18} />
+                              <Truck size={18} />
                             </button>
                           )}
                         </td>
                       </tr>
 
                       {/* EXPANDED PROGRESS ROW */}
-                      {expandedOrderId === o._id && (
+                      {expandedOrderId === o._id && o.progress !== "PARTIAL" && (
                         <tr className="bg-neutral-850">
                           <td colSpan={9} className="p-6">
                             {(() => {
@@ -385,12 +396,10 @@ export default function Orders() {
 
                               return (
                                 <div className="w-full space-y-6">
-                                  {/* TITLE */}
                                   <p className="text-sm text-neutral-300 font-medium">
                                     Order Progress
                                   </p>
 
-                                  {/* STEP LABELS */}
                                   <div className="flex justify-between text-xs text-neutral-400">
                                     {ORDER_STEPS.map((step, index) => (
                                       <span
@@ -406,12 +415,9 @@ export default function Orders() {
                                     ))}
                                   </div>
 
-                                  {/* TRACK */}
                                   <div className="relative w-full h-10 flex items-center">
-                                    {/* BASE LINE */}
                                     <div className="absolute left-0 right-0 h-[4px] bg-neutral-600 rounded-full" />
 
-                                    {/* PROGRESS LINE */}
                                     <div
                                       className="absolute left-0 h-[4px] rounded-full transition-all duration-500"
                                       style={{
@@ -423,20 +429,19 @@ export default function Orders() {
                                       }}
                                     />
 
-                                    {/* CURRENT DOT */}
                                     <div
                                       className="absolute w-4 h-4 rounded-full border-2 border-black shadow"
                                       style={{
                                         left: `calc(${percent}% - 8px)`,
                                         backgroundColor:
-                                          safeIndex === ORDER_STEPS.length - 1
+                                          safeIndex ===
+                                          ORDER_STEPS.length - 1
                                             ? "#22c55e"
                                             : "#f59e0b",
                                       }}
                                     />
                                   </div>
 
-                                  {/* CURRENT STATUS */}
                                   <p className="text-sm">
                                     <span className="text-neutral-400">
                                       Current Stage:
@@ -465,113 +470,114 @@ export default function Orders() {
       </div>
 
       {/* MODAL */}
-{showForm && (
-  <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-    <div className="bg-neutral-900 p-8 rounded-2xl w-full max-w-[520px] border-2 border-amber-600 shadow-2xl">
-      <h2 className="text-2xl font-bold mb-6 text-amber-400">
-        {editingOrderId ? "Update Order" : "Create Order"}
-      </h2>
+      {showForm && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-neutral-900 p-8 rounded-2xl w-full max-w-[520px] border-2 border-amber-600 shadow-2xl">
+            <h2 className="text-2xl font-bold mb-6 text-amber-400">
+              {editingOrderId ? "Update Order" : "Create Order"}
+            </h2>
 
-      <div className="space-y-4">
-        <Input
-          label="Dispatched To"
-          name="dispatchedTo"
-          value={formData.dispatchedTo}
-          onChange={handleFormChange}
-        />
+            <div className="space-y-4">
+              <Input
+                label="Dispatched To"
+                name="dispatchedTo"
+                value={formData.dispatchedTo}
+                onChange={handleFormChange}
+              />
 
-        {/* CHAIR MODEL DROPDOWN */}
-        <div>
-          <label className="block text-base text-neutral-300 mb-2 font-semibold">
-            Chair Model
-          </label>
-          <select
-            name="chairModel"
-            value={formData.chairModel}
-            onChange={handleFormChange}
-            className="w-full px-4 py-3 bg-neutral-800 border-2 border-neutral-600 rounded-lg text-base text-neutral-100 focus:border-amber-600 focus:ring-2 focus:ring-amber-600/50 outline-none"
-            required
-          >
-            <option value="" className="bg-neutral-800">Select Chair Model</option>
-            {CHAIR_MODELS.map((model) => (
-              <option key={model} value={model} className="bg-neutral-800">
-                {model}
-              </option>
-            ))}
-          </select>
+              <div>
+                <label className="block text-base text-neutral-300 mb-2 font-semibold">
+                  Chair Model
+                </label>
+                <select
+                  name="chairModel"
+                  value={formData.chairModel}
+                  onChange={handleFormChange}
+                  className="w-full px-4 py-3 bg-neutral-800 border-2 border-neutral-600 rounded-lg text-base text-neutral-100 focus:border-amber-600 focus:ring-2 focus:ring-amber-600/50 outline-none"
+                  required
+                >
+                  <option value="" className="bg-neutral-800">
+                    Select Chair Model
+                  </option>
+                  {CHAIR_MODELS.map((model) => (
+                    <option key={model} value={model} className="bg-neutral-800">
+                      {model}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <Input
+                label="Order Date"
+                name="orderDate"
+                type="date"
+                value={formData.orderDate}
+                onChange={handleFormChange}
+              />
+
+              <Input
+                label="Quantity"
+                name="quantity"
+                type="number"
+                value={formData.quantity}
+                onChange={handleFormChange}
+              />
+
+              <Input
+                label="Delivery Date"
+                name="deliveryDate"
+                type="date"
+                value={formData.deliveryDate}
+                onChange={handleFormChange}
+              />
+
+              {/* PARTIAL */}
+              <div className="flex items-center gap-3 mt-2 bg-neutral-800 p-4 rounded-lg border-2 border-neutral-700">
+                <input
+                  type="checkbox"
+                  id="isPartial"
+                  checked={formData.isPartial}
+                  onChange={(e) =>
+                    setFormData((prev) => ({
+                      ...prev,
+                      isPartial: e.target.checked,
+                    }))
+                  }
+                  className="w-5 h-5 accent-amber-600"
+                />
+
+                <label
+                  htmlFor="isPartial"
+                  className="text-base text-neutral-200 cursor-pointer font-semibold"
+                >
+                  Mark as Partial (On Hold)
+                </label>
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-3 mt-8">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowForm(false);
+                  setEditingOrderId(null);
+                  setFormData(initialFormData);
+                }}
+                className="px-6 py-2.5 text-base text-neutral-300 hover:text-neutral-100 hover:bg-neutral-800 rounded-lg transition font-medium border-2 border-neutral-700"
+              >
+                Cancel
+              </button>
+
+              <button
+                onClick={handleCreateOrder}
+                className="bg-amber-600 hover:bg-amber-700 text-white px-6 py-2.5 rounded-lg transition font-semibold shadow-lg text-base border-2 border-amber-500"
+              >
+                {editingOrderId ? "Update" : "Create"}
+              </button>
+            </div>
+          </div>
         </div>
-
-        <Input
-          label="Order Date"
-          name="orderDate"
-          type="date"
-          value={formData.orderDate}
-          onChange={handleFormChange}
-        />
-
-        <Input
-          label="Quantity"
-          name="quantity"
-          type="number"
-          value={formData.quantity}
-          onChange={handleFormChange}
-        />
-
-        <Input
-          label="Delivery Date"
-          name="deliveryDate"
-          type="date"
-          value={formData.deliveryDate}
-          onChange={handleFormChange}
-        />
-
-        {/* PARTIAL ORDER CHECKBOX */}
-        <div className="flex items-center gap-3 mt-2 bg-neutral-800 p-4 rounded-lg border-2 border-neutral-700">
-          <input
-            type="checkbox"
-            id="isPartial"
-            checked={formData.isPartial}
-            onChange={(e) =>
-              setFormData((prev) => ({
-                ...prev,
-                isPartial: e.target.checked,
-              }))
-            }
-            className="w-5 h-5 accent-amber-600"
-          />
-
-          <label
-            htmlFor="isPartial"
-            className="text-base text-neutral-200 cursor-pointer font-semibold"
-          >
-            Is this a partial order?
-          </label>
-        </div>
-      </div>
-
-      <div className="flex justify-end gap-3 mt-8">
-        <button
-          type="button"
-          onClick={() => {
-            setShowForm(false);
-            setEditingOrderId(null);
-            setFormData(initialFormData);
-          }}
-          className="px-6 py-2.5 text-base text-neutral-300 hover:text-neutral-100 hover:bg-neutral-800 rounded-lg transition font-medium border-2 border-neutral-700"
-        >
-          Cancel
-        </button>
-
-        <button
-          onClick={handleCreateOrder}
-          className="bg-amber-600 hover:bg-amber-700 text-white px-6 py-2.5 rounded-lg transition font-semibold shadow-lg text-base border-2 border-amber-500"
-        >
-          {editingOrderId ? "Update" : "Create"}
-        </button>
-      </div>
-    </div>
-  </div>
-)}
+      )}
     </div>
   );
 }
@@ -596,7 +602,9 @@ const StatCard = ({ title, value, icon, danger }) => (
 
 const Input = ({ label, name, value, onChange, type = "text" }) => (
   <div>
-    <label className="text-base text-neutral-300 font-semibold block mb-2">{label}</label>
+    <label className="text-base text-neutral-300 font-semibold block mb-2">
+      {label}
+    </label>
     <input
       type={type}
       name={name}
