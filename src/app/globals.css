@@ -24,3 +24,27 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+/* ===== DARK SCROLLBAR (FORM / MODAL) ===== */
+.dark-scrollbar {
+  scrollbar-width: thin;                 /* Firefox */
+  scrollbar-color: #525252 #171717;       /* thumb track */
+}
+
+/* Chrome / Edge / Safari */
+.dark-scrollbar::-webkit-scrollbar {
+  width: 8px;
+}
+
+.dark-scrollbar::-webkit-scrollbar-track {
+  background: #171717; /* neutral-900 */
+}
+
+.dark-scrollbar::-webkit-scrollbar-thumb {
+  background-color: #525252; /* neutral-600 */
+  border-radius: 9999px;
+  border: 2px solid #171717;
+}
+
+.dark-scrollbar::-webkit-scrollbar-thumb:hover {
+  background-color: #737373; /* neutral-500 */
+}

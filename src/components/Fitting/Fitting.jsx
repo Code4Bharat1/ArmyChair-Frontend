@@ -164,7 +164,8 @@ export default function Fitting() {
           </div>
 
           {/* TABLE */}
-          <div className="bg-neutral-800 rounded-xl overflow-hidden border border-neutral-700">
+          <div className="bg-neutral-800 rounded-xl border border-neutral-700 overflow-x-auto">
+
             {loading ? (
               <div className="p-6 text-center">Loading...</div>
             ) : filteredOrders.length === 0 ? (
@@ -172,7 +173,8 @@ export default function Fitting() {
                 No fitting orders available
               </div>
             ) : (
-              <table className="w-full">
+              <table className="min-w-[900px] w-full">
+
                 <thead className="bg-neutral-850 border-b border-neutral-700">
                   <tr>
                     {[
@@ -230,7 +232,8 @@ export default function Fitting() {
                               onClick={() =>
                                 updateProgress(order._id, "FITTING_IN_PROGRESS")
                               }
-                              className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded-lg text-sm disabled:opacity-50"
+                              className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 px-3 py-2 rounded-lg text-xs md:text-sm disabled:opacity-50 w-full md:w-auto justify-center"
+
                             >
                               <Wrench size={16} />
                               {isProcessing ? "Processing..." : "Start Fitting"}
