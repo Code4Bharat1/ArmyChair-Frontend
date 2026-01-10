@@ -128,7 +128,7 @@ export default function PickOrderPage() {
             <>
               {/* ORDER INFO */}
               <div className="bg-neutral-800 border border-neutral-700 rounded-xl p-5 mb-6">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-sm text-center">
                   <div>
                     <span className="text-neutral-400">Order ID</span>
                     <p className="font-medium">{order.orderId}</p>
@@ -140,6 +140,10 @@ export default function PickOrderPage() {
                   <div>
                     <span className="text-neutral-400">Chair Model</span>
                     <p className="font-medium">{order.chairModel}</p>
+                  </div>
+                  <div>
+                    <span className="text-neutral-400">Order Quantity</span>
+                    <p className="font-medium">{order.quantity}</p>
                   </div>
                 </div>
               </div>

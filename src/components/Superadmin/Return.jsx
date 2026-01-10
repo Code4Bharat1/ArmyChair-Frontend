@@ -153,43 +153,46 @@ const Return = () => {
         </div>
 
         {/* ================= FILTERS ================= */}
-        <div className="flex flex-wrap gap-7 mb-6">
-          <div className="relative max-w-md">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-500 w-4 h-4" />
-            <input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search return by ID or product..."
-              className="w-full bg-neutral-900 border border-neutral-700 rounded-lg pl-10 pr-4 py-2 text-sm text-neutral-200 placeholder-neutral-500 focus:outline-none focus:border-amber-600"
-            />
-          </div>
+       <div className="flex flex-wrap items-end gap-6 mb-6">
+  {/* SEARCH */}
+  <div className="relative ml-5 w-full sm:w-[320px]">
+    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-500 w-4 h-4" />
+    <input
+      value={search}
+      onChange={(e) => setSearch(e.target.value)}
+      placeholder="Search return by ID or product..."
+      className="w-full h-[42px] bg-neutral-900 border border-neutral-700 rounded-lg pl-10 pr-4 text-sm text-neutral-200 placeholder-neutral-500 focus:outline-none focus:border-amber-600"
+    />
+  </div>
 
-          <div>
-            <label className="block text-xs text-neutral-400 mb-1">
-              Type
-            </label>
-            <select
-              value={selectedType}
-              onChange={(e) => setSelectedType(e.target.value)}
-              className="px-4 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-sm text-neutral-200 focus:outline-none focus:border-amber-600"
-            >
-              {["All", "Functional", "Non-Functional"].map((o) => (
-                <option key={o}>{o}</option>
-              ))}
-            </select>
-          </div>
-        </div>
+  {/* TYPE FILTER */}
+  <div className="flex flex-col">
+    <label className="mb-1 text-xs text-neutral-400">
+      Type
+    </label>
+    <select
+      value={selectedType}
+      onChange={(e) => setSelectedType(e.target.value)}
+      className="h-[42px] px-4 bg-neutral-800 border border-neutral-700 rounded-lg text-sm text-neutral-200 focus:outline-none focus:border-amber-600"
+    >
+      <option value="All">All</option>
+      <option value="Functional">Functional</option>
+      <option value="Non-Functional">Non-Functional</option>
+    </select>
+  </div>
+</div>
+
 
         {/* ================= TABLE ================= */}
-        <div className="bg-neutral-800 border border-neutral-700 rounded-lg overflow-hidden">
-          <table className="w-full">
+        <div className="bg-neutral-800 m-5 border border-neutral-700 rounded-lg overflow-hidden">
+          <table className=" w-full">
             <thead className="border-b border-neutral-700">
               <tr>
                 {["Order ID", "Product", "Return Date", "Category", "Action"].map(
                   (h) => (
                     <th
                       key={h}
-                      className="text-left p-4 text-xs font-medium text-neutral-400 uppercase"
+                      className="text-center p-4 text-xs font-medium text-neutral-400 uppercase"
                     >
                       {h}
                     </th>
@@ -202,7 +205,7 @@ const Return = () => {
               {filteredReturns.map((r) => (
                 <tr
                   key={r._id}
-                  className="border-b border-neutral-700 hover:bg-neutral-750"
+                  className="border-b text-center border-neutral-700 hover:bg-neutral-750"
                 >
                   <td className="px-6 py-4 text-white">{r.orderId}</td>
 

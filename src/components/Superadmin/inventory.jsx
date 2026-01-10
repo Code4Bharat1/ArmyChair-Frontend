@@ -241,13 +241,13 @@ export default function Inventory() {
               <div className="p-6 text-center">Loading...</div>
             ) : (
               <table className="w-full">
-                <thead className="bg-neutral-850 border-b border-neutral-700">
+                <thead className="bg-neutral-850 border-b text-center border-neutral-700">
                   <tr>
                     {["Product", "Vendor", "Qty", "Status",].map(
                       (h) => (
                         <th
                           key={h}
-                          className="p-4 text-left text-xs text-neutral-400 uppercase tracking-wide"
+                          className="p-4  text-xs text-neutral-400 uppercase tracking-wide"
                         >
                           {h}
                         </th>
@@ -260,9 +260,9 @@ export default function Inventory() {
                   {filteredData.map((i) => (
                     <tr
                       key={i.id}
-                      className="border-b border-neutral-700 hover:bg-neutral-850 transition"
+                      className="border-b border-neutral-700 text-center hover:bg-neutral-850 transition"
                     >
-                      <td className="p-4 font-medium">{i.name}</td>
+                      <td className="p-2 font-medium">{i.name}</td>
                       <td className="p-4 flex items-center gap-2 text-sm">
                         <Building2 size={14} className="text-neutral-400" />
                         {i.vendor}
@@ -359,7 +359,7 @@ const StatusBadge = ({ status }) => {
     Critical: "bg-red-900 text-red-300",
   };
   return (
-    <span className={`px-3 py-1 rounded-full text-xs font-medium ${map[status]}`}>
+    <span className={`px-3 py-1 rounded-full text-[13px] font-medium ${map[status]}`}>
       {status}
     </span>
   );

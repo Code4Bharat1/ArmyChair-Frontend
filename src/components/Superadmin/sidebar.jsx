@@ -25,38 +25,48 @@ export default function Sidebar() {
       <nav className="">
         {/* MAIN MENU */}
         <div className="mb-6">
-          <div className="px-5 mb-10 border-b border-amber-600">
-
-          </div>
-          {/* Warehouse */}
+          
           <div className="mb-6">
-            <div className="px-6 mb-2">
-            <h2 className="text-xs font-bold text-white uppercase tracking-wider">
-              Warehouse
-            </h2>
+            <Link
+              href="/superadmin/dashboard"
+              className={menuItem("/superadmin/dashboard")}
+            >
+              Dashboard
+            </Link>
+
+            <Link
+              href="/superadmin/inventory"
+              className={menuItem("/superadmin/inventory")}
+            >
+              Chair Inventory
+            </Link>
+            <Link
+              href="/superadmin/spareparts"
+              className={menuItem("/superadmin/spareparts")}
+            >
+              Parts Inventory
+            </Link>
+
+            <Link
+              href="/superadmin/order"
+              className={menuItem("/superadmin/order")}
+            >
+              Orders
+            </Link>
+            <Link
+              href="/superadmin/return"
+              className={menuItem("/superadmin/return")}
+            >
+              Returns
+            </Link>
+            <Link
+              href="/superadmin/staff"
+              className={menuItem("/superadmin/staff")}
+            >
+              Staff
+            </Link>
+            
           </div>
-
-
-          <Link href="/superadmin/dashboard" className={menuItem("/superadmin/dashboard")}>
-            Dashboard
-          </Link>
-
-          <Link href="/superadmin/inventory" className={menuItem("/superadmin/inventory")}>
-            Inventory
-          </Link>
-
-
-          <Link href="/superadmin/order" className={menuItem("/superadmin/order")}>
-            Orders
-          </Link>
-           <Link href="/superadmin/return" className={menuItem("/superadmin/return")}>
-            Returns
-          </Link>
-           <Link href="/superadmin/staff" className={menuItem("/superadmin/staff")}>
-            Staff
-          </Link>
-
-        </div>
         </div>
       </nav>
 

@@ -204,50 +204,6 @@ export default function Dashboard() {
               </tbody>
             </table>
           </div>
-
-          {/* ADD NEW USER */}
-          <div className="mt-8 bg-neutral-800 border border-neutral-700 rounded-lg">
-            <div className="p-5 border-b border-neutral-700 flex items-center gap-2">
-              <Users className="w-5 h-5 text-amber-400" />
-              <h2 className="text-lg font-semibold">Add New User</h2>
-            </div>
-
-            <form onSubmit={handleAddUser} className="p-6 grid grid-cols-1 md:grid-cols-3 gap-4">
-              <select
-                name="role"
-                value={newUser.role}
-                onChange={handleUserChange}
-                className="bg-neutral-900 border border-neutral-700 rounded-lg px-3 py-2 text-sm"
-              >
-                <option value="admin">Admin</option>
-                <option value="warehouse">Warehouse</option>
-                <option value="fitting">Fitting</option>
-              </select>
-
-              <input
-                name="phone"
-                value={newUser.phone}
-                onChange={handleUserChange}
-                placeholder="Phone Number"
-                className="bg-neutral-900 border border-neutral-700 rounded-lg px-3 py-2 text-sm"
-              />
-
-              <input
-                type="password"
-                name="password"
-                value={newUser.password}
-                onChange={handleUserChange}
-                placeholder="Password"
-                className="bg-neutral-900 border border-neutral-700 rounded-lg px-3 py-2 text-sm"
-              />
-
-              <div className="md:col-span-3 flex justify-end">
-                <button className="bg-amber-600 px-6 py-2 rounded-lg text-sm">
-                  Add Member
-                </button>
-              </div>
-            </form>
-          </div>
         </div>
       </div>
     </div>

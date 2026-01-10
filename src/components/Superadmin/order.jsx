@@ -7,15 +7,43 @@ import {
   CheckCircle,
   Pencil,
   Trash2,
+  Plus,
+  User,
 } from "lucide-react";
 import axios from "axios";
 import Sidebar from "./sidebar";
+import { useRouter } from "next/navigation";
 
 export default function SalesOrders() {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [expandedOrderId, setExpandedOrderId] = useState(null);
+
+  const router = useRouter();
+
+  const [showForm, setShowForm] = useState(false);
+  const [editingOrderId, setEditingOrderId] = useState(null);
+
+  const initialFormData = {
+    dispatchedTo: "",
+    chairModel: "",
+    orderDate: "",
+    deliveryDate: "",
+    quantity: "",
+    isPartial: false,
+  };
+
+  const CHAIR_MODELS = [
+    "Army Chair - Basic",
+    "Army Chair - Premium",
+    "Office Chair",
+    "Folding Chair",
+    "Plastic Chair",
+    "Metal Chair",
+  ];
+
+  const [formData, setFormData] = useState(initialFormData);
 
   /* ================= API ================= */
   const API = process.env.NEXT_PUBLIC_API_URL;
@@ -32,6 +60,28 @@ export default function SalesOrders() {
       console.error(err);
     } finally {
       setLoading(false);
+    }
+  };
+  const handleCreateOrder = async (e) => {
+    e.preventDefault();
+
+    try {
+      const payload = {
+        dispatchedTo: formData.dispatchedTo,
+        chairModel: formData.chairModel,
+        orderDate: formData.orderDate,
+        deliveryDate: formData.deliveryDate,
+        quantity: Number(formData.quantity),
+        isPartial: formData.isPartial,
+      };
+
+      await axios.post(`${API}/orders`, payload, { headers });
+
+      setShowForm(false);
+      setFormData(initialFormData);
+      fetchOrders();
+    } catch (err) {
+      alert("Failed to create order");
     }
   };
 
@@ -71,8 +121,14 @@ export default function SalesOrders() {
     const safeIndex =
       currentIndex === -1 ? ORDER_STEPS.length - 1 : currentIndex;
 
+    const isDispatched = progress === "DISPATCHED";
+
     return (
-      <span className="text-sm font-medium text-amber-400">
+      <span
+        className={`text-sm font-medium ${
+          isDispatched ? "text-green-600" : "text-amber-400"
+        }`}
+      >
         {ORDER_STEPS[safeIndex]?.label}
       </span>
     );
@@ -91,6 +147,23 @@ export default function SalesOrders() {
             <p className="text-sm text-neutral-400">
               Create, track and manage all orders
             </p>
+          </div>
+
+          <div className="flex items-center gap-4">
+            <button
+              onClick={() => setShowForm(true)}
+              className="bg-amber-600 hover:bg-amber-700 px-4 py-2 rounded-lg flex items-center gap-2 shadow"
+            >
+              <Plus size={16} />
+              Add Order
+            </button>
+
+            <button
+              onClick={() => router.push("/sales/profile")}
+              className="w-10 h-10 rounded-full bg-amber-600 text-black flex items-center justify-center font-bold hover:ring-2 hover:ring-amber-500"
+            >
+              <User size={18} />
+            </button>
           </div>
         </div>
 
@@ -132,14 +205,14 @@ export default function SalesOrders() {
           ) : (
             <table className="w-full text-center">
               <thead className="bg-neutral-900 text-neutral-400 text-sm text-center">
-                <tr>
-                  <th className="p-4 text-left text-center">ORDER ID</th>
-                  <th className="p-4 text-left">DISPATCHED TO</th>
-                  <th className="p-4 text-left">CHAIR</th>
-                  <th className="p-4 text-left">ORDER DATE</th>
-                  <th className="p-4 text-left">DELIVERY DATE</th>
-                  <th className="p-4 text-left">QTY</th>
-                  <th className="p-4 text-left">PROGRESS</th>
+                <tr className="text-center">
+                  <th className="p-4  text-center">ORDER ID</th>
+                  <th className="p-4 ">DISPATCHED TO</th>
+                  <th className="p-4 ">CHAIR</th>
+                  <th className="p-4 ">ORDER DATE</th>
+                  <th className="p-4 ">DELIVERY DATE</th>
+                  <th className="p-4 ">QTY</th>
+                  <th className="p-4 ">PROGRESS</th>
                   {/* <th className="p-4 text-right">ACTIONS</th> */}
                 </tr>
               </thead>
@@ -250,6 +323,82 @@ export default function SalesOrders() {
           )}
         </div>
       </div>
+      {showForm && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-neutral-900 p-8 rounded-2xl w-full max-w-[520px] border-2 border-amber-600">
+            <h2 className="text-2xl font-bold mb-6 text-amber-400">
+              Create Order
+            </h2>
+
+            <div className="space-y-4">
+              <Input
+                label="Dispatched To"
+                name="dispatchedTo"
+                value={formData.dispatchedTo}
+                onChange={(e) =>
+                  setFormData({ ...formData, dispatchedTo: e.target.value })
+                }
+              />
+
+              <select
+                value={formData.chairModel}
+                onChange={(e) =>
+                  setFormData({ ...formData, chairModel: e.target.value })
+                }
+                className="w-full px-4 py-3 bg-neutral-800 border-2 border-neutral-600 rounded-lg"
+              >
+                <option value="">Select Chair Model</option>
+                {CHAIR_MODELS.map((m) => (
+                  <option key={m}>{m}</option>
+                ))}
+              </select>
+
+              <Input
+                label="Order Date"
+                type="date"
+                value={formData.orderDate}
+                onChange={(e) =>
+                  setFormData({ ...formData, orderDate: e.target.value })
+                }
+              />
+
+              <Input
+                label="Delivery Date"
+                type="date"
+                value={formData.deliveryDate}
+                onChange={(e) =>
+                  setFormData({ ...formData, deliveryDate: e.target.value })
+                }
+              />
+
+              <Input
+                label="Quantity"
+                type="number"
+                value={formData.quantity}
+                onChange={(e) =>
+                  setFormData({ ...formData, quantity: e.target.value })
+                }
+              />
+            </div>
+
+            <div className="flex justify-end gap-3 mt-6">
+              <button
+                onClick={() => setShowForm(false)}
+                className="px-5 py-2 border border-neutral-600 rounded-lg"
+              >
+                Cancel
+              </button>
+
+              <button
+                onClick={handleCreateOrder}
+                className="bg-amber-600 px-6 py-2 rounded-lg"
+              >
+                Create
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -272,3 +421,14 @@ function StatCard({ title, value, icon, highlight }) {
     </div>
   );
 }
+const Input = ({ label, value, onChange, type = "text" }) => (
+  <div>
+    <label className="text-sm text-neutral-300 block mb-1">{label}</label>
+    <input
+      type={type}
+      value={value}
+      onChange={onChange}
+      className="w-full px-4 py-2 bg-neutral-800 border border-neutral-700 rounded-lg"
+    />
+  </div>
+);
