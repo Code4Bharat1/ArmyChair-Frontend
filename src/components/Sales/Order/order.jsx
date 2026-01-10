@@ -183,24 +183,32 @@ export default function Orders() {
   };
 
   /* ================= PROGRESS ================= */
-  const ProgressTracker = ({ progress }) => {
-    if (progress === "PARTIAL")
-      return (
-        <span className="text-sm font-medium text-amber-400">
-          Partial / On Hold
-        </span>
-      );
-
-    const currentIndex = ORDER_STEPS.findIndex((s) => s.key === progress);
-    const safeIndex =
-      currentIndex === -1 ? ORDER_STEPS.length - 1 : currentIndex;
-
+ const ProgressTracker = ({ progress }) => {
+  if (progress === "PARTIAL") {
     return (
       <span className="text-sm font-medium text-amber-400">
-        {ORDER_STEPS[safeIndex]?.label}
+        Partial / On Hold
       </span>
     );
-  };
+  }
+
+  const currentIndex = ORDER_STEPS.findIndex((s) => s.key === progress);
+  const safeIndex =
+    currentIndex === -1 ? ORDER_STEPS.length - 1 : currentIndex;
+
+  const isCompleted = progress === "DISPATCHED";
+
+  return (
+    <span
+      className={`text-sm font-medium ${
+        isCompleted ? "text-green-400" : "text-amber-400"
+      }`}
+    >
+      {ORDER_STEPS[safeIndex]?.label}
+    </span>
+  );
+};
+
 
   const handleRowClick = (orderId) => {
     setExpandedOrderId((prev) => (prev === orderId ? null : orderId));
@@ -391,8 +399,7 @@ export default function Orders() {
                                   ? ORDER_STEPS.length - 1
                                   : currentIndex;
 
-                              const percent =
-                                (safeIndex / (ORDER_STEPS.length - 1)) * 100;
+                              const percent = ((safeIndex + 1) / ORDER_STEPS.length) * 100;
 
                               return (
                                 <div className="w-full space-y-6">
@@ -415,32 +422,39 @@ export default function Orders() {
                                     ))}
                                   </div>
 
-                                  <div className="relative w-full h-10 flex items-center">
-                                    <div className="absolute left-0 right-0 h-[4px] bg-neutral-600 rounded-full" />
+                                 {/* TRACK */}
+<div className="relative w-full h-10 flex items-center mt-6">
+  {/* BASE LINE */}
+  <div className="absolute left-0 right-0 h-[4px] bg-neutral-600 rounded-full" />
 
-                                    <div
-                                      className="absolute left-0 h-[4px] rounded-full transition-all duration-500"
-                                      style={{
-                                        width: `${percent}%`,
-                                        background:
-                                          percent === 100
-                                            ? "#22c55e"
-                                            : "linear-gradient(90deg, #22c55e, #f59e0b)",
-                                      }}
-                                    />
+  {/* PROGRESS LINE */}
+  <div
+    className="absolute left-0 h-[4px] rounded-full transition-all duration-500"
+    style={{
+      width: `${percent}%`,
+      background:
+        percent === 100
+          ? "#22c55e"
+          : "linear-gradient(90deg,#22c55e,#f59e0b)",
+    }}
+  />
 
-                                    <div
-                                      className="absolute w-4 h-4 rounded-full border-2 border-black shadow"
-                                      style={{
-                                        left: `calc(${percent}% - 8px)`,
-                                        backgroundColor:
-                                          safeIndex ===
-                                          ORDER_STEPS.length - 1
-                                            ? "#22c55e"
-                                            : "#f59e0b",
-                                      }}
-                                    />
-                                  </div>
+  {/* MOVING NUMBER (REPLACES DOT) */}
+  <div
+    className="absolute w-7 h-7 rounded-full border-2 border-black shadow
+               flex items-center justify-center text-xs font-bold text-black"
+    style={{
+      left: `calc(${percent}% - 14px)`,
+      backgroundColor:
+        safeIndex === ORDER_STEPS.length - 1
+          ? "#22c55e"
+          : "#f59e0b",
+    }}
+  >
+    {safeIndex + 1}
+  </div>
+</div>
+
 
                                   <p className="text-sm">
                                     <span className="text-neutral-400">
