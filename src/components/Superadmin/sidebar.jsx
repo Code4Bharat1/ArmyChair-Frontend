@@ -38,7 +38,13 @@ export default function Sidebar() {
               href="/superadmin/inventory"
               className={menuItem("/superadmin/inventory")}
             >
-              Inventory
+              Chair Inventory
+            </Link>
+            <Link
+              href="/superadmin/spareparts"
+              className={menuItem("/superadmin/spareparts")}
+            >
+              Parts Inventory
             </Link>
 
             <Link
@@ -59,6 +65,7 @@ export default function Sidebar() {
             >
               Staff
             </Link>
+            
           </div>
         </div>
       </nav>
