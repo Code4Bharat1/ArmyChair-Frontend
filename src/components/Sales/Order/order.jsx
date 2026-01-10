@@ -7,10 +7,14 @@ import {
   Package,
   Clock,
   CheckCircle,
+  User, // ✅ ADD
 } from "lucide-react";
 import axios from "axios";
+import { useRouter } from "next/navigation"; // ✅ ADD
 
 export default function Orders() {
+  const router = useRouter();
+
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [expandedOrderId, setExpandedOrderId] = useState(null);
@@ -202,13 +206,25 @@ export default function Orders() {
             </p>
           </div>
 
-          <button
-            onClick={() => setShowForm(true)}
-            className="bg-amber-600 hover:bg-amber-700 px-4 py-2 rounded-lg flex items-center gap-2 shadow"
-          >
-            <Plus size={16} />
-            Add Order
-          </button>
+          {/* RIGHT SIDE */}
+          <div className="flex items-center gap-4">
+            <button
+              onClick={() => setShowForm(true)}
+              className="bg-amber-600 hover:bg-amber-700 px-4 py-2 rounded-lg flex items-center gap-2 shadow"
+            >
+              <Plus size={16} />
+              Add Order
+            </button>
+
+            {/* USER AVATAR */}
+            <button
+              onClick={() => router.push("/sales/profile")}
+              title="My Profile"
+              className="w-10 h-10 rounded-full bg-amber-600 text-black flex items-center justify-center font-bold hover:ring-2 hover:ring-amber-500 transition"
+            >
+              <User size={20} />
+            </button>
+          </div>
         </div>
 
         {/* STATS */}
@@ -381,7 +397,7 @@ export default function Orders() {
                                   : currentIndex;
 
                               const percent =
-                                (safeIndex / (ORDER_STEPS.length - 1)) * 100;
+                                ((safeIndex + 1) / ORDER_STEPS.length) * 100;
 
                               return (
                                 <div className="w-full space-y-6">
@@ -407,7 +423,8 @@ export default function Orders() {
                                   </div>
 
                                   {/* TRACK */}
-                                  <div className="relative w-full h-10 flex items-center">
+                                  {/* TRACK */}
+                                  <div className="relative w-full h-10 flex items-center mt-6">
                                     {/* BASE LINE */}
                                     <div className="absolute left-0 right-0 h-[4px] bg-neutral-600 rounded-full" />
 
@@ -419,21 +436,24 @@ export default function Orders() {
                                         background:
                                           percent === 100
                                             ? "#22c55e"
-                                            : "linear-gradient(90deg, #22c55e, #f59e0b)",
+                                            : "linear-gradient(90deg,#22c55e,#f59e0b)",
                                       }}
                                     />
 
-                                    {/* CURRENT DOT */}
+                                    {/* MOVING NUMBER (REPLACES DOT) */}
                                     <div
-                                      className="absolute w-4 h-4 rounded-full border-2 border-black shadow"
+                                      className="absolute w-7 h-7 rounded-full border-2 border-black shadow
+               flex items-center justify-center text-xs font-bold text-black"
                                       style={{
-                                        left: `calc(${percent}% - 8px)`,
+                                        left: `calc(${percent}% - 14px)`,
                                         backgroundColor:
                                           safeIndex === ORDER_STEPS.length - 1
                                             ? "#22c55e"
                                             : "#f59e0b",
                                       }}
-                                    />
+                                    >
+                                      {safeIndex + 1}
+                                    </div>
                                   </div>
 
                                   {/* CURRENT STATUS */}
@@ -465,113 +485,119 @@ export default function Orders() {
       </div>
 
       {/* MODAL */}
-{showForm && (
-  <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-    <div className="bg-neutral-900 p-8 rounded-2xl w-full max-w-[520px] border-2 border-amber-600 shadow-2xl">
-      <h2 className="text-2xl font-bold mb-6 text-amber-400">
-        {editingOrderId ? "Update Order" : "Create Order"}
-      </h2>
+      {showForm && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-neutral-900 p-8 rounded-2xl w-full max-w-[520px] border-2 border-amber-600 shadow-2xl">
+            <h2 className="text-2xl font-bold mb-6 text-amber-400">
+              {editingOrderId ? "Update Order" : "Create Order"}
+            </h2>
 
-      <div className="space-y-4">
-        <Input
-          label="Dispatched To"
-          name="dispatchedTo"
-          value={formData.dispatchedTo}
-          onChange={handleFormChange}
-        />
+            <div className="space-y-4">
+              <Input
+                label="Dispatched To"
+                name="dispatchedTo"
+                value={formData.dispatchedTo}
+                onChange={handleFormChange}
+              />
 
-        {/* CHAIR MODEL DROPDOWN */}
-        <div>
-          <label className="block text-base text-neutral-300 mb-2 font-semibold">
-            Chair Model
-          </label>
-          <select
-            name="chairModel"
-            value={formData.chairModel}
-            onChange={handleFormChange}
-            className="w-full px-4 py-3 bg-neutral-800 border-2 border-neutral-600 rounded-lg text-base text-neutral-100 focus:border-amber-600 focus:ring-2 focus:ring-amber-600/50 outline-none"
-            required
-          >
-            <option value="" className="bg-neutral-800">Select Chair Model</option>
-            {CHAIR_MODELS.map((model) => (
-              <option key={model} value={model} className="bg-neutral-800">
-                {model}
-              </option>
-            ))}
-          </select>
+              {/* CHAIR MODEL DROPDOWN */}
+              <div>
+                <label className="block text-base text-neutral-300 mb-2 font-semibold">
+                  Chair Model
+                </label>
+                <select
+                  name="chairModel"
+                  value={formData.chairModel}
+                  onChange={handleFormChange}
+                  className="w-full px-4 py-3 bg-neutral-800 border-2 border-neutral-600 rounded-lg text-base text-neutral-100 focus:border-amber-600 focus:ring-2 focus:ring-amber-600/50 outline-none"
+                  required
+                >
+                  <option value="" className="bg-neutral-800">
+                    Select Chair Model
+                  </option>
+                  {CHAIR_MODELS.map((model) => (
+                    <option
+                      key={model}
+                      value={model}
+                      className="bg-neutral-800"
+                    >
+                      {model}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <Input
+                label="Order Date"
+                name="orderDate"
+                type="date"
+                value={formData.orderDate}
+                onChange={handleFormChange}
+              />
+
+              <Input
+                label="Quantity"
+                name="quantity"
+                type="number"
+                value={formData.quantity}
+                onChange={handleFormChange}
+              />
+
+              <Input
+                label="Delivery Date"
+                name="deliveryDate"
+                type="date"
+                value={formData.deliveryDate}
+                onChange={handleFormChange}
+              />
+
+              {/* PARTIAL ORDER CHECKBOX */}
+              <div className="flex items-center gap-3 mt-2 bg-neutral-800 p-4 rounded-lg border-2 border-neutral-700">
+                <input
+                  type="checkbox"
+                  id="isPartial"
+                  checked={formData.isPartial}
+                  onChange={(e) =>
+                    setFormData((prev) => ({
+                      ...prev,
+                      isPartial: e.target.checked,
+                    }))
+                  }
+                  className="w-5 h-5 accent-amber-600"
+                />
+
+                <label
+                  htmlFor="isPartial"
+                  className="text-base text-neutral-200 cursor-pointer font-semibold"
+                >
+                  Is this a partial order?
+                </label>
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-3 mt-8">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowForm(false);
+                  setEditingOrderId(null);
+                  setFormData(initialFormData);
+                }}
+                className="px-6 py-2.5 text-base text-neutral-300 hover:text-neutral-100 hover:bg-neutral-800 rounded-lg transition font-medium border-2 border-neutral-700"
+              >
+                Cancel
+              </button>
+
+              <button
+                onClick={handleCreateOrder}
+                className="bg-amber-600 hover:bg-amber-700 text-white px-6 py-2.5 rounded-lg transition font-semibold shadow-lg text-base border-2 border-amber-500"
+              >
+                {editingOrderId ? "Update" : "Create"}
+              </button>
+            </div>
+          </div>
         </div>
-
-        <Input
-          label="Order Date"
-          name="orderDate"
-          type="date"
-          value={formData.orderDate}
-          onChange={handleFormChange}
-        />
-
-        <Input
-          label="Quantity"
-          name="quantity"
-          type="number"
-          value={formData.quantity}
-          onChange={handleFormChange}
-        />
-
-        <Input
-          label="Delivery Date"
-          name="deliveryDate"
-          type="date"
-          value={formData.deliveryDate}
-          onChange={handleFormChange}
-        />
-
-        {/* PARTIAL ORDER CHECKBOX */}
-        <div className="flex items-center gap-3 mt-2 bg-neutral-800 p-4 rounded-lg border-2 border-neutral-700">
-          <input
-            type="checkbox"
-            id="isPartial"
-            checked={formData.isPartial}
-            onChange={(e) =>
-              setFormData((prev) => ({
-                ...prev,
-                isPartial: e.target.checked,
-              }))
-            }
-            className="w-5 h-5 accent-amber-600"
-          />
-
-          <label
-            htmlFor="isPartial"
-            className="text-base text-neutral-200 cursor-pointer font-semibold"
-          >
-            Is this a partial order?
-          </label>
-        </div>
-      </div>
-
-      <div className="flex justify-end gap-3 mt-8">
-        <button
-          type="button"
-          onClick={() => {
-            setShowForm(false);
-            setEditingOrderId(null);
-            setFormData(initialFormData);
-          }}
-          className="px-6 py-2.5 text-base text-neutral-300 hover:text-neutral-100 hover:bg-neutral-800 rounded-lg transition font-medium border-2 border-neutral-700"
-        >
-          Cancel
-        </button>
-
-        <button
-          onClick={handleCreateOrder}
-          className="bg-amber-600 hover:bg-amber-700 text-white px-6 py-2.5 rounded-lg transition font-semibold shadow-lg text-base border-2 border-amber-500"
-        >
-          {editingOrderId ? "Update" : "Create"}
-        </button>
-      </div>
-    </div>
-  </div>
-)}
+      )}
     </div>
   );
 }
@@ -596,7 +622,9 @@ const StatCard = ({ title, value, icon, danger }) => (
 
 const Input = ({ label, name, value, onChange, type = "text" }) => (
   <div>
-    <label className="text-base text-neutral-300 font-semibold block mb-2">{label}</label>
+    <label className="text-base text-neutral-300 font-semibold block mb-2">
+      {label}
+    </label>
     <input
       type={type}
       name={name}
