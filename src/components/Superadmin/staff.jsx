@@ -28,7 +28,7 @@ export default function Staff() {
   const [selectedStaff, setSelectedStaff] = useState(null);
   const [search, setSearch] = useState("");
   const API = process.env.NEXT_PUBLIC_API_URL;
-  
+
   const fetchStaffs = async () => {
     try {
       const res = await axios.get(`${API}/auth/staff`, {
@@ -43,17 +43,25 @@ export default function Staff() {
     }
   };
 
+  const [imageViewer, setImageViewer] = useState({
+  open: false,
+  src: "",
+  title: "",
+});
+
   useEffect(() => {
     fetchStaffs();
   }, []);
 
+  
   /* ==========================
      FILTER
   ========================== */
-  const filteredStaff = staffs.filter((s) =>
-    s.name.toLowerCase().includes(search.toLowerCase()) ||
-    s.email.toLowerCase().includes(search.toLowerCase()) ||
-    s.role.toLowerCase().includes(search.toLowerCase())
+  const filteredStaff = staffs.filter(
+    (s) =>
+      s.name.toLowerCase().includes(search.toLowerCase()) ||
+      s.email.toLowerCase().includes(search.toLowerCase()) ||
+      s.role.toLowerCase().includes(search.toLowerCase())
   );
 
   /* ==========================
@@ -76,12 +84,17 @@ export default function Staff() {
     aadharNumber: "",
     dateOfBirth: "",
     photo: "",
+    aadharPhotoFront: "", // ✅ NEW
+    aadharPhotoBack: "", // ✅ NEW
   });
 
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
 
   const [preview, setPreview] = useState(null);
+  const [aadharFrontPreview, setAadharFrontPreview] = useState(null);
+  const [aadharBackPreview, setAadharBackPreview] = useState(null);
+
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
   const [cameraOpen, setCameraOpen] = useState(false);
@@ -103,6 +116,21 @@ export default function Staff() {
     const base64 = await fileToBase64(file);
     setPreview(URL.createObjectURL(file));
     setForm({ ...form, photo: base64 });
+  };
+  const handleAadharFrontUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const base64 = await fileToBase64(file);
+    setAadharFrontPreview(URL.createObjectURL(file));
+    setForm({ ...form, aadharPhotoFront: base64 });
+  };
+
+  const handleAadharBackUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const base64 = await fileToBase64(file);
+    setAadharBackPreview(URL.createObjectURL(file));
+    setForm({ ...form, aadharPhotoBack: base64 });
   };
 
   const openCamera = async () => {
@@ -129,6 +157,10 @@ export default function Staff() {
     setMessage("");
 
     const { name, email, password, mobile, aadharNumber, dateOfBirth } = form;
+if (!form.aadharPhotoFront || !form.aadharPhotoBack) {
+  setMessage("Please upload both front and back Aadhar photos");
+  return;
+}
 
     if (
       !name ||
@@ -164,8 +196,13 @@ export default function Staff() {
         aadharNumber: "",
         dateOfBirth: "",
         photo: "",
+        aadharPhotoFront: "",
+        aadharPhotoBack: "",
       });
+
       setPreview(null);
+      setAadharFrontPreview(null);
+      setAadharBackPreview(null);
       setCameraOpen(false);
     } catch (err) {
       setMessage(err.response?.data?.message || "Something went wrong");
@@ -234,16 +271,15 @@ export default function Staff() {
         {/* TABLE */}
         <div className="bg-neutral-800 border border-neutral-700 rounded-xl overflow-hidden">
           <table className="w-full">
-            <thead className="bg-neutral-900 text-neutral-400 text-sm">
+            <thead className="bg-neutral-900 text-center text-neutral-400 text-sm">
               <tr>
-                <th className="p-4 text-left">PHOTO</th>
-                <th className="p-4 text-left">NAME</th>
-                <th className="p-4 text-left">EMAIL</th>
-                <th className="p-4 text-left">MOBILE</th>
-                <th className="p-4 text-left">AADHAR NUMBER</th>
-                <th className="p-4 text-left">ROLE</th>
-                <th className="p-4 text-left">DATE OF BIRTH</th>
-                <th className="p-4 text-left">ACTIONS</th>
+                <th className="p-4 ">PHOTO</th>
+                <th className="p-4 ">NAME</th>
+                <th className="p-4 ">EMAIL</th>
+                <th className="p-4 ">MOBILE</th>
+                <th className="p-4 ">AADHAR NUMBER</th>
+                <th className="p-4 ">ROLE</th>
+                <th className="p-4 ">ACTIONS</th>
               </tr>
             </thead>
 
@@ -251,12 +287,12 @@ export default function Staff() {
               {filteredStaff.map((s) => (
                 <tr
                   key={s._id}
-                  className="border-t border-neutral-700 hover:bg-neutral-700/30"
+                  className="border-t text-center border-neutral-700 hover:bg-neutral-700/30"
                 >
                   <td className="p-4">
                     <img
                       src={s.photo || "/avatar.png"}
-                      className="w-10 h-10 rounded-full object-cover"
+                      className="w-10 h-10 rounded-full items-center object-cover"
                       alt={s.name}
                     />
                   </td>
@@ -268,9 +304,6 @@ export default function Staff() {
                     <span className="inline-block px-3 py-1 rounded-full text-xs font-medium bg-amber-900/60 text-amber-400 border border-amber-700">
                       {s.role}
                     </span>
-                  </td>
-                  <td className="p-4 text-neutral-400">
-                    {new Date(s.dateOfBirth).toLocaleDateString()}
                   </td>
                   <td className="p-4">
                     <button
@@ -305,10 +338,18 @@ export default function Staff() {
 
               <div className="flex flex-col items-center">
                 <img
-                  src={selectedStaff.photo || "/avatar.png"}
-                  className="w-28 h-28 rounded-full object-cover border-4 border-neutral-700"
-                  alt={selectedStaff.name}
-                />
+  src={selectedStaff.photo || "/avatar.png"}
+  onClick={() =>
+    setImageViewer({
+      open: true,
+      src: selectedStaff.photo || "/avatar.png",
+      title: "Profile Photo",
+    })
+  }
+  className="w-28 h-28 rounded-full object-cover border-4 border-neutral-700 cursor-pointer hover:opacity-80 transition"
+  alt={selectedStaff.name}
+/>
+
 
                 <h2 className="mt-4 text-xl font-bold">{selectedStaff.name}</h2>
                 <span className="mt-1 px-3 py-1 rounded-full text-xs font-medium bg-amber-900/60 text-amber-400 border border-amber-700">
@@ -327,7 +368,9 @@ export default function Staff() {
                 </div>
                 <div className="flex justify-between py-2 border-b border-neutral-700">
                   <span className="text-neutral-400">Aadhar</span>
-                  <span className="font-medium">{selectedStaff.aadharNumber}</span>
+                  <span className="font-medium">
+                    {selectedStaff.aadharNumber}
+                  </span>
                 </div>
                 <div className="flex justify-between py-2">
                   <span className="text-neutral-400">Date of Birth</span>
@@ -336,6 +379,67 @@ export default function Staff() {
                   </span>
                 </div>
               </div>
+              {/* AADHAR PHOTOS */}
+{/* AADHAR PHOTOS */}
+{(selectedStaff.aadharPhotoFront || selectedStaff.aadharPhotoBack) && (
+  <div className="mt-4">
+    <p className="text-sm text-neutral-400 mb-2">Aadhar Card</p>
+    <div className="grid grid-cols-2 gap-3">
+      {selectedStaff.aadharPhotoFront && (
+        <img
+          src={selectedStaff.aadharPhotoFront}
+          onClick={() =>
+            setImageViewer({
+              open: true,
+              src: selectedStaff.aadharPhotoFront,
+              title: "Aadhar Card - Front",
+            })
+          }
+          className="rounded-lg border border-neutral-700 object-cover cursor-pointer hover:opacity-80 transition"
+          alt="Aadhar Front"
+        />
+      )}
+      {selectedStaff.aadharPhotoBack && (
+        <img
+          src={selectedStaff.aadharPhotoBack}
+          onClick={() =>
+            setImageViewer({
+              open: true,
+              src: selectedStaff.aadharPhotoBack,
+              title: "Aadhar Card - Back",
+            })
+          }
+          className="rounded-lg border border-neutral-700 object-cover cursor-pointer hover:opacity-80 transition"
+          alt="Aadhar Back"
+        />
+      )}
+    </div>
+  </div>
+)}
+
+{/* ===== IMAGE VIEWER MODAL ===== */}
+{imageViewer.open && (
+  <div className="fixed inset-0 bg-black/90 z-[999] flex items-center justify-center">
+    <button
+      onClick={() => setImageViewer({ open: false, src: "", title: "" })}
+      className="absolute top-6 right-6 text-white hover:text-amber-400"
+    >
+      <X size={28} />
+    </button>
+
+    <div className="max-w-3xl w-full px-4">
+      <p className="text-center text-neutral-300 mb-3">
+        {imageViewer.title}
+      </p>
+      <img
+        src={imageViewer.src}
+        className="w-full max-h-[80vh] object-contain rounded-lg border border-neutral-700"
+        alt="Preview"
+      />
+    </div>
+  </div>
+)}
+
             </div>
           </div>
         )}
@@ -343,13 +447,23 @@ export default function Staff() {
         {/* ===== ADD STAFF FORM MODAL ===== */}
         {showForm && (
           <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
-            <div className="bg-neutral-800 border border-neutral-700 w-full max-w-lg rounded-xl relative max-h-[90vh] overflow-y-auto">
+            <div className="bg-neutral-800 border border-neutral-700 w-full max-w-lg rounded-xl relative max-h-[90vh]">
+
               <div className="sticky top-0 bg-neutral-800 border-b border-neutral-700 p-4 flex justify-between items-center">
                 <h2 className="text-lg font-bold">Add New Staff Member</h2>
                 <button
                   onClick={() => {
                     setShowForm(false);
                     setPreview(null);
+                    setAadharFrontPreview(null);
+                    setAadharBackPreview(null);
+
+                    if (videoRef.current?.srcObject) {
+                      videoRef.current.srcObject
+                        .getTracks()
+                        .forEach((t) => t.stop());
+                    }
+
                     setCameraOpen(false);
                   }}
                   className="text-neutral-400 hover:text-neutral-200"
@@ -357,7 +471,7 @@ export default function Staff() {
                   <X size={20} />
                 </button>
               </div>
-
+<div className="max-h-[75vh] overflow-y-auto dark-scrollbar">
               <form onSubmit={handleSubmit} className="p-6 space-y-4">
                 <Input
                   icon={User}
@@ -401,6 +515,38 @@ export default function Staff() {
                   placeholder="Aadhar Number"
                   required
                 />
+                {/* AADHAR PHOTOS */}
+                <div>
+                  <label className="block text-sm text-neutral-400 mb-2">
+                    Aadhar Card Photos
+                  </label>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {/* FRONT */}
+                    <label className="cursor-pointer flex items-center justify-center gap-2 bg-neutral-900 border border-neutral-700 hover:border-amber-600 px-4 py-3 rounded-lg text-sm transition">
+                      <Upload size={16} />
+                      Upload Front
+                      <input
+                        type="file"
+                        hidden
+                        accept="image/*"
+                        onChange={handleAadharFrontUpload}
+                      />
+                    </label>
+
+                    {/* BACK */}
+                    <label className="cursor-pointer flex items-center justify-center gap-2 bg-neutral-900 border border-neutral-700 hover:border-amber-600 px-4 py-3 rounded-lg text-sm transition">
+                      <Upload size={16} />
+                      Upload Back
+                      <input
+                        type="file"
+                        hidden
+                        accept="image/*"
+                        onChange={handleAadharBackUpload}
+                      />
+                    </label>
+                  </div>
+                </div>
 
                 <div>
                   <label className="block text-sm text-neutral-400 mb-1">
@@ -440,7 +586,12 @@ export default function Staff() {
                     <label className="cursor-pointer flex items-center gap-2 bg-neutral-900 border border-neutral-700 hover:border-amber-600 px-4 py-2 rounded-lg text-sm transition">
                       <Upload size={16} />
                       Upload
-                      <input type="file" hidden onChange={handlePhotoUpload} accept="image/*" />
+                      <input
+                        type="file"
+                        hidden
+                        onChange={handlePhotoUpload}
+                        accept="image/*"
+                      />
                     </label>
                     <button
                       type="button"
@@ -460,6 +611,30 @@ export default function Staff() {
                       className="w-32 h-32 rounded-lg object-cover border-2 border-neutral-700"
                       alt="Preview"
                     />
+                  </div>
+                )}
+                {/* AADHAR PREVIEW */}
+                {(aadharFrontPreview || aadharBackPreview) && (
+                  <div className="grid grid-cols-2 gap-4">
+                    {aadharFrontPreview && (
+                      <div className="text-center">
+                        <p className="text-xs text-neutral-400 mb-1">Front</p>
+                        <img
+                          src={aadharFrontPreview}
+                          className="w-full h-32 object-cover rounded-lg border border-neutral-700"
+                        />
+                      </div>
+                    )}
+
+                    {aadharBackPreview && (
+                      <div className="text-center">
+                        <p className="text-xs text-neutral-400 mb-1">Back</p>
+                        <img
+                          src={aadharBackPreview}
+                          className="w-full h-32 object-cover rounded-lg border border-neutral-700"
+                        />
+                      </div>
+                    )}
                   </div>
                 )}
 
@@ -482,11 +657,13 @@ export default function Staff() {
                 )}
 
                 {message && (
-                  <div className={`text-sm px-4 py-2 rounded-lg ${
-                    message.includes("success")
-                      ? "bg-green-900/60 text-green-400 border border-green-700"
-                      : "bg-red-900/60 text-red-400 border border-red-700"
-                  }`}>
+                  <div
+                    className={`text-sm px-4 py-2 rounded-lg ${
+                      message.includes("success")
+                        ? "bg-green-900/60 text-green-400 border border-green-700"
+                        : "bg-red-900/60 text-red-400 border border-red-700"
+                    }`}
+                  >
                     {message}
                   </div>
                 )}
@@ -499,6 +676,7 @@ export default function Staff() {
                   {loading ? "Adding Staff..." : "Add Staff Member"}
                 </button>
               </form>
+              </div>
             </div>
           </div>
         )}
