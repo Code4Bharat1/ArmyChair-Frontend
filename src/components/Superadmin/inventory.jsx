@@ -41,7 +41,7 @@ export default function Inventory() {
   const fetchInventory = async () => {
     try {
       const res = await axios.get(`${API}/inventory`, { headers });
-      setInventory(res.data.inventory || res.data);
+      setInventory(res.data.inventory );
     } catch (err) {
       console.error("Fetch failed", err);
     } finally {
@@ -51,6 +51,11 @@ export default function Inventory() {
 
   useEffect(() => {
     fetchInventory();
+
+    const refresh = () => fetchInventory();
+    window.addEventListener("inventoryUpdated", refresh);
+
+    return () => window.removeEventListener("inventoryUpdated",refresh);
   }, []);
 
   /* ================= CREATE / UPDATE ================= */

@@ -4,8 +4,17 @@ import { Search, Download, Plus, X } from "lucide-react";
 import Sidebar from "@/components/Superadmin/sidebar";
 import axios from "axios";
 
-const API = process.env.NEXT_PUBLIC_API_URL;
-const headers = { "Content-Type": "application/json" };
+const API = process.env.NEXT_PUBLIC_API_URL
+const getAuthHeaders = () => {
+  
+  const token = localStorage.getItem("token");
+
+  return {
+    "Content-Type": "application/json",
+    Authorization: `Bearer ${token}`,
+  };
+};
+
 
 const Return = () => {
   const [search, setSearch] = useState("");
@@ -34,7 +43,7 @@ const Return = () => {
   const fetchReturns = async () => {
     try {
       setLoading(true);
-      const res = await axios.get(`${API}/returns`, { headers });
+      const res = await axios.get(`${API}/returns`, { headers: getAuthHeaders() });
       setReturns(res.data.data);
     } catch (error) {
       console.error("Failed to fetch returns", error);
@@ -64,17 +73,19 @@ const Return = () => {
   /* ================= MOVE TO INVENTORY ================= */
   const moveToInventory = async (id) => {
     try {
-      await axios.post(`${API}/returns/${id}/move-to-inventory`);
+      await axios.post(`${API}/returns/${id}/move-to-inventory`, {}, { headers : getAuthHeaders()});
       fetchReturns();
-    } catch (error) {
-      console.error("Failed to move to inventory", error);
-    }
-  };
+
+  window.dispatchEvent(new Event("inventoryUpdated"));
+} catch (error) {
+  console.error("Failed to move to inventory", error);
+}
+};
 
   /* ================= ADD RETURN ================= */
   const submitReturn = async () => {
     try {
-      await axios.post(`${API}/returns`, form, { headers });
+      await axios.post(`${API}/returns`, form, { headers : getAuthHeaders() });
       setOpenModal(false);
       setForm({
         orderId: "",
@@ -321,5 +332,6 @@ const Return = () => {
     </div>
   );
 };
+
 
 export default Return;
