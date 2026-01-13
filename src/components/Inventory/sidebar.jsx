@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Package, Wrench, X, Menu, ShoppingCart, CheckCircle } from "lucide-react";
+import { Package, Wrench, X, Menu, ShoppingCart, CheckCircle, ArrowLeftRight } from "lucide-react";
 import { useState } from "react";
 
 export default function InventorySidebar() {
@@ -99,6 +99,15 @@ export default function InventorySidebar() {
             >
               <CheckCircle size={18} className="flex-shrink-0" />
               <span className="truncate">Completed Orders</span>
+            </Link>
+
+                        <Link
+              href="/inventory/transfer"
+              onClick={() => setOpen(false)}
+              className={itemClass("/inventory/transfer")}
+            >
+              <ArrowLeftRight size={18} className="flex-shrink-0" />
+              <span className="truncate">Transfer</span>
             </Link>
           </nav>
         </div>

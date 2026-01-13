@@ -10,6 +10,7 @@ import {
   Truck,
 } from "lucide-react";
 import axios from "axios";
+import SalesSidebar from "./sidebar";
 
 export default function Orders() {
   const [orders, setOrders] = useState([]);
@@ -216,6 +217,7 @@ export default function Orders() {
 
   return (
     <div className="flex h-screen bg-gradient-to-b from-amber-900 via-black to-neutral-900 text-neutral-100">
+        <SalesSidebar />
       <div className="flex-1 overflow-auto">
         {/* HEADER */}
         <div className="bg-neutral-800 border-b border-neutral-700 p-4 flex items-center justify-between">

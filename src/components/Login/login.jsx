@@ -53,7 +53,7 @@ export default function Login() {
             break;
             
           case "sales":
-            router.push("/sales");
+            router.push("/sales/order");
             break;
 
           case "warehouse":
