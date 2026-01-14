@@ -20,6 +20,24 @@ export default function WarehouseOrders() {
   const [search, setSearch] = useState("");
   const [processingId, setProcessingId] = useState(null);
 
+  const [activeFilter, setActiveFilter] = useState("ALL");
+
+const today = new Date();
+today.setHours(0, 0, 0, 0);
+
+const isDelayed = (order) => {
+  if (!order.deliveryDate) return false;
+
+  const delivery = new Date(order.deliveryDate);
+  delivery.setHours(0, 0, 0, 0);
+
+  return (
+    delivery < today &&
+    !["DISPATCHED", "COMPLETED"].includes(order.progress)
+  );
+};
+
+
   const API = process.env.NEXT_PUBLIC_API_URL;
   const token =
     typeof window !== "undefined" ? localStorage.getItem("token") : null;
@@ -130,23 +148,43 @@ export default function WarehouseOrders() {
 
   /* ================= FILTER ================= */
   const filteredOrders = useMemo(() => {
-    const q = (search || "").toLowerCase();
-    return orders.filter(
+  let data = [...orders];
+
+  // 🔥 CARD FILTERS
+  if (activeFilter === "DELAYED") {
+    data = data.filter((o) => isDelayed(o));
+  }
+
+  if (activeFilter === "READY") {
+    data = data.filter((o) => o.progress === "READY_FOR_DISPATCH");
+  }
+
+  // 🔍 SEARCH
+  const q = (search || "").toLowerCase();
+  if (q) {
+    data = data.filter(
       (o) =>
         o.orderId?.toLowerCase().includes(q) ||
         o.dispatchedTo?.toLowerCase().includes(q) ||
         o.chairModel?.toLowerCase().includes(q)
     );
-  }, [orders, search]);
+  }
+
+  return data;
+}, [orders, search, activeFilter]);
+
 
   /* ================= STATS ================= */
-  const totalOrders = filteredOrders.length;
-  const pendingPicking = filteredOrders.filter(
-    (o) => o.progress === "ORDER_PLACED"
-  ).length;
-  const readyForDispatch = filteredOrders.filter(
-    (o) => o.progress === "READY_FOR_DISPATCH"
-  ).length;
+ const totalOrders = orders.length;
+
+const delayedOrders = orders.filter((o) => isDelayed(o)).length;
+
+const readyForDispatch = orders.filter(
+  (o) => o.progress === "READY_FOR_DISPATCH"
+).length;
+
+
+  
 
   /* ================= STATUS BADGE ================= */
   const getStatusBadge = (progress) => {
@@ -264,19 +302,34 @@ export default function WarehouseOrders() {
         </div>
 
         <div className="p-6">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-            <StatCard title="Total Orders" value={totalOrders} icon={<Package />} />
-            <StatCard
-              title="Pending Picking"
-              value={pendingPicking}
-              icon={<Clock />}
-              danger={pendingPicking > 0}
-            />
-            <StatCard
-              title="Ready for Dispatch"
-              value={readyForDispatch}
-              icon={<TrendingUp />}
-            />
+         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+  <StatCard
+    title="Total Orders"
+    value={totalOrders}
+    icon={<Package />}
+    active={activeFilter === "ALL"}
+    onClick={() => setActiveFilter("ALL")}
+  />
+
+  <StatCard
+    title="Delayed Orders"
+    value={delayedOrders}
+    icon={<Clock />}
+    danger={delayedOrders > 0}
+    active={activeFilter === "DELAYED"}
+    onClick={() => setActiveFilter("DELAYED")}
+  />
+
+  <StatCard
+    title="Ready for Dispatch"
+    value={readyForDispatch}
+    icon={<TrendingUp />}
+    active={activeFilter === "READY"}
+    onClick={() => setActiveFilter("READY")}
+  />
+</div>
+
+
           </div>
 
           <div className="mb-4">
@@ -347,18 +400,22 @@ export default function WarehouseOrders() {
           </div>
         </div>
       </div>
-    </div>
+
   );
 }
 
 /* ================= SMALL COMPONENT ================= */
-const StatCard = ({ title, value, icon, danger }) => (
+const StatCard = ({ title, value, icon, danger, active, onClick }) => (
   <div
-    className={`p-5 rounded-xl border ${
-      danger
-        ? "bg-amber-950/40 border-amber-800"
-        : "bg-neutral-800 border-neutral-700"
-    }`}
+    onClick={onClick}
+    className={`p-5 rounded-xl border cursor-pointer transition
+      ${active ? "ring-2 ring-amber-500" : ""}
+      ${
+        danger
+          ? "bg-amber-950/40 border-amber-800"
+          : "bg-neutral-800 border-neutral-700"
+      }
+    `}
   >
     <div className="flex items-center justify-between mb-3">
       <p className="text-sm text-neutral-400">{title}</p>
@@ -367,3 +424,4 @@ const StatCard = ({ title, value, icon, danger }) => (
     <p className="text-3xl font-bold">{value}</p>
   </div>
 );
+

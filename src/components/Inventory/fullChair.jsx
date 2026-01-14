@@ -33,6 +33,16 @@ export default function InventoryPage() {
     quantity: "",
   });
 
+  const VENDORS = [
+  "Ramesh",
+  "Suresh",
+  "Mahesh",
+  "Akash",
+  "Vikram",
+  "Amit",
+];
+
+
   const API = process.env.NEXT_PUBLIC_API_URL;
   const token =
     typeof window !== "undefined" ? localStorage.getItem("token") : null;
@@ -347,11 +357,23 @@ export default function InventoryPage() {
                 value={form.chairType}
                 onChange={(v) => setForm({ ...form, chairType: v })}
               />
-              <Input
-                label="Vendor"
-                value={form.vendor}
-                onChange={(v) => setForm({ ...form, vendor: v })}
-              />
+              <div className="mb-3">
+  <label className="text-xs text-neutral-400">Vendor</label>
+
+  <select
+    value={form.vendor}
+    onChange={(e) => setForm({ ...form, vendor: e.target.value })}
+    className="w-full mt-1 p-2 bg-neutral-800 rounded outline-none text-white"
+  >
+    <option value="">Select Vendor</option>
+    {VENDORS.map((v) => (
+      <option key={v} value={v} className="bg-neutral-900">
+        {v}
+      </option>
+    ))}
+  </select>
+</div>
+
               <Input
                 label="Quantity"
                 type="number"

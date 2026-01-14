@@ -109,6 +109,14 @@ export default function InventorySidebar() {
               <ArrowLeftRight size={18} className="flex-shrink-0" />
               <span className="truncate">Transfer</span>
             </Link>
+            <Link
+                            href="/inventory/task"
+                            onClick={() => setOpen(false)}
+                            className={itemClass("/inventory/task")}
+                        >
+                            <Wrench size={18} className="flex-shrink-0" />
+                            <span className="truncate">My Tasks</span>
+                        </Link>
           </nav>
         </div>
 

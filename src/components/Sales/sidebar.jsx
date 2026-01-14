@@ -99,9 +99,9 @@ export default function SalesSidebar() {
                             <span className="truncate">History</span>
                         </Link>
                         <Link
-                            href="/sales/spare-parts"
+                            href="/sales/task"
                             onClick={() => setOpen(false)}
-                            className={itemClass("/sales/spare-parts")}
+                            className={itemClass("/sales/task")}
                         >
                             <Wrench size={18} className="flex-shrink-0" />
                             <span className="truncate">My Tasks</span>
