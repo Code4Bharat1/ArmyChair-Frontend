@@ -12,7 +12,12 @@ import {
 import axios from "axios";
 import SalesSidebar from "./sidebar";
 
+import { UserCircle } from "lucide-react";
+import { useRouter } from "next/navigation";
+
 export default function Orders() {
+  const router = useRouter();
+
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [expandedOrderId, setExpandedOrderId] = useState(null);
@@ -91,14 +96,16 @@ export default function Orders() {
       const payload = {
         dispatchedTo: formData.dispatchedTo,
         chairModel: formData.chairModel,
-        orderDate: formData.orderDate,
+        orderDate: formData.orderDate || new Date().toISOString().split("T")[0],
         deliveryDate: formData.deliveryDate,
         quantity: Number(formData.quantity),
         progress: formData.isPartial ? "PARTIAL" : "ORDER_PLACED",
       };
 
       if (editingOrderId) {
-        await axios.put(`${API}/orders/${editingOrderId}`, payload, { headers });
+        await axios.put(`${API}/orders/${editingOrderId}`, payload, {
+          headers,
+        });
       } else {
         await axios.post(`${API}/orders`, payload, { headers });
       }
@@ -152,14 +159,34 @@ export default function Orders() {
     );
   }, [orders, search]);
 
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const isDelayed = (order) => {
+    if (!order.deliveryDate) return false;
+
+    const delivery = new Date(order.deliveryDate);
+    delivery.setHours(0, 0, 0, 0);
+
+    return (
+      delivery < today && !["DISPATCHED", "PARTIAL"].includes(order.progress)
+    );
+  };
   /* ================= STATS ================= */
   const totalOrders = filteredOrders.length;
-  const inProgress = filteredOrders.filter(
-    (o) =>
-      !["DISPATCHED", "COMPLETED", "PARTIAL"].includes(o.progress)
+
+  const delayed = filteredOrders.filter(isDelayed).length;
+
+  const readyToDispatch = filteredOrders.filter(
+    (o) => o.progress === "READY_FOR_DISPATCH"
   ).length;
+
   const completed = filteredOrders.filter(
     (o) => o.progress === "DISPATCHED"
+  ).length;
+
+  const inProgress = filteredOrders.filter(
+    (o) => !["DISPATCHED", "PARTIAL"].includes(o.progress) && !isDelayed(o)
   ).length;
 
   /* ================= ORDER STEPS ================= */
@@ -184,32 +211,31 @@ export default function Orders() {
   };
 
   /* ================= PROGRESS ================= */
- const ProgressTracker = ({ progress }) => {
-  if (progress === "PARTIAL") {
+  const ProgressTracker = ({ progress }) => {
+    if (progress === "PARTIAL") {
+      return (
+        <span className="text-sm font-medium text-amber-400">
+          Partial / On Hold
+        </span>
+      );
+    }
+
+    const currentIndex = ORDER_STEPS.findIndex((s) => s.key === progress);
+    const safeIndex =
+      currentIndex === -1 ? ORDER_STEPS.length - 1 : currentIndex;
+
+    const isCompleted = progress === "DISPATCHED";
+
     return (
-      <span className="text-sm font-medium text-amber-400">
-        Partial / On Hold
+      <span
+        className={`text-sm font-medium ${
+          isCompleted ? "text-green-400" : "text-amber-400"
+        }`}
+      >
+        {ORDER_STEPS[safeIndex]?.label}
       </span>
     );
-  }
-
-  const currentIndex = ORDER_STEPS.findIndex((s) => s.key === progress);
-  const safeIndex =
-    currentIndex === -1 ? ORDER_STEPS.length - 1 : currentIndex;
-
-  const isCompleted = progress === "DISPATCHED";
-
-  return (
-    <span
-      className={`text-sm font-medium ${
-        isCompleted ? "text-green-400" : "text-amber-400"
-      }`}
-    >
-      {ORDER_STEPS[safeIndex]?.label}
-    </span>
-  );
-};
-
+  };
 
   const handleRowClick = (orderId) => {
     setExpandedOrderId((prev) => (prev === orderId ? null : orderId));
@@ -217,7 +243,7 @@ export default function Orders() {
 
   return (
     <div className="flex h-screen bg-gradient-to-b from-amber-900 via-black to-neutral-900 text-neutral-100">
-        <SalesSidebar />
+      <SalesSidebar />
       <div className="flex-1 overflow-auto">
         {/* HEADER */}
         <div className="bg-neutral-800 border-b border-neutral-700 p-4 flex items-center justify-between">
@@ -228,25 +254,51 @@ export default function Orders() {
             </p>
           </div>
 
-          <button
-            onClick={() => setShowForm(true)}
-            className="bg-amber-600 hover:bg-amber-700 px-4 py-2 rounded-lg flex items-center gap-2 shadow"
-          >
-            <Plus size={16} />
-            Add Order
-          </button>
+          <div className="flex items-center gap-4">
+            {/* ADD ORDER */}
+            <button
+              onClick={() => setShowForm(true)}
+              className="bg-amber-600 hover:bg-amber-700 px-4 py-2 rounded-lg flex items-center gap-2 shadow"
+            >
+              <Plus size={16} />
+              Add Order
+            </button>
+
+            {/* PROFILE AVATAR */}
+            <button
+              onClick={() => router.push("/sales/profile")}
+              title="My Profile"
+              className="text-neutral-300 hover:text-amber-400 transition"
+            >
+              <UserCircle size={34} />
+            </button>
+          </div>
         </div>
 
         {/* STATS */}
         <div className="p-6">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-            <StatCard title="Total Orders" value={totalOrders} icon={<Package />} />
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
             <StatCard
-              title="In Progress"
-              value={inProgress}
-              icon={<Clock />}
-              danger={inProgress > 0}
+              title="Total Orders"
+              value={totalOrders}
+              icon={<Package />}
             />
+
+            <StatCard title="In Progress" value={inProgress} icon={<Clock />} />
+
+            <StatCard
+              title="Delayed"
+              value={delayed}
+              icon={<Clock />}
+              danger={delayed > 0}
+            />
+
+            <StatCard
+              title="Ready to Dispatch"
+              value={readyToDispatch}
+              icon={<Truck />}
+            />
+
             <StatCard
               title="Completed"
               value={completed}
@@ -324,7 +376,11 @@ export default function Orders() {
 
                         {/* ORDER STATUS */}
                         <td className="p-4">
-                          {o.progress === "PARTIAL" ? (
+                          {isDelayed(o) ? (
+                            <span className="px-3 py-1 rounded-full text-xs bg-red-900/40 text-red-400 border border-red-700">
+                              Delayed
+                            </span>
+                          ) : o.progress === "PARTIAL" ? (
                             <span className="px-3 py-1 rounded-full text-xs bg-amber-900/40 text-amber-400 border border-amber-700">
                               Partial / On Hold
                             </span>
@@ -388,94 +444,95 @@ export default function Orders() {
                       </tr>
 
                       {/* EXPANDED PROGRESS ROW */}
-                      {expandedOrderId === o._id && o.progress !== "PARTIAL" && (
-                        <tr className="bg-neutral-850">
-                          <td colSpan={9} className="p-6">
-                            {(() => {
-                              const currentIndex = ORDER_STEPS.findIndex(
-                                (s) => s.key === o.progress
-                              );
+                      {expandedOrderId === o._id &&
+                        o.progress !== "PARTIAL" && (
+                          <tr className="bg-neutral-850">
+                            <td colSpan={9} className="p-6">
+                              {(() => {
+                                const currentIndex = ORDER_STEPS.findIndex(
+                                  (s) => s.key === o.progress
+                                );
 
-                              const safeIndex =
-                                currentIndex === -1
-                                  ? ORDER_STEPS.length - 1
-                                  : currentIndex;
+                                const safeIndex =
+                                  currentIndex === -1
+                                    ? ORDER_STEPS.length - 1
+                                    : currentIndex;
 
-                              const percent = ((safeIndex + 1) / ORDER_STEPS.length) * 100;
+                                const percent =
+                                  ((safeIndex + 1) / ORDER_STEPS.length) * 100;
 
-                              return (
-                                <div className="w-full space-y-6">
-                                  <p className="text-sm text-neutral-300 font-medium">
-                                    Order Progress
-                                  </p>
+                                return (
+                                  <div className="w-full space-y-6">
+                                    <p className="text-sm text-neutral-300 font-medium">
+                                      Order Progress
+                                    </p>
 
-                                  <div className="flex justify-between text-xs text-neutral-400">
-                                    {ORDER_STEPS.map((step, index) => (
-                                      <span
-                                        key={step.key}
-                                        className={
-                                          index <= safeIndex
-                                            ? "text-neutral-200 font-medium"
-                                            : ""
-                                        }
-                                      >
-                                        {step.label}
-                                      </span>
-                                    ))}
-                                  </div>
+                                    <div className="flex justify-between text-xs text-neutral-400">
+                                      {ORDER_STEPS.map((step, index) => (
+                                        <span
+                                          key={step.key}
+                                          className={
+                                            index <= safeIndex
+                                              ? "text-neutral-200 font-medium"
+                                              : ""
+                                          }
+                                        >
+                                          {step.label}
+                                        </span>
+                                      ))}
+                                    </div>
 
-                                 {/* TRACK */}
-<div className="relative w-full h-10 flex items-center mt-6">
-  {/* BASE LINE */}
-  <div className="absolute left-0 right-0 h-[4px] bg-neutral-600 rounded-full" />
+                                    {/* TRACK */}
+                                    <div className="relative w-full h-10 flex items-center mt-6">
+                                      {/* BASE LINE */}
+                                      <div className="absolute left-0 right-0 h-[4px] bg-neutral-600 rounded-full" />
 
-  {/* PROGRESS LINE */}
-  <div
-    className="absolute left-0 h-[4px] rounded-full transition-all duration-500"
-    style={{
-      width: `${percent}%`,
-      background:
-        percent === 100
-          ? "#22c55e"
-          : "linear-gradient(90deg,#22c55e,#f59e0b)",
-    }}
-  />
+                                      {/* PROGRESS LINE */}
+                                      <div
+                                        className="absolute left-0 h-[4px] rounded-full transition-all duration-500"
+                                        style={{
+                                          width: `${percent}%`,
+                                          background:
+                                            percent === 100
+                                              ? "#22c55e"
+                                              : "linear-gradient(90deg,#22c55e,#f59e0b)",
+                                        }}
+                                      />
 
-  {/* MOVING NUMBER (REPLACES DOT) */}
-  <div
-    className="absolute w-7 h-7 rounded-full border-2 border-black shadow
+                                      {/* MOVING NUMBER (REPLACES DOT) */}
+                                      <div
+                                        className="absolute w-7 h-7 rounded-full border-2 border-black shadow
                flex items-center justify-center text-xs font-bold text-black"
-    style={{
-      left: `calc(${percent}% - 14px)`,
-      backgroundColor:
-        safeIndex === ORDER_STEPS.length - 1
-          ? "#22c55e"
-          : "#f59e0b",
-    }}
-  >
-    {safeIndex + 1}
-  </div>
-</div>
+                                        style={{
+                                          left: `calc(${percent}% - 14px)`,
+                                          backgroundColor:
+                                            safeIndex === ORDER_STEPS.length - 1
+                                              ? "#22c55e"
+                                              : "#f59e0b",
+                                        }}
+                                      >
+                                        {safeIndex + 1}
+                                      </div>
+                                    </div>
 
-
-                                  <p className="text-sm">
-                                    <span className="text-neutral-400">
-                                      Current Stage:
-                                    </span>{" "}
-                                    <span className="text-amber-400 font-medium">
-                                      {
-                                        ORDER_STEPS.find(
-                                          (s) => s.key === o.progress
-                                        )?.label
-                                      }
-                                    </span>
-                                  </p>
-                                </div>
-                              );
-                            })()}
-                          </td>
-                        </tr>
-                      )}
+                                    <p className="text-sm">
+                                      <span className="text-neutral-400">
+                                        Current Stage:
+                                      </span>{" "}
+                                      <span className="text-amber-400 font-medium">
+                                        {
+                                          ORDER_STEPS.find(
+                                            (s) => s.key === o.progress
+                                          )?.label
+                                        }
+                                      </span>
+                                    </p>
+                                  </div>
+                                );
+                              })()}
+                            </td>
+                          </tr>
+                        )}
                     </React.Fragment>
                   ))}
                 </tbody>
@@ -516,20 +573,29 @@ export default function Orders() {
                     Select Chair Model
                   </option>
                   {CHAIR_MODELS.map((model) => (
-                    <option key={model} value={model} className="bg-neutral-800">
+                    <option
+                      key={model}
+                      value={model}
+                      className="bg-neutral-800"
+                    >
                       {model}
                     </option>
                   ))}
                 </select>
               </div>
 
-              <Input
-                label="Order Date"
-                name="orderDate"
-                type="date"
-                value={formData.orderDate}
-                onChange={handleFormChange}
-              />
+              <div>
+                <label className="text-base text-neutral-300 font-semibold block mb-2">
+                  Order Date
+                </label>
+
+                <div
+                  className="w-full px-4 py-3 bg-neutral-700 border-2 border-neutral-600
+                  rounded-lg text-neutral-300 cursor-not-allowed select-none"
+                >
+                  {formData.orderDate || new Date().toISOString().split("T")[0]}
+                </div>
+              </div>
 
               <Input
                 label="Quantity"

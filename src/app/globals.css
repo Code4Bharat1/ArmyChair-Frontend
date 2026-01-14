@@ -48,3 +48,31 @@ body {
 .dark-scrollbar::-webkit-scrollbar-thumb:hover {
   background-color: #737373; /* neutral-500 */
 }
+
+input[type="date"]::-webkit-calendar-picker-indicator {
+  filter: invert(1);
+  cursor: pointer;
+}
+/* ===== Custom Dark Scrollbar ===== */
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background-color: rgba(245, 158, 11, 0.35); /* amber-500 */
+  border-radius: 999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(245, 158, 11, 0.6);
+}
+
+/* Firefox */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(245, 158, 11, 0.35) transparent;
+}

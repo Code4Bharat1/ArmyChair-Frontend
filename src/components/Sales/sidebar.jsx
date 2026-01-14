@@ -48,8 +48,8 @@ export default function SalesSidebar() {
                     {/* HEADER */}
                     <div className="flex items-start justify-between">
                         <div>
-                            <h2 className="text-lg sm:text-xl font-bold text-white">Inventory</h2>
-                            <p className="text-xs text-neutral-500 mt-0.5">Stock Management</p>
+                            <h2 className="text-lg sm:text-xl font-bold text-white">Sales</h2>
+                            <p className="text-xs text-neutral-500 mt-0.5">Sales Management</p>
                         </div>
 
                         {/* Close button - mobile only */}
@@ -89,6 +89,22 @@ export default function SalesSidebar() {
                         >
                             <Wrench size={18} className="flex-shrink-0" />
                             <span className="truncate">Spare Parts</span>
+                        </Link>
+                        <Link
+                            href="/sales/history"
+                            onClick={() => setOpen(false)}
+                            className={itemClass("/sales/history")}
+                        >
+                            <Wrench size={18} className="flex-shrink-0" />
+                            <span className="truncate">History</span>
+                        </Link>
+                        <Link
+                            href="/sales/spare-parts"
+                            onClick={() => setOpen(false)}
+                            className={itemClass("/sales/spare-parts")}
+                        >
+                            <Wrench size={18} className="flex-shrink-0" />
+                            <span className="truncate">My Tasks</span>
                         </Link>
 
 
