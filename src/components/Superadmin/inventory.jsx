@@ -102,27 +102,24 @@ export default function Inventory() {
 
   /* ================= TRANSFORM ================= */
   const inventoryData = useMemo(() => {
-    return inventory.map((item) => {
-      let status = "Healthy";
-      if (item.quantity === 0) status = "Critical";
-      else if (item.quantity < 100) status = "Low Stock";
+  return inventory.map((item) => ({
+    id: item._id,
+    name: item.chairType,
+    color: item.color,
+    vendor: item.vendor || "Internal",
+    quantity: item.quantity,
+    status: item.status,   // comes from backend
+  }));
+}, [inventory]);
 
-      return {
-        id: item._id,
-        name: item.chairType,
-        vendor: item.vendor || "Internal",
-        quantity: item.quantity,
-        status,
-      };
-    });
-  }, [inventory]);
 
   /* ===== FILTER OPTIONS ===== */
   const vendors = useMemo(() => {
     return ["All", ...new Set(inventoryData.map((i) => i.vendor))];
   }, [inventoryData]);
 
-  const statuses = ["All", "Healthy", "Low Stock", "Critical"];
+  const statuses = ["All", "Healthy", "Low", "Critical", "Overstocked"];
+
 
   /* ================= FILTERED DATA ================= */
   const filteredData = inventoryData.filter((i) => {
@@ -136,9 +133,10 @@ export default function Inventory() {
   /* ================= STATS ================= */
   const totalStock = inventoryData.reduce((s, i) => s + i.quantity, 0);
   const totalProducts = inventoryData.length;
-  const lowStockCount = inventoryData.filter(
-    (i) => i.status !== "Healthy"
-  ).length;
+ const lowStockCount = inventoryData.filter(
+  (i) => i.status === "Low" || i.status === "Critical"
+).length;
+
 
   /* ================= UI ================= */
   return (
@@ -248,7 +246,7 @@ export default function Inventory() {
               <table className="w-full">
                 <thead className="bg-neutral-850 border-b text-center border-neutral-700">
                   <tr>
-                    {["Product", "Vendor", "Qty", "Status",].map(
+                    {["Product", "color","Vendor", "Qty", "Status",].map(
                       (h) => (
                         <th
                           key={h}
@@ -268,14 +266,17 @@ export default function Inventory() {
                       className="border-b border-neutral-700 text-center hover:bg-neutral-850 transition"
                     >
                       <td className="p-2 font-medium">{i.name}</td>
-                      <td className="p-4 flex items-center gap-2 text-sm">
-                        <Building2 size={14} className="text-neutral-400" />
-                        {i.vendor}
-                      </td>
-                      <td className="p-4">{i.quantity}</td>
-                      <td className="p-4">
-                        <StatusBadge status={i.status} />
-                      </td>
+<td className="p-4">{i.color}</td>
+<td className="p-4 flex items-center gap-2 text-sm">
+  <Building2 size={14} className="text-neutral-400" />
+  {i.vendor}
+</td>
+<td className="p-4">{i.quantity}</td>
+<td className="p-4">
+  <StatusBadge status={i.status} />
+</td>
+
+                      
                       <td className="p-4 flex gap-3">
 
                       
@@ -359,10 +360,12 @@ const StatCard = ({ title, value, icon, danger }) => (
 
 const StatusBadge = ({ status }) => {
   const map = {
-    Healthy: "bg-green-900 text-green-300",
-    "Low Stock": "bg-amber-900 text-amber-300",
-    Critical: "bg-red-900 text-red-300",
-  };
+  Healthy: "bg-green-900 text-green-300",
+  Low: "bg-amber-900 text-amber-300",
+  Critical: "bg-red-900 text-red-300",
+  Overstocked: "bg-blue-900 text-blue-300",
+};
+
   return (
     <span className={`px-3 py-1 rounded-full text-[13px] font-medium ${map[status]}`}>
       {status}

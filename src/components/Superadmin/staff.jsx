@@ -36,7 +36,7 @@ export default function Staff() {
           Authorization: `Bearer ${localStorage.getItem("token")}`,
         },
       });
-      console.log("Staff data:", res.data); // 👈 Check console
+      console.log("Staff data:", res.data); 
       setStaffs(res.data);
     } catch (err) {
       console.error("Failed to fetch staff");
@@ -52,6 +52,14 @@ export default function Staff() {
   useEffect(() => {
     fetchStaffs();
   }, []);
+  useEffect(() => {
+  if (selectedStaff || showForm) {
+    document.body.style.overflow = "hidden";
+  } else {
+    document.body.style.overflow = "auto";
+  }
+}, [selectedStaff, showForm]);
+
 
   
   /* ==========================
@@ -83,9 +91,10 @@ export default function Staff() {
     mobile: "",
     aadharNumber: "",
     dateOfBirth: "",
+    bloodGroup: "",
     photo: "",
-    aadharPhotoFront: "", // ✅ NEW
-    aadharPhotoBack: "", // ✅ NEW
+    aadharPhotoFront: "", 
+    aadharPhotoBack: "", 
   });
 
   const [loading, setLoading] = useState(false);
@@ -156,7 +165,7 @@ export default function Staff() {
     e.preventDefault();
     setMessage("");
 
-    const { name, email, password, mobile, aadharNumber, dateOfBirth } = form;
+    const { name, email, password, mobile, aadharNumber, dateOfBirth, bloodGroup } = form;
 if (!form.aadharPhotoFront || !form.aadharPhotoBack) {
   setMessage("Please upload both front and back Aadhar photos");
   return;
@@ -168,7 +177,8 @@ if (!form.aadharPhotoFront || !form.aadharPhotoBack) {
       !password ||
       !mobile ||
       !aadharNumber ||
-      !dateOfBirth
+      !dateOfBirth || 
+      !bloodGroup
     ) {
       setMessage("All required fields must be filled");
       return;
@@ -195,6 +205,7 @@ if (!form.aadharPhotoFront || !form.aadharPhotoBack) {
         mobile: "",
         aadharNumber: "",
         dateOfBirth: "",
+        bloodGroup: "",
         photo: "",
         aadharPhotoFront: "",
         aadharPhotoBack: "",
@@ -328,7 +339,8 @@ if (!form.aadharPhotoFront || !form.aadharPhotoBack) {
         {/* ===== STAFF DETAILS MODAL ===== */}
         {selectedStaff && (
           <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50">
-            <div className="bg-neutral-800 border border-neutral-700 w-full max-w-md rounded-xl p-6 relative">
+            <div className="bg-neutral-800 border border-neutral-700 w-full max-w-md rounded-xl relative max-h-[90vh] flex flex-col">
+
               <button
                 onClick={() => setSelectedStaff(null)}
                 className="absolute top-4 right-4 text-neutral-400 hover:text-neutral-200"
@@ -378,8 +390,13 @@ if (!form.aadharPhotoFront || !form.aadharPhotoBack) {
                     {new Date(selectedStaff.dateOfBirth).toLocaleDateString()}
                   </span>
                 </div>
+                <div className="flex justify-between py-2">
+                  <span className=" text-neutral-400">Blood Group</span>
+                  <span className="font-medium">
+                    {selectedStaff.bloodGroup}
+                  </span>
+                  </div>
               </div>
-              {/* AADHAR PHOTOS */}
 {/* AADHAR PHOTOS */}
 {(selectedStaff.aadharPhotoFront || selectedStaff.aadharPhotoBack) && (
   <div className="mt-4">
@@ -561,6 +578,29 @@ if (!form.aadharPhotoFront || !form.aadharPhotoBack) {
                     required
                   />
                 </div>
+                <div>
+  <label className="block text-sm text-neutral-400 mb-1">
+    Blood Group
+  </label>
+  <select
+    name="bloodGroup"
+    value={form.bloodGroup}
+    onChange={handleChange}
+    className="w-full p-2 rounded-lg bg-neutral-900 border border-neutral-700 focus:border-amber-600 focus:outline-none"
+    required
+  >
+    <option value="">Select Blood Group</option>
+    <option value="A+">A+</option>
+    <option value="A-">A-</option>
+    <option value="B+">B+</option>
+    <option value="B-">B-</option>
+    <option value="O+">O+</option>
+    <option value="O-">O-</option>
+    <option value="AB+">AB+</option>
+    <option value="AB-">AB-</option>
+  </select>
+</div>
+
 
                 <div>
                   <label className="block text-sm text-neutral-400 mb-1">
