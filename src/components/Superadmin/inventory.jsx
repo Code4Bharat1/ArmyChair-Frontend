@@ -1,7 +1,11 @@
 "use client";
 import React, { useEffect, useMemo, useState } from "react";
 import {
-  AlertCircle,Plus,Boxes,
+  AlertCircle,
+  Plus,
+  Trash2,
+  Pencil,
+  Boxes,
   Warehouse,
   TrendingDown,
   Building2,
@@ -9,9 +13,9 @@ import {
   Filter,
 } from "lucide-react";
 import axios from "axios";
-import Sidebar from "./sidebar";
+import InventorySidebar from "./sidebar";
 
-export default function Inventory() {
+export default function InventoryPage() {
   const [inventory, setInventory] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -29,11 +33,11 @@ export default function Inventory() {
     quantity: "",
   });
 
+  const VENDORS = ["Ramesh", "Suresh", "Mahesh", "Akash", "Vikram", "Amit"];
+
   const API = process.env.NEXT_PUBLIC_API_URL;
   const token =
-    typeof window !== "undefined"
-      ? localStorage.getItem("token")
-      : null;
+    typeof window !== "undefined" ? localStorage.getItem("token") : null;
 
   const headers = token ? { Authorization: `Bearer ${token}` } : {};
 
@@ -41,7 +45,18 @@ export default function Inventory() {
   const fetchInventory = async () => {
     try {
       const res = await axios.get(`${API}/inventory`, { headers });
-      setInventory(res.data.inventory );
+
+      const data = (res.data.inventory || res.data || []).filter(
+        (i) => i.type === "FULL"
+      );
+
+      // 🔥 normalize quantity immediately
+      const safeData = data.map((i) => ({
+        ...i,
+        quantity: Number(i.quantity || 0),
+      }));
+
+      setInventory(safeData);
     } catch (err) {
       console.error("Fetch failed", err);
     } finally {
@@ -51,11 +66,6 @@ export default function Inventory() {
 
   useEffect(() => {
     fetchInventory();
-
-    const refresh = () => fetchInventory();
-    window.addEventListener("inventoryUpdated", refresh);
-
-    return () => window.removeEventListener("inventoryUpdated",refresh);
   }, []);
 
   /* ================= CREATE / UPDATE ================= */
@@ -67,8 +77,10 @@ export default function Inventory() {
 
       const payload = {
         chairType: form.chairType,
-        vendor: form.vendor,
+        vendor: form.vendor, // vendor NAME (backend converts to ObjectId)
         quantity: Number(form.quantity),
+        color: "Default", // REQUIRED
+        minQuantity: 50, // REQUIRED
         type: "FULL",
       };
 
@@ -102,46 +114,66 @@ export default function Inventory() {
 
   /* ================= TRANSFORM ================= */
   const inventoryData = useMemo(() => {
-  return inventory.map((item) => ({
-    id: item._id,
-    name: item.chairType,
-    color: item.color,
-    vendor: item.vendor || "Internal",
-    quantity: item.quantity,
-    status: item.status,   // comes from backend
-  }));
-}, [inventory]);
+    return inventory.map((item) => {
+      const qty = Number(item.quantity || 0);
 
+      let status = "Healthy";
+      if (qty === 0) status = "Critical";
+      else if (qty < 100) status = "Low Stock";
+
+      return {
+        id: item._id,
+        name: item.chairType || "",
+        vendor: item.vendor || null, // keep the OBJECT
+        quantity: qty,
+        status,
+      };
+    });
+  }, [inventory]);
 
   /* ===== FILTER OPTIONS ===== */
   const vendors = useMemo(() => {
-    return ["All", ...new Set(inventoryData.map((i) => i.vendor))];
+    const names = inventoryData.map((i) => i.vendor?.name).filter(Boolean);
+
+    return ["All", ...new Set(names)];
   }, [inventoryData]);
 
-  const statuses = ["All", "Healthy", "Low", "Critical", "Overstocked"];
+  const statuses = ["All", "Healthy", "Low Stock", "Critical"];
 
+  /* ================= FILTER ================= */
+  const filteredData = useMemo(() => {
+    const term = (searchTerm || "").toLowerCase();
 
-  /* ================= FILTERED DATA ================= */
-  const filteredData = inventoryData.filter((i) => {
-    return (
-      i.name.toLowerCase().includes(searchTerm.toLowerCase()) &&
-      (filterVendor === "All" || i.vendor === filterVendor) &&
-      (filterStatus === "All" || i.status === filterStatus)
-    );
-  });
+    return inventoryData.filter((i) => {
+      const name = (i.name || "").toLowerCase();
+      const vendor = i.vendor?.name || "";
+      const status = i.status || "";
+
+      return (
+        name.includes(term) &&
+        (filterVendor === "All" || vendor === filterVendor) &&
+        (filterStatus === "All" || status === filterStatus)
+      );
+    });
+  }, [inventoryData, searchTerm, filterVendor, filterStatus]);
 
   /* ================= STATS ================= */
-  const totalStock = inventoryData.reduce((s, i) => s + i.quantity, 0);
-  const totalProducts = inventoryData.length;
- const lowStockCount = inventoryData.filter(
-  (i) => i.status === "Low" || i.status === "Critical"
-).length;
+  const totalStock = useMemo(
+    () => inventoryData.reduce((s, i) => s + Number(i.quantity || 0), 0),
+    [inventoryData]
+  );
 
+  const totalProducts = inventoryData.length;
+
+  const lowStockCount = useMemo(
+    () => inventoryData.filter((i) => i.status !== "Healthy").length,
+    [inventoryData]
+  );
 
   /* ================= UI ================= */
   return (
     <div className="flex h-screen bg-gradient-to-b from-amber-900 via-black to-neutral-900 text-neutral-100">
-      <Sidebar />
+      <InventorySidebar />
 
       <div className="flex-1 overflow-auto">
         {/* HEADER */}
@@ -244,13 +276,13 @@ export default function Inventory() {
               <div className="p-6 text-center">Loading...</div>
             ) : (
               <table className="w-full">
-                <thead className="bg-neutral-850 border-b text-center border-neutral-700">
+                <thead className="bg-neutral-850 border-b border-neutral-700">
                   <tr>
-                    {["Product", "color","Vendor", "Qty", "Status",].map(
+                    {["Product", "Vendor", "Qty", "Status", "Actions"].map(
                       (h) => (
                         <th
                           key={h}
-                          className="p-4  text-xs text-neutral-400 uppercase tracking-wide"
+                          className="p-4 text-left text-xs text-neutral-400 uppercase tracking-wide"
                         >
                           {h}
                         </th>
@@ -263,26 +295,53 @@ export default function Inventory() {
                   {filteredData.map((i) => (
                     <tr
                       key={i.id}
-                      className="border-b border-neutral-700 text-center hover:bg-neutral-850 transition"
+                      className="border-b border-neutral-700 hover:bg-neutral-850 transition"
                     >
-                      <td className="p-2 font-medium">{i.name}</td>
-<td className="p-4">{i.color}</td>
-<td className="p-4 flex items-center gap-2 text-sm">
-  <Building2 size={14} className="text-neutral-400" />
-  {i.vendor}
-</td>
-<td className="p-4">{i.quantity}</td>
-<td className="p-4">
-  <StatusBadge status={i.status} />
-</td>
-
-                      
+                      <td className="p-4 font-medium">{i.name}</td>
+                      <td className="p-4 flex items-center gap-2 text-sm">
+                        <Building2 size={14} className="text-neutral-400" />
+                        {i.vendor?.name || "-"}
+                      </td>
+                      <td className="p-4">{i.quantity}</td>
+                      <td className="p-4">
+                        <StatusBadge status={i.status} />
+                      </td>
                       <td className="p-4 flex gap-3">
+                        <button
+                          onClick={() => {
+                            setEditId(i.id);
+                            setForm({
+                              chairType: i.name,
+                              vendor: i.vendor?.name,
+                              quantity: i.quantity,
+                            });
+                            setShowForm(true);
+                          }}
+                          className="text-amber-400 hover:text-amber-300"
+                        >
+                          <Pencil size={16} />
+                        </button>
 
-                      
+                        <button
+                          onClick={() => deleteInventory(i.id)}
+                          className="text-red-400 hover:text-red-300"
+                        >
+                          <Trash2 size={16} />
+                        </button>
                       </td>
                     </tr>
                   ))}
+
+                  {filteredData.length === 0 && (
+                    <tr>
+                      <td
+                        colSpan={5}
+                        className="p-6 text-center text-neutral-400"
+                      >
+                        No inventory found
+                      </td>
+                    </tr>
+                  )}
                 </tbody>
               </table>
             )}
@@ -302,11 +361,23 @@ export default function Inventory() {
                 value={form.chairType}
                 onChange={(v) => setForm({ ...form, chairType: v })}
               />
-              <Input
-                label="Vendor"
-                value={form.vendor}
-                onChange={(v) => setForm({ ...form, vendor: v })}
-              />
+              <div className="mb-3">
+                <label className="text-xs text-neutral-400">Vendor</label>
+
+                <select
+                  value={form.vendor}
+                  onChange={(e) => setForm({ ...form, vendor: e.target.value })}
+                  className="w-full mt-1 p-2 bg-neutral-800 rounded outline-none text-white"
+                >
+                  <option value="">Select Vendor</option>
+                  {VENDORS.map((v) => (
+                    <option key={v} value={v} className="bg-neutral-900">
+                      {v}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
               <Input
                 label="Quantity"
                 type="number"
@@ -342,32 +413,37 @@ export default function Inventory() {
 
 /* ================= SMALL COMPONENTS ================= */
 
-const StatCard = ({ title, value, icon, danger }) => (
-  <div
-    className={`p-5 rounded-xl border transition hover:shadow-md ${
-      danger
-        ? "bg-red-950/40 border-red-800"
-        : "bg-neutral-800 border-neutral-700"
-    }`}
-  >
-    <div className="flex items-center justify-between mb-3">
-      <p className="text-sm text-neutral-400">{title}</p>
-      <span className="text-neutral-400">{icon}</span>
+const StatCard = ({ title, value, icon, danger }) => {
+  const safeValue =
+    typeof value === "number" && !Number.isNaN(value) ? value : 0;
+
+  return (
+    <div
+      className={`p-5 rounded-xl border transition hover:shadow-md ${
+        danger
+          ? "bg-red-950/40 border-red-800"
+          : "bg-neutral-800 border-neutral-700"
+      }`}
+    >
+      <div className="flex items-center justify-between mb-3">
+        <p className="text-sm text-neutral-400">{title}</p>
+        <span className="text-neutral-400">{icon}</span>
+      </div>
+      <p className="text-3xl font-bold">{safeValue}</p>
     </div>
-    <p className="text-3xl font-bold">{value}</p>
-  </div>
-);
+  );
+};
 
 const StatusBadge = ({ status }) => {
   const map = {
-  Healthy: "bg-green-900 text-green-300",
-  Low: "bg-amber-900 text-amber-300",
-  Critical: "bg-red-900 text-red-300",
-  Overstocked: "bg-blue-900 text-blue-300",
-};
-
+    Healthy: "bg-green-900 text-green-300",
+    "Low Stock": "bg-amber-900 text-amber-300",
+    Critical: "bg-red-900 text-red-300",
+  };
   return (
-    <span className={`px-3 py-1 rounded-full text-[13px] font-medium ${map[status]}`}>
+    <span
+      className={`px-3 py-1 rounded-full text-xs font-medium ${map[status]}`}
+    >
       {status}
     </span>
   );

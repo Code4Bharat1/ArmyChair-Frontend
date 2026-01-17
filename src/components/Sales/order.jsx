@@ -20,6 +20,7 @@ import { useRouter } from "next/navigation";
 export default function Orders() {
   const [vendors, setVendors] = useState([]);
   const [vendorSearch, setVendorSearch] = useState("");
+  const [chairModels, setChairModels] = useState([]);
 
   const router = useRouter();
 
@@ -89,14 +90,8 @@ export default function Orders() {
       delivery < today && !["DISPATCHED", "PARTIAL"].includes(order.progress)
     );
   }
-  const CHAIR_MODELS = [
-    "Army Chair - Basic",
-    "Army Chair - Premium",
-    "Office Chair",
-    "Folding Chair",
-    "Plastic Chair",
-    "Metal Chair",
-  ];
+  const CHAIR_MODELS = chairModels;
+
 
   const [formData, setFormData] = useState(initialFormData);
 
@@ -135,6 +130,19 @@ export default function Orders() {
     fetchOrders();
     fetchVendors();
   }, []);
+const fetchChairModels = async () => {
+  try {
+    const res = await axios.get(`${API}/inventory/chair-models`, { headers });
+    setChairModels(res.data.models || []);
+  } catch (err) {
+    console.error("Fetch chair models failed", err);
+  }
+};
+useEffect(() => {
+  fetchOrders();
+  fetchVendors();
+  fetchChairModels();   // 👈 add this
+}, []);
 
   /* ================= EDIT ================= */
   const handleEditOrder = (order) => {
@@ -169,7 +177,6 @@ export default function Orders() {
         deliveryDate: formData.deliveryDate,
         quantity: Number(formData.quantity),
         progress: "ORDER_PLACED",
-
       };
 
       if (editingOrderId) {
@@ -836,7 +843,6 @@ export default function Orders() {
                 value={formData.deliveryDate}
                 onChange={handleFormChange}
               />
-
             </div>
 
             <div className="flex justify-end gap-3 mt-8">
@@ -876,8 +882,8 @@ const StatCard = ({ title, value, icon, danger, onClick, active }) => (
         active
           ? "border-amber-500 bg-amber-900/30"
           : danger
-          ? "bg-amber-950/40 border-amber-800"
-          : "bg-neutral-800 border-neutral-700"
+            ? "bg-amber-950/40 border-amber-800"
+            : "bg-neutral-800 border-neutral-700"
       }
       hover:border-amber-500 hover:bg-neutral-750
     `}

@@ -11,12 +11,13 @@ import {
   Warehouse,
   MapPin,
   Building2,
+  ArrowLeftRight,
 } from "lucide-react";
 import axios from "axios";
-import Sidebar from "./sidebar";
+import InventorySidebar from "./sidebar";
 
 /* ================= PAGE ================= */
-export default function SparePartsAdmin() {
+export default function SparePartsInventory() {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -25,16 +26,25 @@ export default function SparePartsAdmin() {
   const [editId, setEditId] = useState(null);
   const [form, setForm] = useState({
     chairType: "",
-    vendor: "",
     location: "",
+    quantity: "",
+  });
+
+  const VENDORS = ["Ramesh", "Suresh", "Mahesh", "Akash", "Vikram", "Amit"];
+
+  const LOCATIONS = ["A", "B", "C", "D", "E", "F", "G", "H"];
+
+  /* TRANSFER */
+  const [showTransfer, setShowTransfer] = useState(false);
+  const [transferItem, setTransferItem] = useState(null);
+  const [transfer, setTransfer] = useState({
+    toLocation: "",
     quantity: "",
   });
 
   const API = process.env.NEXT_PUBLIC_API_URL;
   const token =
-    typeof window !== "undefined"
-      ? localStorage.getItem("token")
-      : null;
+    typeof window !== "undefined" ? localStorage.getItem("token") : null;
 
   const headers = token ? { Authorization: `Bearer ${token}` } : {};
 
@@ -57,22 +67,18 @@ export default function SparePartsAdmin() {
   /* ================= SAVE ================= */
   const submitPart = async () => {
     try {
-      if (
-        !form.chairType ||
-        !form.vendor ||
-        !form.location ||
-        form.quantity === ""
-      ) {
+      if (!form.chairType || !form.location || form.quantity === "") {
         return alert("All fields required");
       }
 
       const payload = {
-        chairType: form.chairType,
-        vendor: form.vendor,
-        location: form.location,
-        quantity: Number(form.quantity),
-        type: "SPARE",
-      };
+  chairType: form.chairType,
+  vendor: "Production",          // 🔥 REQUIRED FOR BACKEND
+  location: form.location,
+  quantity: Number(form.quantity),
+  type: "SPARE",
+};
+
 
       if (editId) {
         await axios.patch(
@@ -106,6 +112,38 @@ export default function SparePartsAdmin() {
     }
   };
 
+  /* ================= TRANSFER ================= */
+  const submitTransfer = async () => {
+    try {
+      if (!transfer.toLocation || transfer.quantity === "") {
+        return alert("Destination location and quantity required");
+      }
+
+      const qty = Number(transfer.quantity);
+      if (qty <= 0) return alert("Quantity must be greater than 0");
+      if (qty > transferItem.quantity)
+        return alert("Not enough stock in source location");
+
+      const payload = {
+        sourceId: transferItem.id, // ✅ ID-based transfer
+        toLocation: transfer.toLocation,
+        quantity: qty,
+      };
+
+      await axios.post(`${API}/transfer`, payload, { headers });
+
+      setShowTransfer(false);
+      setTransfer({ toLocation: "", quantity: "" });
+      setTransferItem(null);
+      fetchParts();
+    } catch (err) {
+      console.error("Transfer failed", err?.response?.data || err);
+      alert(err?.response?.data?.message || "Transfer failed");
+    }
+  };
+  const formatRole = (role) =>
+    role ? role.charAt(0).toUpperCase() + role.slice(1) : "—";
+
   /* ================= DATA ================= */
   const data = useMemo(() => {
     return items.map((i) => {
@@ -116,12 +154,19 @@ export default function SparePartsAdmin() {
       return {
         id: i._id,
         name: i.chairType,
-        vendor: i.vendor,
+        source: `${formatRole(i.createdByRole)} - ${i.createdBy?.name || "—"}`,
+
         location: i.location,
         quantity: i.quantity,
         status,
       };
     });
+  }, [items]);
+
+  /* ================= LOCATIONS (FOR DROPDOWN) ================= */
+  const locations = useMemo(() => {
+    const set = new Set(items.map((i) => i.location));
+    return Array.from(set);
   }, [items]);
 
   /* ================= STATS ================= */
@@ -132,188 +177,262 @@ export default function SparePartsAdmin() {
   /* ================= UI ================= */
   return (
     <div className="flex h-screen bg-gradient-to-b from-amber-900 via-black to-neutral-900 text-neutral-100">
-      <Sidebar/>
+      <InventorySidebar />
 
       {/* MAIN */}
       <div className="flex-1 overflow-auto">
         {/* HEADER */}
-    <div className="bg-neutral-800 border-b border-neutral-700 p-4 flex items-center justify-between ">
-            <div>
-              <h1 className="text-2xl font-bold">Spare Parts Inventory</h1>
-              <p className="text-sm mb-5 text-neutral-400">
-                Manage your spare parts stock levels and details
-              </p>
-            </div>
-  
-            <button
-              onClick={() => setShowForm(true)}
-              className="bg-amber-600 hover:bg-amber-700 px-4 py-2 rounded-lg flex items-center gap-2 shadow"
-            >
-              <Plus size={16} /> Add Inventory
-            </button>
+        <div className="bg-neutral-800 border-b border-neutral-700 p-4 flex items-center justify-between ">
+          <div>
+            <h1 className="text-2xl font-bold">Spare Parts Inventory</h1>
+            <p className="text-sm mb-5 text-neutral-400">
+              Manage your spare parts stock levels and details
+            </p>
           </div>
+
+          <button
+            onClick={() => setShowForm(true)}
+            className="bg-amber-600 hover:bg-amber-700 px-4 py-2 rounded-lg flex items-center gap-2 shadow"
+          >
+            <Plus size={16} /> Add Inventory
+          </button>
+        </div>
 
         {/* STATS */}
         <div className="p-6">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-          <StatCard title="Total Parts" value={totalParts} icon={<Boxes />} />
-          <StatCard
-            title="Total Quantity"
-            value={totalQty}
-            icon={<Warehouse />}
-          />
-          <StatCard
-            title="Low / Critical"
-            value={lowStock}
-            danger
-            icon={<TrendingDown />}
-          />
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+            <StatCard title="Total Parts" value={totalParts} icon={<Boxes />} />
+            <StatCard
+              title="Total Quantity"
+              value={totalQty}
+              icon={<Warehouse />}
+            />
+            <StatCard
+              title="Low / Critical"
+              value={lowStock}
+              danger
+              icon={<TrendingDown />}
+            />
+          </div>
+
+          {/* ALERT */}
+          {lowStock > 0 && (
+            <div className="bg-amber-950/60 border border-amber-800 p-4 mb-4 flex gap-3 rounded-lg">
+              <AlertCircle className="text-amber-400" />
+              {lowStock} spare parts need restocking
+            </div>
+          )}
+
+          {/* TABLE */}
+          <div className="bg-neutral-800 rounded-xl overflow-hidden border border-neutral-700">
+            {loading ? (
+              <div className="p-6 text-center">Loading...</div>
+            ) : (
+              <table className="w-full">
+                <thead className="bg-neutral-850 border-b border-neutral-700">
+                  <tr>
+                    {[
+                      "Part",
+                      "Source",
+                      "Qty",
+                      "Location",
+                      "Status",
+                      "Actions",
+                    ].map((h) => (
+                      <th
+                        key={h}
+                        className="p-4 text-left text-xs text-neutral-400 uppercase tracking-wide"
+                      >
+                        {h}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+
+                <tbody>
+                  {data.map((i) => (
+                    <tr
+                      key={i.id}
+                      className="border-b border-neutral-700 hover:bg-neutral-850 transition"
+                    >
+                      <td className="p-4 font-medium">{i.name}</td>
+
+                      <td className="p-4 flex items-center gap-2 text-sm">
+                        <Building2 size={14} className="text-neutral-400" />
+                        {i.source}
+                      </td>
+
+                      <td className="p-4">{i.quantity}</td>
+                      <td className="p-4 flex items-center gap-2 text-sm">
+                        <MapPin size={14} className="text-neutral-400" />
+                        {i.location}
+                      </td>
+
+                      <td className="p-4">
+                        <StatusBadge status={i.status} />
+                      </td>
+
+                      <td className="p-4 flex gap-3">
+                        {/* EDIT */}
+                        <button
+                          onClick={() => {
+                            setEditId(i.id);
+                            setForm({
+                              chairType: i.name,
+                              location: i.location,
+                              quantity: i.quantity,
+                            });
+
+                            setShowForm(true);
+                          }}
+                          className="text-amber-400 hover:text-amber-300"
+                        >
+                          <Pencil size={16} />
+                        </button>
+
+                        {/* DELETE */}
+                        <button
+                          onClick={() => deletePart(i.id)}
+                          className="text-red-400 hover:text-red-300"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+
+                        {/* TRANSFER */}
+                        <button
+                          onClick={() => {
+                            setTransferItem(i);
+                            setShowTransfer(true);
+                          }}
+                          title="Transfer Location"
+                          className="text-sky-400 hover:text-sky-300"
+                        >
+                          <ArrowLeftRight size={16} />
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
         </div>
 
-        {/* ALERT */}
-        {lowStock > 0 && (
-          <div className="bg-amber-950/60 border border-amber-800 p-4 mb-4 flex gap-3 rounded-lg">
-            <AlertCircle className="text-amber-400" />
-            {lowStock} spare parts need restocking
+        {/* ADD / EDIT MODAL */}
+        {showForm && (
+          <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
+            <div className="bg-neutral-900 p-6 rounded-xl w-[380px] border border-neutral-700">
+              <h2 className="text-lg font-semibold mb-4">
+                {editId ? "Update Spare Part" : "Add Spare Part"}
+              </h2>
+
+              <Input
+                label="Part Name"
+                value={form.chairType}
+                onChange={(v) => setForm({ ...form, chairType: v })}
+              />
+
+              <Input
+                label="Location"
+                value={form.location}
+                onChange={(v) => setForm({ ...form, location: v })}
+              />
+              <Input
+                label="Quantity"
+                type="number"
+                value={form.quantity}
+                onChange={(v) => setForm({ ...form, quantity: v })}
+              />
+
+              <div className="flex justify-end gap-2 mt-4">
+                <button
+                  onClick={() => {
+                    setShowForm(false);
+                    setEditId(null);
+                  }}
+                  className="px-4 py-2 text-neutral-300"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={submitPart}
+                  className="bg-amber-600 hover:bg-amber-700 px-4 py-2 rounded"
+                >
+                  Save
+                </button>
+              </div>
+            </div>
           </div>
         )}
 
-        {/* TABLE */}
-        <div className="bg-neutral-800 rounded-xl overflow-hidden border border-neutral-700">
-          {loading ? (
-            <div className="p-6 text-center">Loading...</div>
-          ) : (
-            <table className="w-full">
-              <thead className="bg-neutral-850 border-b border-neutral-700">
-                <tr>
-                  {[
-                    "Part",
-                    "Vendor",
-                    "Qty",
-                    "Location",
-                    "Status",
-                    "Actions",
-                  ].map((h) => (
-                    <th
-                      key={h}
-                      className="p-4 text-left text-xs text-neutral-400 uppercase tracking-wide"
-                    >
-                      {h}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
+        {/* TRANSFER MODAL */}
+        {showTransfer && transferItem && (
+          <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
+            <div className="bg-neutral-900 p-6 rounded-xl w-[380px] border border-neutral-700">
+              <h2 className="text-lg font-semibold mb-4">Transfer Location</h2>
 
-              <tbody>
-                {data.map((i) => (
-                  <tr
-                    key={i.id}
-                    className="border-b border-neutral-700 hover:bg-neutral-850 transition"
-                  >
-                    <td className="p-4 font-medium">{i.name}</td>
+              <p className="text-sm text-neutral-400 mb-2">
+                Part:{" "}
+                <span className="text-neutral-200">{transferItem.name}</span>
+              </p>
+              <p className="text-sm text-neutral-400 mb-4">
+                From:{" "}
+                <span className="text-neutral-200">
+                  {transferItem.location}
+                </span>
+              </p>
 
-                    <td className="p-4 flex items-center gap-2 text-sm">
-                      <Building2 size={14} className="text-neutral-400" />
-                      {i.vendor}
-                    </td>
+              {/* DROPDOWN LOCATION */}
+              <div className="mb-3">
+                <label className="text-xs text-neutral-400">To Location</label>
+                <select
+                  value={transfer.toLocation}
+                  onChange={(e) =>
+                    setTransfer({ ...transfer, toLocation: e.target.value })
+                  }
+                  className="w-full mt-1 p-2 bg-neutral-800 rounded outline-none"
+                >
+                  <option value="">Select Location</option>
+                  {locations
+                    .filter((loc) => loc !== transferItem.location)
+                    .map((loc) => (
+                      <option key={loc} value={loc}>
+                        {loc}
+                      </option>
+                    ))}
+                </select>
+              </div>
 
-              
+              <Input
+                label="Quantity"
+                type="number"
+                value={transfer.quantity}
+                onChange={(v) => setTransfer({ ...transfer, quantity: v })}
+              />
 
-                    <td className="p-4">{i.quantity}</td>
-                          <td className="p-4 flex items-center gap-2 text-sm">
-                      <MapPin size={14} className="text-neutral-400" />
-                      {i.location}
-                    </td>
-
-                    <td className="p-4">
-                      <StatusBadge status={i.status} />
-                    </td>
-
-                    <td className="p-4 flex gap-3">
-                      <button
-                        onClick={() => {
-                          setEditId(i.id);
-                          setForm({
-                            chairType: i.name,
-                            vendor: i.vendor,
-                            location: i.location,
-                            quantity: i.quantity,
-                          });
-                          setShowForm(true);
-                        }}
-                        className="text-amber-400 hover:text-amber-300"
-                      >
-                        <Pencil size={16} />
-                      </button>
-
-                      <button
-                        onClick={() => deletePart(i.id)}
-                        className="text-red-400 hover:text-red-300"
-                      >
-                        <Trash2 size={16} />
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-        </div>
-      </div>
-
-      {/* MODAL */}
-      {showForm && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
-          <div className="bg-neutral-900 p-6 rounded-xl w-[380px] border border-neutral-700">
-            <h2 className="text-lg font-semibold mb-4">
-              {editId ? "Update Spare Part" : "Add Spare Part"}
-            </h2>
-
-            <Input
-              label="Part Name"
-              value={form.chairType}
-              onChange={(v) => setForm({ ...form, chairType: v })}
-            />
-            <Input
-              label="Vendor"
-              value={form.vendor}
-              onChange={(v) => setForm({ ...form, vendor: v })}
-            />
-            <Input
-              label="Location"
-              value={form.location}
-              onChange={(v) => setForm({ ...form, location: v })}
-            />
-            <Input
-              label="Quantity"
-              type="number"
-              value={form.quantity}
-              onChange={(v) => setForm({ ...form, quantity: v })}
-            />
-
-            <div className="flex justify-end gap-2 mt-4">
-              <button
-                onClick={() => {
-                  setShowForm(false);
-                  setEditId(null);
-                }}
-                className="px-4 py-2 text-neutral-300"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={submitPart}
-                className="bg-amber-600 hover:bg-amber-700 px-4 py-2 rounded"
-              >
-                Save
-              </button>
+              <div className="flex justify-end gap-2 mt-4">
+                <button
+                  onClick={() => {
+                    setShowTransfer(false);
+                    setTransfer({ toLocation: "", quantity: "" });
+                    setTransferItem(null);
+                  }}
+                  className="px-4 py-2 text-neutral-300"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={submitTransfer}
+                  className="bg-sky-600 hover:bg-sky-700 px-4 py-2 rounded"
+                >
+                  Transfer
+                </button>
+              </div>
             </div>
           </div>
-        </div>
-        
-      )}
+        )}
+      </div>
     </div>
-    </div>  
   );
 }
 
@@ -342,7 +461,9 @@ const StatusBadge = ({ status }) => {
     Critical: "bg-red-900 text-red-300",
   };
   return (
-    <span className={`px-3 py-1 rounded-full text-xs font-medium ${map[status]}`}>
+    <span
+      className={`px-3 py-1 rounded-full text-xs font-medium ${map[status]}`}
+    >
       {status}
     </span>
   );
@@ -359,4 +480,3 @@ const Input = ({ label, value, onChange, type = "text" }) => (
     />
   </div>
 );
-
