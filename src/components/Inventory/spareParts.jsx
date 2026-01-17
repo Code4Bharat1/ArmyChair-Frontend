@@ -31,18 +31,9 @@ export default function SparePartsInventory() {
     quantity: "",
   });
 
-  const VENDORS = [
-  "Ramesh",
-  "Suresh",
-  "Mahesh",
-  "Akash",
-  "Vikram",
-  "Amit",
-];
+  const VENDORS = ["Ramesh", "Suresh", "Mahesh", "Akash", "Vikram", "Amit"];
 
-const LOCATIONS = ["A", "B", "C", "D", "E", "F", "G", "H"];
-
-
+  const LOCATIONS = ["A", "B", "C", "D", "E", "F", "G", "H"];
 
   /* TRANSFER */
   const [showTransfer, setShowTransfer] = useState(false);
@@ -53,7 +44,8 @@ const LOCATIONS = ["A", "B", "C", "D", "E", "F", "G", "H"];
   });
 
   const API = process.env.NEXT_PUBLIC_API_URL;
-  const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
+  const token =
+    typeof window !== "undefined" ? localStorage.getItem("token") : null;
 
   const headers = token ? { Authorization: `Bearer ${token}` } : {};
 
@@ -76,7 +68,12 @@ const LOCATIONS = ["A", "B", "C", "D", "E", "F", "G", "H"];
   /* ================= SAVE ================= */
   const submitPart = async () => {
     try {
-      if (!form.chairType || !form.vendor || !form.location || form.quantity === "") {
+      if (
+        !form.chairType ||
+        !form.vendor ||
+        !form.location ||
+        form.quantity === ""
+      ) {
         return alert("All fields required");
       }
 
@@ -89,7 +86,11 @@ const LOCATIONS = ["A", "B", "C", "D", "E", "F", "G", "H"];
       };
 
       if (editId) {
-        await axios.patch(`${API}/inventory/spare-parts/update/${editId}`, payload, { headers });
+        await axios.patch(
+          `${API}/inventory/spare-parts/update/${editId}`,
+          payload,
+          { headers }
+        );
       } else {
         await axios.post(`${API}/inventory/spare-parts`, payload, { headers });
       }
@@ -107,7 +108,9 @@ const LOCATIONS = ["A", "B", "C", "D", "E", "F", "G", "H"];
   const deletePart = async (id) => {
     if (!confirm("Delete this spare part?")) return;
     try {
-      await axios.delete(`${API}/inventory/spare-parts/delete/${id}`, { headers });
+      await axios.delete(`${API}/inventory/spare-parts/delete/${id}`, {
+        headers,
+      });
       fetchParts();
     } catch (err) {
       console.error("Delete failed", err);
@@ -123,7 +126,8 @@ const LOCATIONS = ["A", "B", "C", "D", "E", "F", "G", "H"];
 
       const qty = Number(transfer.quantity);
       if (qty <= 0) return alert("Quantity must be greater than 0");
-      if (qty > transferItem.quantity) return alert("Not enough stock in source location");
+      if (qty > transferItem.quantity)
+        return alert("Not enough stock in source location");
 
       const payload = {
         sourceId: transferItem.id, // ✅ ID-based transfer
@@ -153,7 +157,8 @@ const LOCATIONS = ["A", "B", "C", "D", "E", "F", "G", "H"];
       return {
         id: i._id,
         name: i.chairType,
-        vendor: i.vendor,
+        vendor: i.vendor?.name || "—",
+
         location: i.location,
         quantity: i.quantity,
         status,
@@ -183,7 +188,9 @@ const LOCATIONS = ["A", "B", "C", "D", "E", "F", "G", "H"];
         <div className="bg-neutral-800 border-b border-neutral-700 p-4 flex items-center justify-between ">
           <div>
             <h1 className="text-2xl font-bold">Spare Parts Inventory</h1>
-            <p className="text-sm mb-5 text-neutral-400">Manage your spare parts stock levels and details</p>
+            <p className="text-sm mb-5 text-neutral-400">
+              Manage your spare parts stock levels and details
+            </p>
           </div>
 
           <button
@@ -198,8 +205,17 @@ const LOCATIONS = ["A", "B", "C", "D", "E", "F", "G", "H"];
         <div className="p-6">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
             <StatCard title="Total Parts" value={totalParts} icon={<Boxes />} />
-            <StatCard title="Total Quantity" value={totalQty} icon={<Warehouse />} />
-            <StatCard title="Low / Critical" value={lowStock} danger icon={<TrendingDown />} />
+            <StatCard
+              title="Total Quantity"
+              value={totalQty}
+              icon={<Warehouse />}
+            />
+            <StatCard
+              title="Low / Critical"
+              value={lowStock}
+              danger
+              icon={<TrendingDown />}
+            />
           </div>
 
           {/* ALERT */}
@@ -218,8 +234,18 @@ const LOCATIONS = ["A", "B", "C", "D", "E", "F", "G", "H"];
               <table className="w-full">
                 <thead className="bg-neutral-850 border-b border-neutral-700">
                   <tr>
-                    {["Part", "Vendor", "Qty", "Location", "Status", "Actions"].map((h) => (
-                      <th key={h} className="p-4 text-left text-xs text-neutral-400 uppercase tracking-wide">
+                    {[
+                      "Part",
+                      "Vendor",
+                      "Qty",
+                      "Location",
+                      "Status",
+                      "Actions",
+                    ].map((h) => (
+                      <th
+                        key={h}
+                        className="p-4 text-left text-xs text-neutral-400 uppercase tracking-wide"
+                      >
                         {h}
                       </th>
                     ))}
@@ -228,7 +254,10 @@ const LOCATIONS = ["A", "B", "C", "D", "E", "F", "G", "H"];
 
                 <tbody>
                   {data.map((i) => (
-                    <tr key={i.id} className="border-b border-neutral-700 hover:bg-neutral-850 transition">
+                    <tr
+                      key={i.id}
+                      className="border-b border-neutral-700 hover:bg-neutral-850 transition"
+                    >
                       <td className="p-4 font-medium">{i.name}</td>
 
                       <td className="p-4 flex items-center gap-2 text-sm">
@@ -251,7 +280,12 @@ const LOCATIONS = ["A", "B", "C", "D", "E", "F", "G", "H"];
                         <button
                           onClick={() => {
                             setEditId(i.id);
-                            setForm({ chairType: i.name, vendor: i.vendor, location: i.location, quantity: i.quantity });
+                            setForm({
+                              chairType: i.name,
+                              vendor: i.vendor,
+                              location: i.location,
+                              quantity: i.quantity,
+                            });
                             setShowForm(true);
                           }}
                           className="text-amber-400 hover:text-amber-300"
@@ -260,7 +294,10 @@ const LOCATIONS = ["A", "B", "C", "D", "E", "F", "G", "H"];
                         </button>
 
                         {/* DELETE */}
-                        <button onClick={() => deletePart(i.id)} className="text-red-400 hover:text-red-300">
+                        <button
+                          onClick={() => deletePart(i.id)}
+                          className="text-red-400 hover:text-red-300"
+                        >
                           <Trash2 size={16} />
                         </button>
 
@@ -288,28 +325,43 @@ const LOCATIONS = ["A", "B", "C", "D", "E", "F", "G", "H"];
         {showForm && (
           <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
             <div className="bg-neutral-900 p-6 rounded-xl w-[380px] border border-neutral-700">
-              <h2 className="text-lg font-semibold mb-4">{editId ? "Update Spare Part" : "Add Spare Part"}</h2>
+              <h2 className="text-lg font-semibold mb-4">
+                {editId ? "Update Spare Part" : "Add Spare Part"}
+              </h2>
 
-              <Input label="Part Name" value={form.chairType} onChange={(v) => setForm({ ...form, chairType: v })} />
+              <Input
+                label="Part Name"
+                value={form.chairType}
+                onChange={(v) => setForm({ ...form, chairType: v })}
+              />
               <div className="mb-3">
-  <label className="text-xs text-neutral-400">Vendor</label>
+                <label className="text-xs text-neutral-400">Vendor</label>
 
-  <select
-    value={form.vendor}
-    onChange={(e) => setForm({ ...form, vendor: e.target.value })}
-    className="w-full mt-1 p-2 bg-neutral-800 rounded outline-none text-white"
-  >
-    <option value="">Select Vendor</option>
-    {VENDORS.map((v) => (
-      <option key={v} value={v} className="bg-neutral-900">
-        {v}
-      </option>
-    ))}
-  </select>
-</div>
+                <select
+                  value={form.vendor}
+                  onChange={(e) => setForm({ ...form, vendor: e.target.value })}
+                  className="w-full mt-1 p-2 bg-neutral-800 rounded outline-none text-white"
+                >
+                  <option value="">Select Vendor</option>
+                  {VENDORS.map((v) => (
+                    <option key={v} value={v} className="bg-neutral-900">
+                      {v}
+                    </option>
+                  ))}
+                </select>
+              </div>
 
-              <Input label="Location" value={form.location} onChange={(v) => setForm({ ...form, location: v })} />
-              <Input label="Quantity" type="number" value={form.quantity} onChange={(v) => setForm({ ...form, quantity: v })} />
+              <Input
+                label="Location"
+                value={form.location}
+                onChange={(v) => setForm({ ...form, location: v })}
+              />
+              <Input
+                label="Quantity"
+                type="number"
+                value={form.quantity}
+                onChange={(v) => setForm({ ...form, quantity: v })}
+              />
 
               <div className="flex justify-end gap-2 mt-4">
                 <button
@@ -321,7 +373,10 @@ const LOCATIONS = ["A", "B", "C", "D", "E", "F", "G", "H"];
                 >
                   Cancel
                 </button>
-                <button onClick={submitPart} className="bg-amber-600 hover:bg-amber-700 px-4 py-2 rounded">
+                <button
+                  onClick={submitPart}
+                  className="bg-amber-600 hover:bg-amber-700 px-4 py-2 rounded"
+                >
                   Save
                 </button>
               </div>
@@ -335,15 +390,25 @@ const LOCATIONS = ["A", "B", "C", "D", "E", "F", "G", "H"];
             <div className="bg-neutral-900 p-6 rounded-xl w-[380px] border border-neutral-700">
               <h2 className="text-lg font-semibold mb-4">Transfer Location</h2>
 
-              <p className="text-sm text-neutral-400 mb-2">Part: <span className="text-neutral-200">{transferItem.name}</span></p>
-              <p className="text-sm text-neutral-400 mb-4">From: <span className="text-neutral-200">{transferItem.location}</span></p>
+              <p className="text-sm text-neutral-400 mb-2">
+                Part:{" "}
+                <span className="text-neutral-200">{transferItem.name}</span>
+              </p>
+              <p className="text-sm text-neutral-400 mb-4">
+                From:{" "}
+                <span className="text-neutral-200">
+                  {transferItem.location}
+                </span>
+              </p>
 
               {/* DROPDOWN LOCATION */}
               <div className="mb-3">
                 <label className="text-xs text-neutral-400">To Location</label>
                 <select
                   value={transfer.toLocation}
-                  onChange={(e) => setTransfer({ ...transfer, toLocation: e.target.value })}
+                  onChange={(e) =>
+                    setTransfer({ ...transfer, toLocation: e.target.value })
+                  }
                   className="w-full mt-1 p-2 bg-neutral-800 rounded outline-none"
                 >
                   <option value="">Select Location</option>
@@ -375,7 +440,10 @@ const LOCATIONS = ["A", "B", "C", "D", "E", "F", "G", "H"];
                 >
                   Cancel
                 </button>
-                <button onClick={submitTransfer} className="bg-sky-600 hover:bg-sky-700 px-4 py-2 rounded">
+                <button
+                  onClick={submitTransfer}
+                  className="bg-sky-600 hover:bg-sky-700 px-4 py-2 rounded"
+                >
                   Transfer
                 </button>
               </div>
@@ -390,7 +458,13 @@ const LOCATIONS = ["A", "B", "C", "D", "E", "F", "G", "H"];
 /* ================= SMALL COMPONENTS ================= */
 
 const StatCard = ({ title, value, icon, danger }) => (
-  <div className={`p-5 rounded-xl border ${danger ? "bg-red-950/40 border-red-800" : "bg-neutral-800 border-neutral-700"}`}>
+  <div
+    className={`p-5 rounded-xl border ${
+      danger
+        ? "bg-red-950/40 border-red-800"
+        : "bg-neutral-800 border-neutral-700"
+    }`}
+  >
     <div className="flex items-center justify-between mb-3">
       <p className="text-sm text-neutral-400">{title}</p>
       <span className="text-neutral-400">{icon}</span>
@@ -405,7 +479,13 @@ const StatusBadge = ({ status }) => {
     "Low Stock": "bg-amber-900 text-amber-300",
     Critical: "bg-red-900 text-red-300",
   };
-  return <span className={`px-3 py-1 rounded-full text-xs font-medium ${map[status]}`}>{status}</span>;
+  return (
+    <span
+      className={`px-3 py-1 rounded-full text-xs font-medium ${map[status]}`}
+    >
+      {status}
+    </span>
+  );
 };
 
 const Input = ({ label, value, onChange, type = "text" }) => (

@@ -19,12 +19,13 @@ import { useRouter } from "next/navigation";
 
 export default function Orders() {
   const [vendors, setVendors] = useState([]);
- const [vendorSearch, setVendorSearch] = useState("");
+  const [vendorSearch, setVendorSearch] = useState("");
 
   const router = useRouter();
 
   const [uploading, setUploading] = useState(false);
 
+  const [statusFilter, setStatusFilter] = useState("ALL");
 
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -42,7 +43,53 @@ export default function Orders() {
     quantity: "",
     isPartial: false,
   };
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const filteredOrders = useMemo(() => {
+    const q = search.toLowerCase();
 
+    return orders.filter((o) => {
+      // 🔍 Search filter
+      const matchesSearch =
+        o.orderId?.toLowerCase().includes(q) ||
+        o.dispatchedTo?.toLowerCase().includes(q) ||
+        o.chairModel?.toLowerCase().includes(q);
+
+      if (!matchesSearch) return false;
+
+      // 📊 Stat filter
+      switch (statusFilter) {
+        case "IN_PROGRESS":
+          return (
+            !["DISPATCHED", "PARTIAL"].includes(o.progress) && !isDelayed(o)
+          );
+
+        case "DELAYED":
+          return isDelayed(o);
+
+        case "READY":
+          return o.progress === "READY_FOR_DISPATCH";
+
+        case "COMPLETED":
+          return o.progress === "DISPATCHED";
+
+        case "ALL":
+        default:
+          return true;
+      }
+    });
+  }, [orders, search, statusFilter]);
+
+  function isDelayed(order) {
+    if (!order.deliveryDate) return false;
+
+    const delivery = new Date(order.deliveryDate);
+    delivery.setHours(0, 0, 0, 0);
+
+    return (
+      delivery < today && !["DISPATCHED", "PARTIAL"].includes(order.progress)
+    );
+  }
   const CHAIR_MODELS = [
     "Army Chair - Basic",
     "Army Chair - Premium",
@@ -75,37 +122,36 @@ export default function Orders() {
   useEffect(() => {
     fetchOrders();
   }, []);
- const fetchVendors = async () => {
-  try {
-    const res = await axios.get(`${API}/vendors`, { headers });
-    console.log("VENDORS:", res.data.vendors || res.data); 
-    setVendors(res.data.vendors || res.data);
-  } catch (err) {
-    console.error("Fetch vendors failed", err);
-  }
-};
+  const fetchVendors = async () => {
+    try {
+      const res = await axios.get(`${API}/vendors`, { headers });
+      console.log("VENDORS:", res.data.vendors || res.data);
+      setVendors(res.data.vendors || res.data);
+    } catch (err) {
+      console.error("Fetch vendors failed", err);
+    }
+  };
 
-useEffect(() => {
-  fetchOrders();
-  fetchVendors();
-}, []);
+  useEffect(() => {
+    fetchOrders();
+    fetchVendors();
+  }, []);
 
   /* ================= EDIT ================= */
   const handleEditOrder = (order) => {
-  setEditingOrderId(order._id);
-  setFormData({
-    dispatchedTo: order.dispatchedTo?._id || order.dispatchedTo,
-    chairModel: order.chairModel,
-    orderDate: order.orderDate?.split("T")[0],
-    deliveryDate: order.deliveryDate?.split("T")[0] || "",
-    quantity: order.quantity,
-    isPartial: order.progress === "PARTIAL",
-  });
+    setEditingOrderId(order._id);
+    setFormData({
+      dispatchedTo: order.dispatchedTo?._id || order.dispatchedTo,
+      chairModel: order.chairModel,
+      orderDate: order.orderDate?.split("T")[0],
+      deliveryDate: order.deliveryDate?.split("T")[0] || "",
+      quantity: order.quantity,
+      isPartial: order.progress === "PARTIAL",
+    });
 
-  setVendorSearch(order.dispatchedTo?.name || "");
-  setShowForm(true);
-};
-
+    setVendorSearch(order.dispatchedTo?.name || "");
+    setShowForm(true);
+  };
 
   /* ================= FORM CHANGE ================= */
   const handleFormChange = (e) => {
@@ -174,29 +220,29 @@ useEffect(() => {
   };
 
   /* ================= FILTER ================= */
-  const filteredOrders = useMemo(() => {
-    const q = search.toLowerCase();
-    return orders.filter(
-      (o) =>
-        o.orderId?.toLowerCase().includes(q) ||
-        o.dispatchedTo?.name?.toLowerCase().includes(q) ||
-        o.chairModel?.toLowerCase().includes(q)
-    );
-  }, [orders, search]);
+  // const filteredOrders = useMemo(() => {
+  //   const q = search.toLowerCase();
+  //   return orders.filter(
+  //     (o) =>
+  //       o.orderId?.toLowerCase().includes(q) ||
+  //       o.dispatchedTo?.name?.toLowerCase().includes(q) ||
+  //       o.chairModel?.toLowerCase().includes(q)
+  //   );
+  // }, [orders, search]);
 
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
+  // const today = new Date();
+  // today.setHours(0, 0, 0, 0);
 
-  const isDelayed = (order) => {
-    if (!order.deliveryDate) return false;
+  // const isDelayed = (order) => {
+  //   if (!order.deliveryDate) return false;
 
-    const delivery = new Date(order.deliveryDate);
-    delivery.setHours(0, 0, 0, 0);
+  //   const delivery = new Date(order.deliveryDate);
+  //   delivery.setHours(0, 0, 0, 0);
 
-    return (
-      delivery < today && !["DISPATCHED", "PARTIAL"].includes(order.progress)
-    );
-  };
+  //   return (
+  //     delivery < today && !["DISPATCHED", "PARTIAL"].includes(order.progress)
+  //   );
+  // };
   /* ================= STATS ================= */
   const totalOrders = filteredOrders.length;
 
@@ -267,72 +313,70 @@ useEffect(() => {
   };
 
   /* ================= CSV / FOLDER UPLOAD ================= */
-const handleUploadOrders = async (files) => {
-  try {
-    setUploading(true);
+  const handleUploadOrders = async (files) => {
+    try {
+      setUploading(true);
 
-    const formData = new FormData();
+      const formData = new FormData();
 
-    // supports single csv OR entire folder
-    Array.from(files).forEach((file) => {
-      formData.append("files", file);
-    });
+      // supports single csv OR entire folder
+      Array.from(files).forEach((file) => {
+        formData.append("files", file);
+      });
 
-    await axios.post(`${API}/orders/upload`, formData, {
-      headers: {
-        ...headers,
-        "Content-Type": "multipart/form-data",
-      },
-    });
+      await axios.post(`${API}/orders/upload`, formData, {
+        headers: {
+          ...headers,
+          "Content-Type": "multipart/form-data",
+        },
+      });
 
-    alert("Orders uploaded successfully");
-    fetchOrders();
-  } catch (err) {
-    console.error(err);
-    alert(err?.response?.data?.message || "Upload failed");
-  } finally {
-    setUploading(false);
-  }
-};
+      alert("Orders uploaded successfully");
+      fetchOrders();
+    } catch (err) {
+      console.error(err);
+      alert(err?.response?.data?.message || "Upload failed");
+    } finally {
+      setUploading(false);
+    }
+  };
 
-/* ================= EXPORT CSV ================= */
-const handleExportCSV = async () => {
-  try {
-    const res = await axios.get(`${API}/orders/export`, {
-      headers,
-      responseType: "blob",
-    });
+  /* ================= EXPORT CSV ================= */
+  const handleExportCSV = async () => {
+    try {
+      const res = await axios.get(`${API}/orders/export`, {
+        headers,
+        responseType: "blob",
+      });
 
-    const blob = new Blob([res.data], { type: "text/csv" });
-    const url = window.URL.createObjectURL(blob);
+      const blob = new Blob([res.data], { type: "text/csv" });
+      const url = window.URL.createObjectURL(blob);
 
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = `orders_${new Date().toISOString().slice(0, 10)}.csv`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  } catch (err) {
-    alert("Export failed");
-  }
-};
-
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `orders_${new Date().toISOString().slice(0, 10)}.csv`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } catch (err) {
+      alert("Export failed");
+    }
+  };
 
   return (
     <div className="flex h-screen bg-gradient-to-b from-amber-900 via-black to-neutral-900 text-neutral-100">
       <SalesSidebar />
       <div className="flex-1 overflow-auto">
-
-  {/* ================= HIDDEN UPLOAD INPUT ================= */}
-  <input
-    type="file"
-    id="orderUploadInput"
-    webkitdirectory="true"
-    directory=""
-    multiple
-    hidden
-    onChange={(e) => handleUploadOrders(e.target.files)}
-  />
+        {/* ================= HIDDEN UPLOAD INPUT ================= */}
+        <input
+          type="file"
+          id="orderUploadInput"
+          webkitdirectory="true"
+          directory=""
+          multiple
+          hidden
+          onChange={(e) => handleUploadOrders(e.target.files)}
+        />
 
         {/* HEADER */}
         <div className="bg-neutral-800 border-b border-neutral-700 p-4 flex items-center justify-between">
@@ -344,50 +388,49 @@ const handleExportCSV = async () => {
           </div>
 
           <div className="flex items-center gap-3">
+            {/* UPLOAD ORDERS */}
+            <button
+              onClick={() =>
+                document.getElementById("orderUploadInput").click()
+              }
+              className="bg-amber-600 hover:bg-amber-700 px-4 py-2 rounded-lg flex items-center gap-2 shadow"
+            >
+              <Upload size={16} />
+              {uploading ? "Uploading..." : "Upload Orders"}
+            </button>
 
-  {/* UPLOAD ORDERS */}
-  <button
-    onClick={() => document.getElementById("orderUploadInput").click()}
-    className="bg-amber-600 hover:bg-amber-700 px-4 py-2 rounded-lg flex items-center gap-2 shadow"
-  >
-    <Upload size={16} />
-    {uploading ? "Uploading..." : "Upload Orders"}
-  </button>
+            {/* ADD ORDER */}
+            <button
+              onClick={() => {
+                setVendorSearch("");
+                setFormData(initialFormData);
+                setEditingOrderId(null);
+                setShowForm(true);
+              }}
+              className="bg-amber-600 hover:bg-amber-700 px-4 py-2 rounded-lg flex items-center gap-2 shadow"
+            >
+              <Plus size={16} />
+              Add Order
+            </button>
 
-  {/* ADD ORDER */}
- <button
-  onClick={() => {
-    setVendorSearch("");
-    setFormData(initialFormData);
-    setEditingOrderId(null);
-    setShowForm(true);
-  }}
-  className="bg-amber-600 hover:bg-amber-700 px-4 py-2 rounded-lg flex items-center gap-2 shadow"
->
-    <Plus size={16} />
-    Add Order
-  </button>
+            {/* EXPORT CSV */}
+            <button
+              onClick={handleExportCSV}
+              className="bg-emerald-700 hover:bg-emerald-600 px-4 py-2 rounded-lg flex items-center gap-2 border border-emerald-600"
+            >
+              <Download size={16} />
+              Export CSV
+            </button>
 
-  {/* EXPORT CSV */}
-  <button
-    onClick={handleExportCSV}
-    className="bg-emerald-700 hover:bg-emerald-600 px-4 py-2 rounded-lg flex items-center gap-2 border border-emerald-600"
-  >
-    <Download size={16} />
-    Export CSV
-  </button>
-
-  {/* PROFILE */}
-  <button
-    onClick={() => router.push("/sales/profile")}
-    title="My Profile"
-    className="text-neutral-300 hover:text-amber-400 transition"
-  >
-    <UserCircle size={34} />
-  </button>
-
-</div>
-
+            {/* PROFILE */}
+            <button
+              onClick={() => router.push("/sales/profile")}
+              title="My Profile"
+              className="text-neutral-300 hover:text-amber-400 transition"
+            >
+              <UserCircle size={34} />
+            </button>
+          </div>
         </div>
 
         {/* STATS */}
@@ -397,27 +440,41 @@ const handleExportCSV = async () => {
               title="Total Orders"
               value={totalOrders}
               icon={<Package />}
+              onClick={() => setStatusFilter("ALL")}
+              active={statusFilter === "ALL"}
             />
 
-            <StatCard title="In Progress" value={inProgress} icon={<Clock />} />
+            <StatCard
+              title="In Progress"
+              value={inProgress}
+              icon={<Clock />}
+              onClick={() => setStatusFilter("IN_PROGRESS")}
+              active={statusFilter === "IN_PROGRESS"}
+            />
 
             <StatCard
               title="Delayed"
               value={delayed}
               icon={<Clock />}
               danger={delayed > 0}
+              onClick={() => setStatusFilter("DELAYED")}
+              active={statusFilter === "DELAYED"}
             />
 
             <StatCard
               title="Ready to Dispatch"
               value={readyToDispatch}
               icon={<Truck />}
+              onClick={() => setStatusFilter("READY")}
+              active={statusFilter === "READY"}
             />
 
             <StatCard
               title="Completed"
               value={completed}
               icon={<CheckCircle />}
+              onClick={() => setStatusFilter("COMPLETED")}
+              active={statusFilter === "COMPLETED"}
             />
           </div>
 
@@ -670,57 +727,61 @@ const handleExportCSV = async () => {
 
             <div className="space-y-4">
               <div>
-  <label className="text-base text-neutral-300 font-semibold block mb-2">
-    Dispatched To
-  </label>
+                <label className="text-base text-neutral-300 font-semibold block mb-2">
+                  Dispatched To
+                </label>
 
-  <input
-    placeholder="Search or type vendor name"
-    value={vendorSearch}
-    onChange={(e) => {
-      setVendorSearch(e.target.value);
-      setFormData((prev) => ({ ...prev, dispatchedTo: e.target.value }));
-    }}
-    className="w-full px-4 py-3 bg-neutral-800 rounded-lg outline-none border-2 border-neutral-600 focus:border-amber-600"
-  />
+                <input
+                  placeholder="Search or type vendor name"
+                  value={vendorSearch}
+                  onChange={(e) => {
+                    setVendorSearch(e.target.value);
+                    setFormData((prev) => ({
+                      ...prev,
+                      dispatchedTo: e.target.value,
+                    }));
+                  }}
+                  className="w-full px-4 py-3 bg-neutral-800 rounded-lg outline-none border-2 border-neutral-600 focus:border-amber-600"
+                />
 
-  {vendorSearch && (
-    <div className="bg-neutral-800 border border-neutral-700 mt-1 rounded-lg max-h-48 overflow-auto">
-      {vendors
-        .filter((v) =>
-          v.name.toLowerCase().includes(vendorSearch.toLowerCase())
-        )
-        .map((v) => (
-          <div
-            key={v._id}
-            onClick={() => {
-              setFormData((prev) => ({
-                ...prev,
-                dispatchedTo: v._id,
-              }));
-              setVendorSearch(v.name);
-            }}
-            className="px-4 py-2 hover:bg-amber-600 cursor-pointer"
-          >
-            {v.name}
-          </div>
-        ))}
+                {vendorSearch && (
+                  <div className="bg-neutral-800 border border-neutral-700 mt-1 rounded-lg max-h-48 overflow-auto">
+                    {vendors
+                      .filter((v) =>
+                        v.name
+                          .toLowerCase()
+                          .includes(vendorSearch.toLowerCase())
+                      )
+                      .map((v) => (
+                        <div
+                          key={v._id}
+                          onClick={() => {
+                            setFormData((prev) => ({
+                              ...prev,
+                              dispatchedTo: v._id,
+                            }));
+                            setVendorSearch(v.name);
+                          }}
+                          className="px-4 py-2 hover:bg-amber-600 cursor-pointer"
+                        >
+                          {v.name}
+                        </div>
+                      ))}
 
-      <div
-        onClick={() => {
-          setFormData((prev) => ({
-            ...prev,
-            dispatchedTo: vendorSearch,
-          }));
-        }}
-        className="px-4 py-2 bg-neutral-900 hover:bg-emerald-700 cursor-pointer text-emerald-400"
-      >
-        ➕ Add "{vendorSearch}" as new vendor
-      </div>
-    </div>
-  )}
-</div>
-
+                    <div
+                      onClick={() => {
+                        setFormData((prev) => ({
+                          ...prev,
+                          dispatchedTo: vendorSearch,
+                        }));
+                      }}
+                      className="px-4 py-2 bg-neutral-900 hover:bg-emerald-700 cursor-pointer text-emerald-400"
+                    >
+                      ➕ Add "{vendorSearch}" as new vendor
+                    </div>
+                  </div>
+                )}
+              </div>
 
               <div>
                 <label className="block text-base text-neutral-300 mb-2 font-semibold">
@@ -830,13 +891,19 @@ const handleExportCSV = async () => {
 
 /* ================= SMALL COMPONENTS ================= */
 
-const StatCard = ({ title, value, icon, danger }) => (
+const StatCard = ({ title, value, icon, danger, onClick, active }) => (
   <div
-    className={`p-5 rounded-xl border ${
-      danger
-        ? "bg-amber-950/40 border-amber-800"
-        : "bg-neutral-800 border-neutral-700"
-    }`}
+    onClick={onClick}
+    className={`p-5 rounded-xl border cursor-pointer transition
+      ${
+        active
+          ? "border-amber-500 bg-amber-900/30"
+          : danger
+          ? "bg-amber-950/40 border-amber-800"
+          : "bg-neutral-800 border-neutral-700"
+      }
+      hover:border-amber-500 hover:bg-neutral-750
+    `}
   >
     <div className="flex items-center justify-between mb-3">
       <p className="text-sm text-neutral-400">{title}</p>

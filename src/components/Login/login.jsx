@@ -1,7 +1,14 @@
 "use client";
 import Link from "next/link";
 import React, { useState } from "react";
-import { Eye, EyeOff, Lock, Mail, AlertCircle, CheckCircle } from "lucide-react";
+import {
+  Eye,
+  EyeOff,
+  Lock,
+  Mail,
+  AlertCircle,
+  CheckCircle,
+} from "lucide-react";
 import axios from "axios";
 import { useRouter } from "next/navigation";
 
@@ -51,7 +58,10 @@ export default function Login() {
           case "fitting":
             router.push("/fitting");
             break;
-            
+          case "production":
+            router.push("/production");
+            break;
+
           case "sales":
             router.push("/sales/order");
             break;
@@ -66,8 +76,7 @@ export default function Login() {
       }, 800);
     } catch (err) {
       setError(
-        err.response?.data?.message ||
-          "Invalid credentials. Please try again."
+        err.response?.data?.message || "Invalid credentials. Please try again."
       );
     } finally {
       setIsLoading(false);
@@ -79,12 +88,8 @@ export default function Login() {
       <div className="w-full max-w-md">
         {/* Header */}
         <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-white mb-2">
-            Army Industry
-          </h1>
-          <p className="text-neutral-400 text-sm">
-            Sign in to your account
-          </p>
+          <h1 className="text-3xl font-bold text-white mb-2">Army Industry</h1>
+          <p className="text-neutral-400 text-sm">Sign in to your account</p>
         </div>
 
         {/* Card */}

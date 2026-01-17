@@ -2,7 +2,15 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Package, Wrench, X, Menu, ShoppingCart, CheckCircle, ArrowLeftRight } from "lucide-react";
+import {
+  Package,
+  Wrench,
+  X,
+  Menu,
+  ShoppingCart,
+  CheckCircle,
+  ArrowLeftRight,
+} from "lucide-react";
 import { useState } from "react";
 
 export default function InventorySidebar() {
@@ -42,15 +50,21 @@ export default function InventorySidebar() {
         className={`fixed lg:static top-0 left-0 z-50 h-screen w-64 sm:w-72 lg:w-60
         bg-neutral-950 border-r border-neutral-800 flex flex-col
         transition-transform duration-300 ease-in-out
-        ${open ? "translate-x-0 shadow-2xl" : "-translate-x-full"} lg:translate-x-0`}
+        ${
+          open ? "translate-x-0 shadow-2xl" : "-translate-x-full"
+        } lg:translate-x-0`}
       >
         {/* Scrollable Content */}
         <div className="flex-1 overflow-y-auto p-4 space-y-6">
           {/* HEADER */}
           <div className="flex items-start justify-between">
             <div>
-              <h2 className="text-lg sm:text-xl font-bold text-white">Inventory</h2>
-              <p className="text-xs text-neutral-500 mt-0.5">Stock Management</p>
+              <h2 className="text-lg sm:text-xl font-bold text-white">
+                Inventory
+              </h2>
+              <p className="text-xs text-neutral-500 mt-0.5">
+                Stock Management
+              </p>
             </div>
 
             {/* Close button - mobile only */}
@@ -101,7 +115,7 @@ export default function InventorySidebar() {
               <span className="truncate">Completed Orders</span>
             </Link>
 
-                        <Link
+            <Link
               href="/inventory/transfer"
               onClick={() => setOpen(false)}
               className={itemClass("/inventory/transfer")}
@@ -110,13 +124,21 @@ export default function InventorySidebar() {
               <span className="truncate">Transfer</span>
             </Link>
             <Link
-                            href="/inventory/task"
-                            onClick={() => setOpen(false)}
-                            className={itemClass("/inventory/task")}
-                        >
-                            <Wrench size={18} className="flex-shrink-0" />
-                            <span className="truncate">My Tasks</span>
-                        </Link>
+              href="/inventory/inward-pending"
+              onClick={() => setOpen(false)}
+              className={itemClass("/inventory/inward-pending")}
+            >
+              <ArrowLeftRight size={18} className="flex-shrink-0" />
+              <span className="truncate">Pending Approval</span>
+            </Link>
+            <Link
+              href="/inventory/task"
+              onClick={() => setOpen(false)}
+              className={itemClass("/inventory/task")}
+            >
+              <Wrench size={18} className="flex-shrink-0" />
+              <span className="truncate">My Tasks</span>
+            </Link>
           </nav>
         </div>
 

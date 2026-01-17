@@ -1,7 +1,7 @@
 "use client";
 import React, { useEffect, useState } from "react";
 import axios from "axios";
-import { CalendarDays, Search } from "lucide-react";
+import { CalendarDays, Download } from "lucide-react";
 import SalesSidebar from "@/components/Sales/sidebar";
 
 export default function History() {
@@ -34,21 +34,79 @@ export default function History() {
     fetchHistory(range);
   }, [range]);
 
+  const exportToCSV = () => {
+  if (!orders.length) return;
+
+  const headers = [
+    "Order ID",
+    "Dispatched To",
+    "Chair Model",
+    "Order Date",
+    "Delivery Date",
+    "Quantity",
+    "Status",
+  ];
+
+  const rows = orders.map((o) => [
+    o.orderId,
+    o.dispatchedTo,
+    o.chairModel,
+    new Date(o.orderDate).toLocaleDateString(),
+    o.deliveryDate ? new Date(o.deliveryDate).toLocaleDateString() : "",
+    o.quantity,
+    o.progress.replaceAll("_", " "),
+  ]);
+
+  const csvContent =
+    [headers, ...rows]
+      .map((row) =>
+        row
+          .map((cell) => `"${String(cell).replace(/"/g, '""')}"`)
+          .join(",")
+      )
+      .join("\n");
+
+  const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `orders_${range}_${new Date()
+    .toISOString()
+    .slice(0, 10)}.csv`;
+  link.click();
+
+  URL.revokeObjectURL(url);
+};
+
   return (
     <div className="flex h-screen bg-gradient-to-b from-amber-900 via-black to-neutral-900 text-neutral-100">
       <SalesSidebar />
 
       <div className="flex-1 overflow-auto">
         {/* HEADER */}
-        <div className="bg-neutral-800 border-b border-neutral-700 p-4">
-          <h1 className="text-2xl font-bold flex items-center gap-2">
-            <CalendarDays />
-            Order History
-          </h1>
-          <p className="text-sm text-neutral-400">
-            View and search your past orders
-          </p>
-        </div>
+        {/* HEADER */}
+<div className="bg-neutral-800 border-b border-neutral-700 p-4 flex items-center justify-between">
+  <div>
+    <h1 className="text-2xl font-bold flex items-center gap-2">
+      <CalendarDays />
+      Order History
+    </h1>
+    <p className="text-sm text-neutral-400">
+      View and search your past orders
+    </p>
+  </div>
+
+  <button
+    onClick={exportToCSV}
+    disabled={loading || orders.length === 0}
+    className="flex items-center gap-2 px-4 py-2 text-sm rounded-lg border border-amber-500 bg-amber-600 hover:bg-amber-700 disabled:opacity-50 disabled:cursor-not-allowed transition"
+  >
+    <Download className="w-4 h-4" />
+    Export CSV
+  </button>
+</div>
+
 
         {/* FILTERS */}
         <div className="p-6 flex flex-wrap gap-3">

@@ -82,11 +82,14 @@ export default function InventoryPage() {
       }
 
       const payload = {
-        chairType: form.chairType,
-        vendor: form.vendor,
-        quantity: Number(form.quantity),
-        type: "FULL",
-      };
+  chairType: form.chairType,
+  vendor: form.vendor,      // vendor NAME (backend converts to ObjectId)
+  quantity: Number(form.quantity),
+  color: "Default",         // REQUIRED
+  minQuantity: 50,          // REQUIRED
+  type: "FULL",
+};
+
 
       if (editId) {
         await axios.patch(`${API}/inventory/update/${editId}`, payload, {
@@ -126,19 +129,25 @@ export default function InventoryPage() {
       else if (qty < 100) status = "Low Stock";
 
       return {
-        id: item._id,
-        name: item.chairType || "",
-        vendor: item.vendor || "Internal",
-        quantity: qty,
-        status,
-      };
+  id: item._id,
+  name: item.chairType || "",
+  vendor: item.vendor || null, // keep the OBJECT
+  quantity: qty,
+  status,
+};
+
     });
   }, [inventory]);
 
   /* ===== FILTER OPTIONS ===== */
   const vendors = useMemo(() => {
-    return ["All", ...new Set(inventoryData.map((i) => i.vendor || "Internal"))];
-  }, [inventoryData]);
+  const names = inventoryData
+    .map((i) => i.vendor?.name)
+    .filter(Boolean);
+
+  return ["All", ...new Set(names)];
+}, [inventoryData]);
+
 
   const statuses = ["All", "Healthy", "Low Stock", "Critical"];
 
@@ -148,7 +157,7 @@ export default function InventoryPage() {
 
     return inventoryData.filter((i) => {
       const name = (i.name || "").toLowerCase();
-      const vendor = i.vendor || "";
+      const vendor = i.vendor?.name || "";
       const status = i.status || "";
 
       return (
@@ -296,7 +305,7 @@ export default function InventoryPage() {
                       <td className="p-4 font-medium">{i.name}</td>
                       <td className="p-4 flex items-center gap-2 text-sm">
                         <Building2 size={14} className="text-neutral-400" />
-                        {i.vendor}
+                        {i.vendor?.name || "-"}
                       </td>
                       <td className="p-4">{i.quantity}</td>
                       <td className="p-4">
@@ -308,7 +317,7 @@ export default function InventoryPage() {
                             setEditId(i.id);
                             setForm({
                               chairType: i.name,
-                              vendor: i.vendor,
+                              vendor: i.vendor?.name,
                               quantity: i.quantity,
                             });
                             setShowForm(true);
