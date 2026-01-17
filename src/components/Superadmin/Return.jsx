@@ -31,6 +31,7 @@ const Return = () => {
     category: "Functional",
     vendor: "",
     location: "",
+    returnedFrom: "", 
     reason: "",
   });
 
@@ -52,11 +53,14 @@ const Return = () => {
       quantity: order.quantity,
       vendor: order.salesPerson?.name || "Sales",
       location: order.dispatchedTo,
+      returnedFrom: order.dispatchedTo,   // ✅ STRING NOW
+      deliveryDate: order.deliveryDate,   // ✅ ADD THIS
     }));
   } catch (error) {
     console.error("Order not found");
   }
 };
+
 
 
 
@@ -69,8 +73,12 @@ const Return = () => {
       });
       setReturns(res.data.data);
     } catch (error) {
-      console.error("Failed to fetch returns", error);
-    } finally {
+  console.error(
+    "Failed to add return:",
+    error.response?.data || error.message
+  );
+}
+ finally {
       setLoading(false);
     }
   };
@@ -87,50 +95,63 @@ const Return = () => {
         r.chairType?.toLowerCase().includes(search.toLowerCase());
       const matchType =
         selectedType === "All" || r.category === selectedType;
-      return matchSearch && matchType && !r.movedToInventory;
+      return matchSearch && matchType && r.status === "Pending";
+
     });
   }, [search, selectedType, returns]);
 
   /* ================= MOVE TO INVENTORY ================= */
-  const moveToInventory = async (id) => {
-    try {
-      await axios.post(
-        `${API}/returns/${id}/move-to-inventory`,
-        {},
-        { headers: getAuthHeaders() }
-      );
-      fetchReturns();
-      window.dispatchEvent(new Event("inventoryUpdated"));
-    } catch (error) {
-      console.error("Failed to move to inventory", error);
-    }
-  };
+  const moveToFitting = async (id) => {
+  try {
+    await axios.post(
+      `${API}/returns/${id}/move-to-fitting`,
+      {},
+      { headers: getAuthHeaders() }
+    );
+    fetchReturns();
+  } catch (error) {
+    alert(error.response?.data?.message || "Failed to move to fitting");
+  }
+};
+
 
   /* ================= ADD RETURN ================= */
   const submitReturn = async () => {
-    try {
-      await axios.post(`${API}/returns`, form, {
-        headers: getAuthHeaders(),
-      });
+  try {
+    const payload = {
+      orderId: form.orderId,
+      returnDate: form.returnDate,
+      category: form.category,
+      description: form.reason, // ✅ FIX
+    };
 
-      setOpenModal(false);
-      setForm({
-        orderId: "",
-        chairType: "",
-        description: "",
-        quantity: 1,
-        returnDate: "",
-        category: "Functional",
-        vendor: "",
-        location: "",
-        reason: "",
-      });
+    await axios.post(`${API}/returns`, payload, {
+      headers: getAuthHeaders(),
+    });
 
-      fetchReturns();
-    } catch (error) {
-      console.error("Failed to add return", error);
-    }
-  };
+    setOpenModal(false);
+    setForm({
+      orderId: "",
+      chairType: "",
+      description: "",
+      quantity: 1,
+      returnDate: "",
+      category: "Functional",
+      vendor: "",
+      location: "",
+      returnedFrom: "",
+      reason: "",
+    });
+
+    fetchReturns();
+  } catch (error) {
+  console.log("FULL ERROR:", error);
+  console.log("STATUS:", error.response?.status);
+  console.log("DATA:", error.response?.data);
+}
+
+};
+
 
   /* ================= EXPORT ================= */
   const exportCSV = () => {
@@ -260,11 +281,12 @@ const Return = () => {
           </td>
           <td className="px-6 py-4">{r.category}</td>
           <td
-            onClick={() => moveToInventory(r._id)}
-            className="px-6 py-4 font-medium text-amber-500 cursor-pointer hover:underline"
-          >
-            Move to Inventory
-          </td>
+  onClick={() => moveToFitting(r._id)}
+  className="px-6 py-4 font-medium text-blue-400 cursor-pointer hover:underline"
+>
+  Move to Fitting
+</td>
+
         </tr>
       ))}
     </tbody>

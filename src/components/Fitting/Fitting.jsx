@@ -174,7 +174,7 @@ export default function Fitting() {
                   {filteredOrders.map((o) => (
                     <tr key={o._id} className="border-b border-neutral-700">
                       <td className="p-4">{o.orderId}</td>
-                      <td className="p-4">{o.dispatchedTo}</td>
+                      <td className="p-4">{o.dispatchedTo?.name}</td>
                       <td className="p-4">{o.chairModel}</td>
                       <td className="p-4">{o.quantity}</td>
                       <td className="p-4">{getWarehouseBadge(o.progress)}</td>

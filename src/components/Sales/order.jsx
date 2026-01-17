@@ -41,7 +41,6 @@ export default function Orders() {
     orderDate: "",
     deliveryDate: "",
     quantity: "",
-    isPartial: false,
   };
   const today = new Date();
   today.setHours(0, 0, 0, 0);
@@ -146,7 +145,6 @@ export default function Orders() {
       orderDate: order.orderDate?.split("T")[0],
       deliveryDate: order.deliveryDate?.split("T")[0] || "",
       quantity: order.quantity,
-      isPartial: order.progress === "PARTIAL",
     });
 
     setVendorSearch(order.dispatchedTo?.name || "");
@@ -170,7 +168,8 @@ export default function Orders() {
         orderDate: formData.orderDate || new Date().toISOString().split("T")[0],
         deliveryDate: formData.deliveryDate,
         quantity: Number(formData.quantity),
-        progress: formData.isPartial,
+        progress: "ORDER_PLACED",
+
       };
 
       if (editingOrderId) {
@@ -838,28 +837,6 @@ export default function Orders() {
                 onChange={handleFormChange}
               />
 
-              {/* PARTIAL */}
-              <div className="flex items-center gap-3 mt-2 bg-neutral-800 p-4 rounded-lg border-2 border-neutral-700">
-                <input
-                  type="checkbox"
-                  id="isPartial"
-                  checked={formData.isPartial}
-                  onChange={(e) =>
-                    setFormData((prev) => ({
-                      ...prev,
-                      isPartial: e.target.checked,
-                    }))
-                  }
-                  className="w-5 h-5 accent-amber-600"
-                />
-
-                <label
-                  htmlFor="isPartial"
-                  className="text-base text-neutral-200 cursor-pointer font-semibold"
-                >
-                  Mark as Partial (On Hold)
-                </label>
-              </div>
             </div>
 
             <div className="flex justify-end gap-3 mt-8">

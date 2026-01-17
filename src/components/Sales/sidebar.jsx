@@ -106,6 +106,14 @@ export default function SalesSidebar() {
                             <Wrench size={18} className="flex-shrink-0" />
                             <span className="truncate">My Tasks</span>
                         </Link>
+                        <Link
+                            href="/sales/Client-List"
+                            onClick={() => setOpen(false)}
+                            className={itemClass("/sales/Client-List")}
+                        >
+                            <Wrench size={18} className="flex-shrink-0" />
+                            <span className="truncate">Client List</span>
+                        </Link>
 
 
                     </nav>

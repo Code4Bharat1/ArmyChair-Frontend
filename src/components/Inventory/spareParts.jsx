@@ -26,7 +26,6 @@ export default function SparePartsInventory() {
   const [editId, setEditId] = useState(null);
   const [form, setForm] = useState({
     chairType: "",
-    vendor: "",
     location: "",
     quantity: "",
   });
@@ -68,22 +67,18 @@ export default function SparePartsInventory() {
   /* ================= SAVE ================= */
   const submitPart = async () => {
     try {
-      if (
-        !form.chairType ||
-        !form.vendor ||
-        !form.location ||
-        form.quantity === ""
-      ) {
+      if (!form.chairType || !form.location || form.quantity === "") {
         return alert("All fields required");
       }
 
       const payload = {
-        chairType: form.chairType,
-        vendor: form.vendor,
-        location: form.location,
-        quantity: Number(form.quantity),
-        type: "SPARE",
-      };
+  chairType: form.chairType,
+  vendor: "Production",          // 🔥 REQUIRED FOR BACKEND
+  location: form.location,
+  quantity: Number(form.quantity),
+  type: "SPARE",
+};
+
 
       if (editId) {
         await axios.patch(
@@ -146,6 +141,8 @@ export default function SparePartsInventory() {
       alert(err?.response?.data?.message || "Transfer failed");
     }
   };
+  const formatRole = (role) =>
+    role ? role.charAt(0).toUpperCase() + role.slice(1) : "—";
 
   /* ================= DATA ================= */
   const data = useMemo(() => {
@@ -157,7 +154,7 @@ export default function SparePartsInventory() {
       return {
         id: i._id,
         name: i.chairType,
-        vendor: i.vendor?.name || "—",
+        source: `${formatRole(i.createdByRole)} - ${i.createdBy?.name || "—"}`,
 
         location: i.location,
         quantity: i.quantity,
@@ -236,7 +233,7 @@ export default function SparePartsInventory() {
                   <tr>
                     {[
                       "Part",
-                      "Vendor",
+                      "Source",
                       "Qty",
                       "Location",
                       "Status",
@@ -262,7 +259,7 @@ export default function SparePartsInventory() {
 
                       <td className="p-4 flex items-center gap-2 text-sm">
                         <Building2 size={14} className="text-neutral-400" />
-                        {i.vendor}
+                        {i.source}
                       </td>
 
                       <td className="p-4">{i.quantity}</td>
@@ -282,10 +279,10 @@ export default function SparePartsInventory() {
                             setEditId(i.id);
                             setForm({
                               chairType: i.name,
-                              vendor: i.vendor,
                               location: i.location,
                               quantity: i.quantity,
                             });
+
                             setShowForm(true);
                           }}
                           className="text-amber-400 hover:text-amber-300"
@@ -334,22 +331,6 @@ export default function SparePartsInventory() {
                 value={form.chairType}
                 onChange={(v) => setForm({ ...form, chairType: v })}
               />
-              <div className="mb-3">
-                <label className="text-xs text-neutral-400">Vendor</label>
-
-                <select
-                  value={form.vendor}
-                  onChange={(e) => setForm({ ...form, vendor: e.target.value })}
-                  className="w-full mt-1 p-2 bg-neutral-800 rounded outline-none text-white"
-                >
-                  <option value="">Select Vendor</option>
-                  {VENDORS.map((v) => (
-                    <option key={v} value={v} className="bg-neutral-900">
-                      {v}
-                    </option>
-                  ))}
-                </select>
-              </div>
 
               <Input
                 label="Location"
