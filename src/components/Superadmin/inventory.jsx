@@ -188,22 +188,22 @@ export default function InventoryPage() {
 
   /* ================= UI ================= */
   return (
-    <div className="flex h-screen bg-gradient-to-b from-amber-900 via-black to-neutral-900 text-neutral-100">
+    <div className="flex h-screen bg-gray-50 text-gray-900">
       <InventorySidebar />
 
       <div className="flex-1 overflow-auto">
         {/* HEADER */}
-        <div className="bg-neutral-800 border-b border-neutral-700 p-4 flex items-center justify-between">
+        <div className="bg-white border-b border-gray-200 p-4 flex items-center justify-between shadow-sm">
           <div>
             <h1 className="text-2xl font-bold">Inventory Management</h1>
-            <p className="text-sm text-neutral-400">
+            <p className="text-sm text-gray-600">
               Track stock, vendors and availability
             </p>
           </div>
 
           <button
             onClick={() => setShowForm(true)}
-            className="bg-amber-600 hover:bg-amber-700 px-4 py-2 rounded-lg flex items-center gap-2 shadow"
+            className="bg-[#c62d23] hover:bg-[#991b1b] px-4 py-2 rounded-lg flex items-center gap-2 shadow text-white transition-colors"
           >
             <Plus size={16} /> Add Inventory
           </button>
@@ -212,25 +212,28 @@ export default function InventoryPage() {
         <div className="p-6">
           {/* ===== TOP CARDS ===== */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-            <StatCard title="Total Stock" value={totalStock} icon={<Warehouse />} />
+            <StatCard 
+              title="Total Stock" 
+              value={totalStock} 
+              icon={<Warehouse className="text-[#c62d23]" />} 
+            />
             <StatCard
               title="Total Products"
               value={totalProducts}
-              icon={<Boxes />}
+              icon={<Boxes className="text-[#c62d23]" />}
             />
             <StatCard
               title="Low / Critical"
               value={lowStockCount}
-              danger
-              icon={<TrendingDown />}
+              icon={<TrendingDown className="text-white" />}
             />
           </div>
 
           {/* ===== FILTER BAR ===== */}
-          <div className="bg-neutral-800 border border-neutral-700 rounded-xl p-4 mb-6 flex flex-col md:flex-row gap-4">
+          <div className="bg-white border border-gray-200 rounded-xl p-4 mb-6 flex flex-col md:flex-row gap-4 shadow-sm">
             {/* Search */}
-            <div className="flex items-center gap-2 bg-neutral-900 px-3 py-2 rounded-lg flex-1">
-              <Search size={16} className="text-neutral-400" />
+            <div className="flex items-center gap-2 bg-gray-50 px-3 py-2 rounded-lg flex-1 border border-gray-200">
+              <Search size={16} className="text-gray-400" />
               <input
                 placeholder="Search product..."
                 value={searchTerm}
@@ -240,15 +243,15 @@ export default function InventoryPage() {
             </div>
 
             {/* Vendor */}
-            <div className="flex items-center gap-2 bg-neutral-900 px-3 py-2 rounded-lg">
-              <Building2 size={16} className="text-neutral-400" />
+            <div className="flex items-center gap-2 bg-gray-50 px-3 py-2 rounded-lg border border-gray-200">
+              <Building2 size={16} className="text-gray-400" />
               <select
                 value={filterVendor}
                 onChange={(e) => setFilterVendor(e.target.value)}
-                className="bg-transparent outline-none text-sm"
+                className="bg-transparent outline-none text-sm w-full"
               >
                 {vendors.map((v) => (
-                  <option key={v} value={v} className="bg-neutral-900">
+                  <option key={v} value={v} className="bg-white">
                     {v}
                   </option>
                 ))}
@@ -256,15 +259,15 @@ export default function InventoryPage() {
             </div>
 
             {/* Status */}
-            <div className="flex items-center gap-2 bg-neutral-900 px-3 py-2 rounded-lg">
-              <Filter size={16} className="text-neutral-400" />
+            <div className="flex items-center gap-2 bg-gray-50 px-3 py-2 rounded-lg border border-gray-200">
+              <Filter size={16} className="text-gray-400" />
               <select
                 value={filterStatus}
                 onChange={(e) => setFilterStatus(e.target.value)}
-                className="bg-transparent outline-none text-sm"
+                className="bg-transparent outline-none text-sm w-full"
               >
                 {statuses.map((s) => (
-                  <option key={s} value={s} className="bg-neutral-900">
+                  <option key={s} value={s} className="bg-white">
                     {s}
                   </option>
                 ))}
@@ -274,26 +277,26 @@ export default function InventoryPage() {
 
           {/* ALERT */}
           {lowStockCount > 0 && (
-            <div className="bg-amber-950/60 border border-amber-800 p-4 mb-5 flex gap-3 rounded-lg">
-              <AlertCircle className="text-amber-400" />
-              <span className="text-sm">
+            <div className="bg-[#fef2f2] border border-[#f87171] p-4 mb-5 flex gap-3 rounded-lg">
+              <AlertCircle className="text-[#c62d23]" />
+              <span className="text-sm text-[#991b1b]">
                 {lowStockCount} items need immediate restocking
               </span>
             </div>
           )}
 
           {/* TABLE */}
-          <div className="bg-neutral-800 rounded-xl overflow-hidden border border-neutral-700">
+          <div className="bg-white rounded-xl overflow-hidden border border-gray-200 shadow-sm">
             {loading ? (
-              <div className="p-6 text-center">Loading...</div>
+              <div className="p-6 text-center text-gray-500">Loading...</div>
             ) : (
               <table className="w-full">
-                <thead className="bg-neutral-850 border-b border-neutral-700">
+                <thead className="bg-gray-50 border-b border-gray-200">
                   <tr>
                     {["Product", "Vendor", "Qty", "Status", "Actions"].map((h) => (
                       <th
                         key={h}
-                        className="p-4 text-left text-xs text-neutral-400 uppercase tracking-wide"
+                        className="p-4 text-left text-xs text-gray-600 uppercase tracking-wide font-semibold"
                       >
                         {h}
                       </th>
@@ -305,14 +308,14 @@ export default function InventoryPage() {
                   {filteredData.map((i) => (
                     <tr
                       key={i.id}
-                      className="border-b border-neutral-700 hover:bg-neutral-850 transition"
+                      className="border-b border-gray-100 hover:bg-gray-50 transition-colors"
                     >
-                      <td className="p-4 font-medium">{i.name}</td>
-                      <td className="p-4 flex items-center gap-2 text-sm">
-                        <Building2 size={14} className="text-neutral-400" />
+                      <td className="p-4 font-medium text-gray-900">{i.name}</td>
+                      <td className="p-4 flex items-center gap-2 text-sm text-gray-700">
+                        <Building2 size={14} className="text-gray-400" />
                         {i.vendor?.name || "-"}
                       </td>
-                      <td className="p-4">{i.quantity}</td>
+                      <td className="p-4 text-gray-900 font-semibold">{i.quantity}</td>
                       <td className="p-4">
                         <StatusBadge status={i.status} />
                       </td>
@@ -327,14 +330,14 @@ export default function InventoryPage() {
                             });
                             setShowForm(true);
                           }}
-                          className="text-amber-400 hover:text-amber-300"
+                          className="text-[#c62d23] hover:text-[#991b1b] transition-colors"
                         >
                           <Pencil size={16} />
                         </button>
 
                         <button
                           onClick={() => deleteInventory(i.id)}
-                          className="text-red-400 hover:text-red-300"
+                          className="text-red-600 hover:text-red-800 transition-colors"
                         >
                           <Trash2 size={16} />
                         </button>
@@ -346,7 +349,7 @@ export default function InventoryPage() {
                     <tr>
                       <td
                         colSpan={5}
-                        className="p-6 text-center text-neutral-400"
+                        className="p-6 text-center text-gray-500"
                       >
                         No inventory found
                       </td>
@@ -361,8 +364,8 @@ export default function InventoryPage() {
         {/* MODAL */}
         {showForm && (
           <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
-            <div className="bg-neutral-900 p-6 rounded-xl w-[380px] border border-neutral-700">
-              <h2 className="text-lg font-semibold mb-4">
+            <div className="bg-white p-6 rounded-xl w-[380px] border border-gray-200 shadow-lg">
+              <h2 className="text-lg font-semibold mb-4 text-gray-900">
                 {editId ? "Update Inventory" : "Add Inventory"}
               </h2>
 
@@ -372,16 +375,16 @@ export default function InventoryPage() {
                 onChange={(v) => setForm({ ...form, chairType: v })}
               />
               <div className="mb-3">
-  <label className="text-xs text-neutral-400">Vendor</label>
+  <label className="text-xs text-gray-600 font-medium">Vendor</label>
 
   <select
     value={form.vendor}
     onChange={(e) => setForm({ ...form, vendor: e.target.value })}
-    className="w-full mt-1 p-2 bg-neutral-800 rounded outline-none text-white"
+    className="w-full mt-1 p-2 bg-gray-50 border border-gray-200 rounded outline-none text-gray-900 focus:border-[#c62d23] focus:ring-1 focus:ring-[#c62d23]"
   >
     <option value="">Select Vendor</option>
     {VENDORS.map((v) => (
-      <option key={v} value={v} className="bg-neutral-900">
+      <option key={v} value={v} className="bg-white">
         {v}
       </option>
     ))}
@@ -401,14 +404,14 @@ export default function InventoryPage() {
                     setShowForm(false);
                     setEditId(null);
                   }}
-                  className="px-4 py-2 text-neutral-300 hover:text-white"
+                  className="px-4 py-2 text-gray-600 hover:text-gray-900 transition-colors"
                 >
                   Cancel
                 </button>
 
                 <button
                   onClick={submitInventory}
-                  className="bg-amber-600 px-4 py-2 rounded hover:bg-amber-700"
+                  className="bg-[#c62d23] px-4 py-2 rounded hover:bg-[#991b1b] text-white transition-colors"
                 >
                   Save
                 </button>
@@ -423,32 +426,31 @@ export default function InventoryPage() {
 
 /* ================= SMALL COMPONENTS ================= */
 
-const StatCard = ({ title, value, icon, danger }) => {
+const StatCard = ({ title, value, icon}) => {
   const safeValue =
     typeof value === "number" && !Number.isNaN(value) ? value : 0;
 
   return (
     <div
-      className={`p-5 rounded-xl border transition hover:shadow-md ${
-        danger
-          ? "bg-red-950/40 border-red-800"
-          : "bg-neutral-800 border-neutral-700"
-      }`}
+      className="p-5 rounded-xl border border-gray-200 bg-white transition hover:shadow-md"
+      style={{ borderLeft: '4px solid #c62d23' }}
     >
       <div className="flex items-center justify-between mb-3">
-        <p className="text-sm text-neutral-400">{title}</p>
-        <span className="text-neutral-400">{icon}</span>
+        <p className="text-sm text-gray-600 font-medium">{title}</p>
+        <span>{icon}</span>
       </div>
-      <p className="text-3xl font-bold">{safeValue}</p>
+      <p className={`text-3xl font-bold 'text-gray-900'}`}>
+        {safeValue}
+      </p>
     </div>
   );
 };
 
 const StatusBadge = ({ status }) => {
   const map = {
-    Healthy: "bg-green-900 text-green-300",
-    "Low Stock": "bg-amber-900 text-amber-300",
-    Critical: "bg-red-900 text-red-300",
+    Healthy: "bg-green-100 text-green-800",
+    "Low Stock": "bg-amber-100 text-amber-800",
+    Critical: "bg-[#fef2f2] text-[#991b1b]",
   };
   return (
     <span className={`px-3 py-1 rounded-full text-xs font-medium ${map[status]}`}>
@@ -459,12 +461,12 @@ const StatusBadge = ({ status }) => {
 
 const Input = ({ label, value, onChange, type = "text" }) => (
   <div className="mb-3">
-    <label className="text-xs text-neutral-400">{label}</label>
+    <label className="text-xs text-gray-600 font-medium">{label}</label>
     <input
       type={type}
       value={value}
       onChange={(e) => onChange(e.target.value)}
-      className="w-full mt-1 p-2 bg-neutral-800 rounded outline-none"
+      className="w-full mt-1 p-2 bg-gray-50 border border-gray-200 rounded outline-none text-gray-900 focus:border-[#c62d23] focus:ring-1 focus:ring-[#c62d23]"
     />
   </div>
 );

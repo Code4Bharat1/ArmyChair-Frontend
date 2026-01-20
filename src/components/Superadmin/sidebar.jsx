@@ -7,93 +7,92 @@ export default function Sidebar() {
   const pathname = usePathname();
 
   const menuItem = (href) =>
-    `w-full block px-6 py-2.5 text-sm transition
+    `w-full block px-6 py-3 text-sm font-medium transition-all duration-200
      ${
        pathname === href
-         ? "bg-amber-600 text-white border-l-4 border-amber-500"
-         : "text-neutral-400 hover:bg-neutral-900 hover:text-neutral-200"
+         ? "bg-[#fef2f2] text-[#991b1b] border-l-4 border-[#c62d23] shadow-sm"
+         : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
      }`;
 
   return (
-    <div className="w-55 bg-neutral-950 border-r border-neutral-800 relative">
+    <div className="w-64 bg-white border-r border-gray-200 shadow-sm relative h-screen">
       {/* Logo */}
-      <div className="p-6">
-        <h1 className="text-xl font-bold text-white">Army Industry</h1>
+      <div className="p-6 border-b border-gray-100">
+        <h1 className="text-2xl font-bold flex items-center gap-2">
+          <span className="text-gray-900">Army</span>
+          <span className="text-[#c62d23]">Industry</span>
+        </h1>
       </div>
 
       {/* Navigation */}
-      <nav className="">
+      <nav className="p-4 space-y-1">
         {/* MAIN MENU */}
-        <div className="mb-6">
-          
-          <div className="mb-6">
-            <Link
-              href="/superadmin/dashboard"
-              className={menuItem("/superadmin/dashboard")}
-            >
-              Dashboard
-            </Link>
+        <div className="space-y-1">
+          <Link
+            href="/superadmin/dashboard"
+            className={menuItem("/superadmin/dashboard")}
+          >
+            Dashboard
+          </Link>
 
-            <Link
-              href="/superadmin/inventory"
-              className={menuItem("/superadmin/inventory")}
-            >
-              Chair Inventory
-            </Link>
-            <Link
-              href="/superadmin/spareparts"
-              className={menuItem("/superadmin/spareparts")}
-            >
-              Parts Inventory
-            </Link>
+          <Link
+            href="/superadmin/inventory"
+            className={menuItem("/superadmin/inventory")}
+          >
+            Chair Inventory
+          </Link>
+          <Link
+            href="/superadmin/spareparts"
+            className={menuItem("/superadmin/spareparts")}
+          >
+            Parts Inventory
+          </Link>
 
-            <Link
-              href="/superadmin/order"
-              className={menuItem("/superadmin/order")}
-            >
-              Orders
-            </Link>
-            <Link
-              href="/superadmin/return"
-              className={menuItem("/superadmin/return")}
-            >
-              Returns
-            </Link>
-            <Link
-              href="/superadmin/staff"
-              className={menuItem("/superadmin/staff")}
-            >
-              Staff
-            </Link>
-            <Link
-              href="/superadmin/task"
-              className={menuItem("/superadmin/task")}
-            >
-              Assign tasks
-            </Link>
-            <Link
-              href="/superadmin/activity"
-              className={menuItem("/superadmin/activity")}
-            >
-              Activity
-            </Link>
-            
-          </div>
+          <Link
+            href="/superadmin/order"
+            className={menuItem("/superadmin/order")}
+          >
+            Orders
+          </Link>
+          <Link
+            href="/superadmin/return"
+            className={menuItem("/superadmin/return")}
+          >
+            Returns
+          </Link>
+          <Link
+            href="/superadmin/staff"
+            className={menuItem("/superadmin/staff")}
+          >
+            Staff
+          </Link>
+          <Link
+            href="/superadmin/task"
+            className={menuItem("/superadmin/task")}
+          >
+            Assign tasks
+          </Link>
+          <Link
+            href="/superadmin/activity"
+            className={menuItem("/superadmin/activity")}
+          >
+            Activity
+          </Link>
         </div>
       </nav>
 
       {/* Footer */}
-      <div className="absolute bottom-0 w-full border-t border-neutral-800">
+      <div className="absolute bottom-0 w-full border-t border-gray-200 bg-gray-50">
         <Link
           href="/settings"
-          className="block px-6 py-3 text-sm text-neutral-400 hover:bg-neutral-900 hover:text-neutral-200"
+          className="block px-6 py-3 text-sm text-gray-600 hover:bg-gray-100 hover:text-gray-900 transition-colors"
         >
           Settings
         </Link>
 
         <Link
           href="/logout"
-          className="block px-6 py-3 text-sm text-neutral-400 hover:bg-neutral-900 hover:text-neutral-200"
+          className="block px-6 py-3 text-sm text-gray-600 hover:bg-gray-100 hover:text-gray-900 transition-colors border-t border-gray-200"
         >
           Logout
         </Link>
