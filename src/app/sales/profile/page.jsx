@@ -18,7 +18,7 @@ export default function ProfilePage() {
   useEffect(() => {
     const fetchProfile = async () => {
       try {
-        const res = await axios.get(`${API}/me`, { headers });
+        const res = await axios.get(`${API}/auth/me`, { headers });
         setUser(res.data.user);
       } catch (err) {
         console.error("Failed to load profile", err);
@@ -39,7 +39,7 @@ export default function ProfilePage() {
 
     try {
       await axios.put(
-        `${API}/change-password`,
+        `${API}/auth/change-password`,
         { password },
         { headers }
       );

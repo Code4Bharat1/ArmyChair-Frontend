@@ -25,7 +25,7 @@ export default function SparePartsInventory() {
   const [showForm, setShowForm] = useState(false);
   const [editId, setEditId] = useState(null);
   const [form, setForm] = useState({
-    chairType: "",
+    partName: "", // Spare Part Name
     location: "",
     quantity: "",
   });
@@ -67,16 +67,14 @@ export default function SparePartsInventory() {
   /* ================= SAVE ================= */
   const submitPart = async () => {
     try {
-      if (!form.chairType || !form.location || form.quantity === "") {
+      if (!form.partName || !form.location || form.quantity === "") {
         return alert("All fields required");
       }
 
       const payload = {
-  chairType: form.chairType,
-  vendor: "Production",          // 🔥 REQUIRED FOR BACKEND
+  partName: form.partName,
   location: form.location,
   quantity: Number(form.quantity),
-  type: "SPARE",
 };
 
 
@@ -84,14 +82,14 @@ export default function SparePartsInventory() {
         await axios.patch(
           `${API}/inventory/spare-parts/update/${editId}`,
           payload,
-          { headers }
+          { headers },
         );
       } else {
         await axios.post(`${API}/inventory/spare-parts`, payload, { headers });
       }
 
       setShowForm(false);
-      setForm({ chairType: "", vendor: "", location: "", quantity: "" });
+      setForm({ partName: "", location: "", quantity: "" });
       setEditId(null);
       fetchParts();
     } catch (err) {
@@ -153,7 +151,7 @@ export default function SparePartsInventory() {
 
       return {
         id: i._id,
-        name: i.chairType,
+        name: i.partName,
         source: `${formatRole(i.createdByRole)} - ${i.createdBy?.name || "—"}`,
 
         location: i.location,
@@ -278,7 +276,7 @@ export default function SparePartsInventory() {
                           onClick={() => {
                             setEditId(i.id);
                             setForm({
-                              chairType: i.name,
+                              partName: i.name,
                               location: i.location,
                               quantity: i.quantity,
                             });
@@ -326,10 +324,12 @@ export default function SparePartsInventory() {
                 {editId ? "Update Spare Part" : "Add Spare Part"}
               </h2>
 
-              <Input
-                label="Part Name"
-                value={form.chairType}
-                onChange={(v) => setForm({ ...form, chairType: v })}
+             
+
+              <Input  
+                label="Spare Part Name"
+                value={form.partName}
+                onChange={(v) => setForm({ ...form, partName: v })}
               />
 
               <Input

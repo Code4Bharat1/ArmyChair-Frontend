@@ -33,7 +33,15 @@ export default function InventoryPage() {
     quantity: "",
   });
 
-  const VENDORS = ["Ramesh", "Suresh", "Mahesh", "Akash", "Vikram", "Amit"];
+  const VENDORS = [
+  "Ramesh",
+  "Suresh",
+  "Mahesh",
+  "Akash",
+  "Vikram",
+  "Amit",
+];
+
 
   const API = process.env.NEXT_PUBLIC_API_URL;
   const token =
@@ -42,27 +50,28 @@ export default function InventoryPage() {
   const headers = token ? { Authorization: `Bearer ${token}` } : {};
 
   /* ================= FETCH ================= */
-  const fetchInventory = async () => {
-    try {
-      const res = await axios.get(`${API}/inventory`, { headers });
+ const fetchInventory = async () => {
+  try {
+    const res = await axios.get(`${API}/inventory`, { headers });
 
-      const data = (res.data.inventory || res.data || []).filter(
-        (i) => i.type === "FULL"
-      );
+    const data = res.data.inventory || [];
 
-      // 🔥 normalize quantity immediately
-      const safeData = data.map((i) => ({
-        ...i,
-        quantity: Number(i.quantity || 0),
-      }));
+    const safeData = data.map(i => ({
+      ...i,
+      quantity: Number(i.quantity || 0),
+    }));
 
-      setInventory(safeData);
-    } catch (err) {
-      console.error("Fetch failed", err);
-    } finally {
-      setLoading(false);
-    }
-  };
+    // ✅ ONLY FULL CHAIRS
+    const onlyFullChairs = safeData.filter(i => i.type === "FULL");
+
+    setInventory(onlyFullChairs);
+  } catch (err) {
+    console.error("Fetch failed", err);
+  } finally {
+    setLoading(false);
+  }
+};
+
 
   useEffect(() => {
     fetchInventory();
@@ -76,13 +85,16 @@ export default function InventoryPage() {
       }
 
       const payload = {
-        chairType: form.chairType,
-        vendor: form.vendor, // vendor NAME (backend converts to ObjectId)
-        quantity: Number(form.quantity),
-        color: "Default", // REQUIRED
-        minQuantity: 50, // REQUIRED
-        type: "FULL",
-      };
+  chairType: form.chairType,
+  vendor: form.vendor,
+  quantity: Number(form.quantity),
+  color: "Default",
+  minQuantity: 50,
+  location: "WAREHOUSE", // 🔥 REQUIRED
+  type: "FULL",
+};
+
+
 
       if (editId) {
         await axios.patch(`${API}/inventory/update/${editId}`, payload, {
@@ -122,21 +134,25 @@ export default function InventoryPage() {
       else if (qty < 100) status = "Low Stock";
 
       return {
-        id: item._id,
-        name: item.chairType || "",
-        vendor: item.vendor || null, // keep the OBJECT
-        quantity: qty,
-        status,
-      };
+  id: item._id,
+  name: item.chairType || "",
+  vendor: item.vendor || null, // keep the OBJECT
+  quantity: qty,
+  status,
+};
+
     });
   }, [inventory]);
 
   /* ===== FILTER OPTIONS ===== */
   const vendors = useMemo(() => {
-    const names = inventoryData.map((i) => i.vendor?.name).filter(Boolean);
+  const names = inventoryData
+    .map((i) => i.vendor?.name)
+    .filter(Boolean);
 
-    return ["All", ...new Set(names)];
-  }, [inventoryData]);
+  return ["All", ...new Set(names)];
+}, [inventoryData]);
+
 
   const statuses = ["All", "Healthy", "Low Stock", "Critical"];
 
@@ -196,11 +212,7 @@ export default function InventoryPage() {
         <div className="p-6">
           {/* ===== TOP CARDS ===== */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-            <StatCard
-              title="Total Stock"
-              value={totalStock}
-              icon={<Warehouse />}
-            />
+            <StatCard title="Total Stock" value={totalStock} icon={<Warehouse />} />
             <StatCard
               title="Total Products"
               value={totalProducts}
@@ -278,16 +290,14 @@ export default function InventoryPage() {
               <table className="w-full">
                 <thead className="bg-neutral-850 border-b border-neutral-700">
                   <tr>
-                    {["Product", "Vendor", "Qty", "Status", "Actions"].map(
-                      (h) => (
-                        <th
-                          key={h}
-                          className="p-4 text-left text-xs text-neutral-400 uppercase tracking-wide"
-                        >
-                          {h}
-                        </th>
-                      )
-                    )}
+                    {["Product", "Vendor", "Qty", "Status", "Actions"].map((h) => (
+                      <th
+                        key={h}
+                        className="p-4 text-left text-xs text-neutral-400 uppercase tracking-wide"
+                      >
+                        {h}
+                      </th>
+                    ))}
                   </tr>
                 </thead>
 
@@ -362,21 +372,21 @@ export default function InventoryPage() {
                 onChange={(v) => setForm({ ...form, chairType: v })}
               />
               <div className="mb-3">
-                <label className="text-xs text-neutral-400">Vendor</label>
+  <label className="text-xs text-neutral-400">Vendor</label>
 
-                <select
-                  value={form.vendor}
-                  onChange={(e) => setForm({ ...form, vendor: e.target.value })}
-                  className="w-full mt-1 p-2 bg-neutral-800 rounded outline-none text-white"
-                >
-                  <option value="">Select Vendor</option>
-                  {VENDORS.map((v) => (
-                    <option key={v} value={v} className="bg-neutral-900">
-                      {v}
-                    </option>
-                  ))}
-                </select>
-              </div>
+  <select
+    value={form.vendor}
+    onChange={(e) => setForm({ ...form, vendor: e.target.value })}
+    className="w-full mt-1 p-2 bg-neutral-800 rounded outline-none text-white"
+  >
+    <option value="">Select Vendor</option>
+    {VENDORS.map((v) => (
+      <option key={v} value={v} className="bg-neutral-900">
+        {v}
+      </option>
+    ))}
+  </select>
+</div>
 
               <Input
                 label="Quantity"
@@ -441,9 +451,7 @@ const StatusBadge = ({ status }) => {
     Critical: "bg-red-900 text-red-300",
   };
   return (
-    <span
-      className={`px-3 py-1 rounded-full text-xs font-medium ${map[status]}`}
-    >
+    <span className={`px-3 py-1 rounded-full text-xs font-medium ${map[status]}`}>
       {status}
     </span>
   );
