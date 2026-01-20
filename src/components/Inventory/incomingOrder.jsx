@@ -15,6 +15,8 @@ import { useRouter } from "next/navigation";
 export default function WarehouseOrders() {
   const router = useRouter();
 
+  const [activeTab, setActiveTab] = useState("FULL");
+
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -22,9 +24,13 @@ export default function WarehouseOrders() {
   const [partialPicks, setPartialPicks] = useState({});
 
   const [activeFilter, setActiveFilter] = useState("ALL");
+  const [currentPage, setCurrentPage] = useState(1);
+  const ITEMS_PER_PAGE = 5;
+
   // 🔥 NEW — do NOT remove anything else
   const [expandedOrderId, setExpandedOrderId] = useState(null);
   const [inventoryPreview, setInventoryPreview] = useState({});
+
   const [showDecisionPanel, setShowDecisionPanel] = useState(false);
 
   const today = new Date();
@@ -62,7 +68,7 @@ export default function WarehouseOrders() {
           "DISPATCHED",
           "PARTIAL",
           "COMPLETED",
-        ].includes(o.progress)
+        ].includes(o.progress),
       );
 
       setOrders(warehouseOrders);
@@ -77,6 +83,10 @@ export default function WarehouseOrders() {
     fetchOrders();
   }, []);
 
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [activeTab, search, activeFilter]);
+
   /* ================= STATUS UPDATES ================= */
 
   const fittingStarted = async (id) => {
@@ -87,7 +97,7 @@ export default function WarehouseOrders() {
       await axios.patch(
         `${API}/orders/${id}/progress`,
         { progress: "FITTING_IN_PROGRESS" },
-        { headers }
+        { headers },
       );
       fetchOrders();
     } catch (err) {
@@ -103,7 +113,7 @@ export default function WarehouseOrders() {
       await axios.patch(
         `${API}/orders/${id}/progress`,
         { progress: "READY_FOR_DISPATCH" },
-        { headers }
+        { headers },
       );
       fetchOrders();
     } catch (err) {
@@ -121,7 +131,7 @@ export default function WarehouseOrders() {
       await axios.patch(
         `${API}/orders/${id}/progress`,
         { progress: "PARTIAL" },
-        { headers }
+        { headers },
       );
       fetchOrders();
     } catch (err) {
@@ -146,7 +156,7 @@ export default function WarehouseOrders() {
       await axios.patch(
         `${API}/orders/${id}/progress`,
         { progress: "DISPATCHED" },
-        { headers }
+        { headers },
       );
       fetchOrders();
     } catch (err) {
@@ -159,7 +169,7 @@ export default function WarehouseOrders() {
     try {
       const res = await axios.get(
         `${API}/warehouse/order/${orderId}/pick-data`,
-        { headers }
+        { headers },
       );
 
       const parts = res.data.parts || [];
@@ -170,7 +180,7 @@ export default function WarehouseOrders() {
         parts.forEach((p) => {
           p.locations.forEach((l) => {
             const found = order.partialParts.find(
-              (x) => x.inventoryId === l.inventoryId
+              (x) => x.inventoryId === l.inventoryId,
             );
             if (found) l.picked = found.qty; // 👈 THIS IS THE MAGIC
           });
@@ -206,12 +216,25 @@ export default function WarehouseOrders() {
         (o) =>
           o.orderId?.toLowerCase().includes(q) ||
           o.dispatchedTo?.toLowerCase().includes(q) ||
-          o.chairModel?.toLowerCase().includes(q)
+          o.chairModel?.toLowerCase().includes(q),
       );
     }
 
     return data;
   }, [orders, search, activeFilter]);
+
+  const fullChairOrders = filteredOrders.filter((o) => o.orderType === "FULL");
+
+  const sparePartOrders = filteredOrders.filter((o) => o.orderType === "SPARE");
+
+  const activeOrders = activeTab === "FULL" ? fullChairOrders : sparePartOrders;
+
+  const totalPages = Math.ceil(activeOrders.length / ITEMS_PER_PAGE);
+
+  const paginatedOrders = activeOrders.slice(
+    (currentPage - 1) * ITEMS_PER_PAGE,
+    currentPage * ITEMS_PER_PAGE,
+  );
 
   /* ================= STATS ================= */
   const totalOrders = orders.length;
@@ -219,7 +242,7 @@ export default function WarehouseOrders() {
   const delayedOrders = orders.filter((o) => isDelayed(o)).length;
 
   const readyForDispatch = orders.filter(
-    (o) => o.progress === "READY_FOR_DISPATCH"
+    (o) => o.progress === "READY_FOR_DISPATCH",
   ).length;
 
   /* ================= STATUS BADGE ================= */
@@ -268,29 +291,28 @@ export default function WarehouseOrders() {
   };
 
   const sumPartQty = (parts, partName) => {
-  if (!parts) return 0;
+    if (!parts) return 0;
 
-  const part = parts.find(p => p.partName === partName);
-  if (!part) return 0;
+    const part = parts.find((p) => p.partName === partName);
+    if (!part) return 0;
 
-  let total = 0;
+    let total = 0;
 
-  for (const l of part.locations) {
-    const picked = Number(l.picked || 0);
+    for (const l of part.locations) {
+      const picked = Number(l.picked || 0);
 
-    // 🔥 HARD BLOCK
-    if (picked > l.available) {
-      throw new Error(
-        `Picked quantity for ${partName} at ${l.location} exceeds available stock`
-      );
+      // 🔥 HARD BLOCK
+      if (picked > l.available) {
+        throw new Error(
+          `Picked quantity for ${partName} at ${l.location} exceeds available stock`,
+        );
+      }
+
+      total += picked;
     }
 
-    total += picked;
-  }
-
-  return total;
-};
-
+    return total;
+  };
 
   const getBuildableChairs = (parts) => {
     const seats = sumPartQty(parts, "seats");
@@ -300,86 +322,86 @@ export default function WarehouseOrders() {
     return Math.min(seats, back, wheels);
   };
 
- const handlePartialAccepted = async (orderId) => {
-  const parts = inventoryPreview[orderId];
-  if (!parts) return alert("No parts selected");
+  const handlePartialAccepted = async (orderId) => {
+    const parts = inventoryPreview[orderId];
+    if (!parts) return alert("No parts selected");
 
-  const order = orders.find(o => o._id === orderId);
-  if (!order) return alert("Order not found");
+    const order = orders.find((o) => o._id === orderId);
+    if (!order) return alert("Order not found");
 
-  let buildable;
+    let buildable;
 
-try {
-  const seats = sumPartQty(parts, "seats");
-  const back = sumPartQty(parts, "back");
-  const wheels = sumPartQty(parts, "wheels");
-  buildable = Math.min(seats, back, wheels);
-} catch (e) {
-  return alert(e.message);
-}
+    try {
+      buildable = Math.min(...parts.map((p) => sumPartQty(parts, p.partName)));
+    } catch (e) {
+      return alert(e.message);
+    }
 
-// ❌ OVER PICK BLOCK
-if (buildable > order.quantity) {
-  return alert(
-    `You selected parts for ${buildable} chairs but order requires only ${order.quantity}. 
-Please reduce picks to exactly ${order.quantity}.`
-  );
-}
+    // ❌ OVER PICK BLOCK
+    if (buildable > order.quantity) {
+      return alert(
+        `You selected parts for ${buildable} chairs but order requires only ${order.quantity}.
+Please reduce picks to exactly ${order.quantity}.`,
+      );
+    }
 
-  // 🔥 FULL ORDER CASE
-if (buildable >= order.quantity) {
-  if (!confirm("All parts available. Send full order to fitting?")) return;
+    // 🔥 FULL ORDER CASE
+    if (buildable >= order.quantity) {
+      if (!confirm("All parts available. Send full order to fitting?")) return;
 
-  await axios.post(
-    `${API}/warehouse/order/dispatch`,
-    {
-      orderId,
-      items: parts.flatMap(p =>
-        p.locations
-          .filter(l => l.picked > 0)
-          .map(l => ({ inventoryId: l.inventoryId, qty: l.picked }))
-      ),
-    },
-    { headers }
-  );
+      await axios.post(
+        `${API}/warehouse/order/dispatch`,
+        {
+          orderId,
+          items: parts.flatMap((p) =>
+            p.locations
+              .filter((l) => l.picked > 0)
+              .map((l) => ({ inventoryId: l.inventoryId, qty: l.picked })),
+          ),
+        },
+        { headers },
+      );
 
-  alert("Order sent to fitting successfully");
-  fetchOrders();
-  setExpandedOrderId(null);
-  setShowDecisionPanel(false);
-  return;
-}
+      alert("Order sent to fitting successfully");
+      fetchOrders();
+      setExpandedOrderId(null);
+      setShowDecisionPanel(false);
+      return;
+    }
 
+    // 🔥 PARTIAL CASE
+    if (buildable === 0) return alert("Not enough parts to build even 1 chair");
 
-  // 🔥 PARTIAL CASE
-  if (buildable === 0) return alert("Not enough parts to build even 1 chair");
+    if (
+      !confirm(
+        `Only ${buildable} chairs can be built. Save partial acceptance?`,
+      )
+    )
+      return;
 
-  if (!confirm(`Only ${buildable} chairs can be built. Save partial acceptance?`))
-    return;
-
-  const items = [];
-  parts.forEach(p => {
-    p.locations.forEach(l => {
-      if (l.picked > 0) items.push({ inventoryId: l.inventoryId, qty: l.picked });
+    const items = [];
+    parts.forEach((p) => {
+      p.locations.forEach((l) => {
+        if (l.picked > 0)
+          items.push({ inventoryId: l.inventoryId, qty: l.picked });
+      });
     });
-  });
 
-  try {
-    await axios.post(
-      `${API}/warehouse/order/partial-accept`,
-      { orderId, buildable, items },
-      { headers }
-    );
+    try {
+      await axios.post(
+        `${API}/warehouse/order/partial-accept`,
+        { orderId, buildable, items },
+        { headers },
+      );
 
-    alert(`Partial accepted for ${buildable} chairs`);
-    setExpandedOrderId(null);
-    setShowDecisionPanel(false);
-    fetchOrders();
-  } catch (err) {
-    alert("Partial accept failed");
-  }
-};
-
+      alert(`Partial accepted for ${buildable} chairs`);
+      setExpandedOrderId(null);
+      setShowDecisionPanel(false);
+      fetchOrders();
+    } catch (err) {
+      alert("Partial accept failed");
+    }
+  };
 
   /* ================= ACTION BUTTON ================= */
   const renderAction = (o) => {
@@ -489,8 +511,7 @@ if (buildable >= order.quantity) {
             Manual picking & fitting workflow
           </p>
         </div>
-
-        <div className="p-6">
+        <div className="px-6 lg:px-10 py-6 space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
             <StatCard
               title="Total Orders"
@@ -517,256 +538,277 @@ if (buildable >= order.quantity) {
               onClick={() => setActiveFilter("READY")}
             />
           </div>
-        </div>
 
-        <div className="mb-4">
-          <input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search orders..."
-            className="w-full bg-neutral-800 border border-neutral-700 px-4 py-2 rounded-lg outline-none focus:border-amber-600"
+          <div className="mb-4">
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search orders..."
+              className="w-full bg-neutral-800 border border-neutral-700 px-4 py-2 rounded-lg outline-none focus:border-amber-600"
+            />
+          </div>
+          {/* TABS */}
+          <div className="flex gap-6 mb-4 border-b border-neutral-700">
+            <button
+              onClick={() => setActiveTab("FULL")}
+              className={`pb-2 font-medium ${
+                activeTab === "FULL"
+                  ? "border-b-2 border-amber-500 text-amber-400"
+                  : "text-neutral-400"
+              }`}
+            >
+              Full Chair Orders ({fullChairOrders.length})
+            </button>
+
+            <button
+              onClick={() => setActiveTab("SPARE")}
+              className={`pb-2 font-medium ${
+                activeTab === "SPARE"
+                  ? "border-b-2 border-amber-500 text-amber-400"
+                  : "text-neutral-400"
+              }`}
+            >
+              Spare Part Orders ({sparePartOrders.length})
+            </button>
+          </div>
+
+          <OrdersTable
+            orders={paginatedOrders}
+            renderAction={renderAction}
+            getStatusBadge={getStatusBadge}
+            expandedOrderId={expandedOrderId}
+            showDecisionPanel={showDecisionPanel}
+            inventoryPreview={inventoryPreview}
+            handlePartialAccepted={handlePartialAccepted}
+            setExpandedOrderId={setExpandedOrderId}
+              setInventoryPreview={setInventoryPreview}
+
+            setShowDecisionPanel={setShowDecisionPanel}
           />
-        </div>
 
-        <div className="bg-neutral-800 rounded-xl overflow-hidden border border-neutral-700">
-          {loading ? (
-            <div className="p-6 text-center">Loading...</div>
-          ) : filteredOrders.length === 0 ? (
-            <div className="text-center text-neutral-400 py-10">
-              No warehouse orders available
+          {/* PAGINATION */}
+          {totalPages > 1 && (
+            <div className="flex justify-end items-center gap-2 mt-4">
+              <button
+                disabled={currentPage === 1}
+                onClick={() => setCurrentPage((p) => p - 1)}
+                className="px-3 py-1 rounded bg-neutral-700 disabled:opacity-40"
+              >
+                Prev
+              </button>
+
+              <span className="text-sm text-neutral-400">
+                Page {currentPage} of {totalPages}
+              </span>
+
+              <button
+                disabled={currentPage === totalPages}
+                onClick={() => setCurrentPage((p) => p + 1)}
+                className="px-3 py-1 rounded bg-neutral-700 disabled:opacity-40"
+              >
+                Next
+              </button>
             </div>
-          ) : (
-            <table className="w-full">
-              <thead className="bg-neutral-850 border-b border-neutral-700">
-                <tr>
-                  {[
-                    "Order ID",
-                    "Dispatched To",
-                    "Chair",
-                    "Order Date",
-                    "Delivery Date",
-                    "Qty",
-                    "Status",
-                    "Action",
-                  ].map((h) => (
-                    <th
-                      key={h}
-                      className="p-4 text-left text-xs text-neutral-400 uppercase tracking-wide"
-                    >
-                      {h}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-
-              <tbody>
-                {filteredOrders.map((o) => (
-                  <React.Fragment key={o._id}>
-                    {/* MAIN ROW */}
-                    <tr className="border-b border-neutral-700 hover:bg-neutral-850 transition">
-                      <td className="p-4 font-medium">{o.orderId}</td>
-                      <td className="p-4">{o.dispatchedTo?.name}</td>
-                      <td className="p-4">{o.chairModel}</td>
-                      <td className="p-4">
-                        {new Date(o.orderDate).toLocaleDateString()}
-                      </td>
-                      <td className="p-4">
-                        {o.deliveryDate
-                          ? new Date(o.deliveryDate).toLocaleDateString()
-                          : "-"}
-                      </td>
-                      <td className="p-4">{o.quantity}</td>
-                      <td className="p-4">{getStatusBadge(o.progress)}</td>
-                      <td className="p-4">{renderAction(o)}</td>
-                    </tr>
-
-                    {/* ✅ EXPANDED DECISION ROW (NEW, CORRECT PLACE) */}
-                    {expandedOrderId === o._id &&
-                      showDecisionPanel &&
-                      (o.progress === "ORDER_PLACED" || o.progress === "PARTIAL")
- && (
-                        <tr>
-                          <td colSpan={8} className="p-0">
-                            <div
-                              className={`overflow-hidden transition-all duration-300 ease-in-out
-        ${expandedOrderId === o._id ? "max-h-[900px] opacity-100" : "max-h-0 opacity-0"}
-      `}
-                            >
-                              <div className="bg-neutral-900 p-6">
-                                {/* ORDER INFO */}
-                                <div className="mb-4 text-sm text-neutral-300">
-                                  <p>
-                                    <b>Chair:</b> {o.chairModel}
-                                  </p>
-                                  <p>
-                                    <b>Required Qty:</b> {o.quantity}
-                                  </p>
-                                </div>
-
-                                {/* INVENTORY PREVIEW – SAME AS PICK PAGE */}
-                                <div className="bg-neutral-800 p-5 rounded mb-4">
-                                  <p className="text-amber-400 font-semibold mb-4 text-lg">
-                                    Parts Availability
-                                  </p>
-
-                                  {!inventoryPreview[o._id] ? (
-                                    <p className="text-neutral-400">
-                                      Loading inventory…
-                                    </p>
-                                  ) : inventoryPreview[o._id].length === 0 ? (
-                                    <p className="text-neutral-400">
-                                      No spare parts available
-                                    </p>
-                                  ) : (
-                                    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-                                      {inventoryPreview[o._id].map((part) => (
-                                        <div
-                                          key={part.partName}
-                                          className="bg-neutral-900 border border-neutral-700 rounded-xl p-5"
-                                        >
-                                          <h3 className="font-semibold mb-4 text-amber-400 text-lg">
-                                            {part.partName}
-                                          </h3>
-
-                                          <div className="space-y-3">
-                                            {part.locations.map((loc) => (
-                                              <div
-                                                key={loc.inventoryId}
-                                                className="flex items-center justify-between bg-black/40 px-4 py-3 rounded-lg"
-                                              >
-                                                <div>
-                                                  <p className="font-medium text-sm">
-                                                    Location: {loc.location}
-                                                  </p>
-                                                  <p className="text-neutral-400 text-xs">
-                                                    Available: {loc.available}
-                                                  </p>
-                                                </div>
-
-                                                <input
-                                                  type="number"
-                                                  min="0"
-                                                  max={loc.available}
-                                                  className="w-24 bg-neutral-800 border border-neutral-700 px-3 py-1 rounded"
-                                                  value={loc.picked || ""}
-                                                  onChange={(e) => {
-                                                    let qty = Number(
-                                                      e.target.value
-                                                    );
-                                                    if (qty < 0) qty = 0;
-                                                    if (qty > loc.available)
-                                                      qty = loc.available;
-
-                                                    setInventoryPreview(
-                                                      (prev) => {
-                                                        const parts = prev[
-                                                          o._id
-                                                        ].map((p) => {
-                                                          if (
-                                                            p.partName !==
-                                                            part.partName
-                                                          )
-                                                            return p;
-
-                                                          let remaining =
-                                                            o.quantity;
-
-                                                          const locations =
-                                                            p.locations.map(
-                                                              (l) => {
-                                                                if (
-                                                                  l.inventoryId ===
-                                                                  loc.inventoryId
-                                                                ) {
-                                                                  remaining -=
-                                                                    qty;
-                                                                  return {
-                                                                    ...l,
-                                                                    picked: qty,
-                                                                  };
-                                                                }
-
-                                                                const safe =
-                                                                  Math.min(
-                                                                    l.picked ||
-                                                                      0,
-                                                                    remaining
-                                                                  );
-                                                                remaining -=
-                                                                  safe;
-                                                                return {
-                                                                  ...l,
-                                                                  picked: safe,
-                                                                };
-                                                              }
-                                                            );
-
-                                                          return {
-                                                            ...p,
-                                                            locations,
-                                                          };
-                                                        });
-
-                                                        return {
-                                                          ...prev,
-                                                          [o._id]: parts,
-                                                        };
-                                                      }
-                                                    );
-                                                  }}
-                                                />
-                                              </div>
-                                            ))}
-                                          </div>
-                                        </div>
-                                      ))}
-                                    </div>
-                                  )}
-                                </div>
-
-                                {/* DECISION ACTIONS */}
-                                <div className="flex gap-3">
-                                  <button
-                                    onClick={() => handlePartialAccepted(o._id)}
-                                    className="bg-amber-600 px-4 py-2 rounded text-black"
-                                  >
-                                    Partial Accepted
-                                  </button>
-
-                                  <button
-                                    onClick={() => handleMarkPartial(o._id)}
-                                    className="bg-red-600 px-4 py-2 rounded"
-                                  >
-                                    Put On Hold
-                                  </button>
-
-                                  <button
-                                    onClick={() => {
-                                      setShowDecisionPanel(false);
-                                      setExpandedOrderId(null);
-                                    }}
-                                    className="bg-neutral-700 px-4 py-2 rounded"
-                                  >
-                                    Cancel
-                                  </button>
-                                </div>
-                              </div>
-                            </div>
-                          </td>
-                        </tr>
-                      )}
-                  </React.Fragment>
-                ))}
-              </tbody>
-            </table>
           )}
-        </div>
+        </div>{" "}
+        {/* closes px wrapper */}
       </div>
     </div>
   );
 }
 
 /* ================= SMALL COMPONENT ================= */
+const OrdersTable = ({
+  orders,
+  renderAction,
+  getStatusBadge,
+  expandedOrderId,
+  showDecisionPanel,
+  inventoryPreview,
+  setInventoryPreview,   // ✅ MUST BE HERE
+  handlePartialAccepted,
+  setExpandedOrderId,
+  setShowDecisionPanel,
+}) => {
+
+  if (!orders.length)
+    return (
+      <div className="text-center text-neutral-400 py-10">No orders found</div>
+    );
+
+  return (
+    <div className="bg-neutral-800 rounded-xl overflow-hidden border border-neutral-700">
+      <table className="w-full">
+        <thead className="bg-neutral-850 border-b border-neutral-700">
+          <tr>
+            {[
+              "Order ID",
+              "Dispatched To",
+              "Chair / Part",
+              "Order Date",
+              "Delivery Date",
+              "Qty",
+              "Status",
+              "Action",
+            ].map((h) => (
+              <th
+                key={h}
+                className="p-4 text-left text-xs text-neutral-400 uppercase"
+              >
+                {h}
+              </th>
+            ))}
+          </tr>
+        </thead>
+
+        <tbody>
+          {orders.map((o) => (
+            <React.Fragment key={`order-row-${o._id}`}>
+              {/* MAIN ROW */}
+              <tr className="border-b border-neutral-700 hover:bg-neutral-850">
+                <td className="p-4 font-medium">{o.orderId}</td>
+                <td className="p-4">{o.dispatchedTo?.name}</td>
+                <td className="p-4">{o.chairModel || "Spare Parts"}</td>
+                <td className="p-4">
+                  {new Date(o.orderDate).toLocaleDateString()}
+                </td>
+                <td className="p-4">
+                  {o.deliveryDate
+                    ? new Date(o.deliveryDate).toLocaleDateString()
+                    : "-"}
+                </td>
+                <td className="p-4">{o.quantity}</td>
+                <td className="p-4">{getStatusBadge(o.progress)}</td>
+                <td className="p-4">{renderAction(o)}</td>
+              </tr>
+
+              {/* 🔥 EXPANDED INVENTORY ROW */}
+          {expandedOrderId === o._id &&
+ showDecisionPanel &&
+ ["ORDER_PLACED", "PARTIAL"].includes(o.progress) && (
+  <tr>
+    <td colSpan={8} className="p-0">
+      <div className="bg-neutral-900 p-6 border-t border-neutral-700">
+
+        {/* ORDER INFO */}
+        <div className="mb-4 text-sm text-neutral-300">
+          <p><b>Chair:</b> {o.chairModel}</p>
+          <p><b>Required Qty:</b> {o.quantity}</p>
+        </div>
+
+        {/* INVENTORY GRID */}
+        <div className="bg-neutral-800 p-5 rounded mb-4">
+          <p className="text-amber-400 font-semibold mb-4 text-lg">
+            Parts Availability
+          </p>
+
+          {!Array.isArray(inventoryPreview[o._id]) ? (
+            <p className="text-neutral-400">Loading inventory…</p>
+          ) : inventoryPreview[o._id].length === 0 ? (
+            <p className="text-neutral-400">No spare parts available</p>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+              {inventoryPreview[o._id].map((part) => (
+                <div
+                  key={`${o._id}-${part.partName}`}
+                  className="bg-neutral-900 border border-neutral-700 rounded-xl p-5"
+                >
+                  <h3 className="font-semibold mb-4 text-amber-400 text-lg">
+                    {part.partName}
+                  </h3>
+
+                  <div className="space-y-3">
+                    {part.locations.map((loc) => (
+                      <div
+                        key={loc.inventoryId}
+                        className="flex items-center justify-between bg-black/40 px-4 py-3 rounded-lg"
+                      >
+                        <div>
+                          <p className="font-medium text-sm">
+                            Location: {loc.location}
+                          </p>
+                          <p className="text-neutral-400 text-xs">
+                            Available: {loc.available}
+                          </p>
+                        </div>
+
+                        <input
+                          type="number"
+                          min="0"
+                          max={loc.available}
+                          value={loc.picked || ""}
+                          className="w-24 bg-neutral-800 border border-neutral-700 px-3 py-1 rounded"
+                          onChange={(e) => {
+                            let qty = Number(e.target.value);
+                            if (qty < 0) qty = 0;
+                            if (qty > loc.available) qty = loc.available;
+
+                            setInventoryPreview(prev => {
+                              const parts = prev[o._id].map(p => {
+                                if (p.partName !== part.partName) return p;
+
+                                let remaining = o.quantity;
+
+                                const locations = p.locations.map(l => {
+                                  if (l.inventoryId === loc.inventoryId) {
+                                    remaining -= qty;
+                                    return { ...l, picked: qty };
+                                  }
+
+                                  const safe = Math.min(l.picked || 0, remaining);
+                                  remaining -= safe;
+                                  return { ...l, picked: safe };
+                                });
+
+                                return { ...p, locations };
+                              });
+
+                              return { ...prev, [o._id]: parts };
+                            });
+                          }}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* ACTIONS */}
+        <div className="flex gap-3">
+          <button
+            onClick={() => handlePartialAccepted(o._id)}
+            className="bg-amber-600 px-4 py-2 rounded text-black"
+          >
+            Partial Accepted
+          </button>
+
+          <button
+            onClick={() => {
+              setExpandedOrderId(null);
+              setShowDecisionPanel(false);
+            }}
+            className="bg-neutral-700 px-4 py-2 rounded"
+          >
+            Cancel
+          </button>
+        </div>
+
+      </div>
+    </td>
+  </tr>
+)}
+
+            </React.Fragment>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+};
+
 const StatCard = ({ title, value, icon, danger, active, onClick }) => (
   <div
     onClick={onClick}

@@ -71,6 +71,12 @@ export default function Sidebar() {
             >
               Assign tasks
             </Link>
+            <Link
+              href="/superadmin/activity"
+              className={menuItem("/superadmin/activity")}
+            >
+              Activity
+            </Link>
             
           </div>
         </div>

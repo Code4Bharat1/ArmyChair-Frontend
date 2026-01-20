@@ -31,38 +31,34 @@ const Return = () => {
     category: "Functional",
     vendor: "",
     location: "",
-    returnedFrom: "", 
+    returnedFrom: "",
     reason: "",
   });
 
   /* ================= FETCH ORDER BY ORDER ID ================= */
- const fetchOrderDetails = async (orderId) => {
-  if (!orderId) return;
+  const fetchOrderDetails = async (orderId) => {
+    if (!orderId) return;
 
-  try {
-    const res = await axios.get(
-      `${API}/orders/by-order-id/${orderId}`,
-      { headers: getAuthHeaders() }
-    );
+    try {
+      const res = await axios.get(`${API}/orders/by-order-id/${orderId}`, {
+        headers: getAuthHeaders(),
+      });
 
-    const order = res.data.order;
+      const order = res.data.order;
 
-    setForm((prev) => ({
-      ...prev,
-      chairType: order.chairModel,
-      quantity: order.quantity,
-      vendor: order.salesPerson?.name || "Sales",
-      location: order.dispatchedTo,
-      returnedFrom: order.dispatchedTo,   // ✅ STRING NOW
-      deliveryDate: order.deliveryDate,   // ✅ ADD THIS
-    }));
-  } catch (error) {
-    console.error("Order not found");
-  }
-};
-
-
-
+      setForm((prev) => ({
+        ...prev,
+        chairType: order.chairModel,
+        quantity: order.quantity,
+        vendor: order.salesPerson?.name || "Sales",
+        location: order.dispatchedTo,
+        returnedFrom: order.dispatchedTo, // ✅ STRING NOW
+        deliveryDate: order.deliveryDate, // ✅ ADD THIS
+      }));
+    } catch (error) {
+      console.error("Order not found");
+    }
+  };
 
   /* ================= FETCH RETURNS ================= */
   const fetchReturns = async () => {
@@ -73,12 +69,11 @@ const Return = () => {
       });
       setReturns(res.data.data);
     } catch (error) {
-  console.error(
-    "Failed to add return:",
-    error.response?.data || error.message
-  );
-}
- finally {
+      console.error(
+        "Failed to add return:",
+        error.response?.data || error.message,
+      );
+    } finally {
       setLoading(false);
     }
   };
@@ -93,78 +88,79 @@ const Return = () => {
       const matchSearch =
         r.orderId?.toLowerCase().includes(search.toLowerCase()) ||
         r.chairType?.toLowerCase().includes(search.toLowerCase());
-      const matchType =
-        selectedType === "All" || r.category === selectedType;
-      return matchSearch && matchType && r.status === "Pending";
 
+      const matchType = selectedType === "All" || r.category === selectedType;
+
+      const matchStatus = ["Pending", "In-Fitting"].includes(r.status);
+
+      return matchSearch && matchType && matchStatus;
     });
   }, [search, selectedType, returns]);
 
   /* ================= MOVE TO INVENTORY ================= */
   const moveToFitting = async (id) => {
-  try {
-    await axios.post(
-      `${API}/returns/${id}/move-to-fitting`,
-      {},
-      { headers: getAuthHeaders() }
-    );
-    fetchReturns();
-  } catch (error) {
-    alert(error.response?.data?.message || "Failed to move to fitting");
-  }
-};
-
+    try {
+      await axios.post(
+        `${API}/returns/${id}/move-to-fitting`,
+        {},
+        { headers: getAuthHeaders() },
+      );
+      fetchReturns();
+    } catch (error) {
+      alert(error.response?.data?.message || "Failed to move to fitting");
+    }
+  };
 
   /* ================= ADD RETURN ================= */
   const submitReturn = async () => {
-  try {
-    const payload = {
-      orderId: form.orderId,
-      returnDate: form.returnDate,
-      category: form.category,
-      description: form.reason, // ✅ FIX
-    };
+    try {
+      const payload = {
+        orderId: form.orderId,
+        returnDate: form.returnDate,
+        category: form.category,
+        description: form.reason, // ✅ FIX
+      };
 
-    await axios.post(`${API}/returns`, payload, {
-      headers: getAuthHeaders(),
-    });
+      await axios.post(`${API}/returns`, payload, {
+        headers: getAuthHeaders(),
+      });
 
-    setOpenModal(false);
-    setForm({
-      orderId: "",
-      chairType: "",
-      description: "",
-      quantity: 1,
-      returnDate: "",
-      category: "Functional",
-      vendor: "",
-      location: "",
-      returnedFrom: "",
-      reason: "",
-    });
+      setOpenModal(false);
+      setForm({
+        orderId: "",
+        chairType: "",
+        description: "",
+        quantity: 1,
+        returnDate: "",
+        category: "Functional",
+        vendor: "",
+        location: "",
+        returnedFrom: "",
+        reason: "",
+      });
 
-    fetchReturns();
-  } catch (error) {
-  console.log("FULL ERROR:", error);
-  console.log("STATUS:", error.response?.status);
-  console.log("DATA:", error.response?.data);
-}
-
-};
-
+      fetchReturns();
+    } catch (error) {
+      console.log("FULL ERROR:", error);
+      console.log("STATUS:", error.response?.status);
+      console.log("DATA:", error.response?.data);
+    }
+  };
 
   /* ================= EXPORT ================= */
   const exportCSV = () => {
     if (returns.length === 0) return;
 
-    const headers = ["Order ID", "Product", "Return Date", "Category"].join(",");
+    const headers = ["Order ID", "Product", "Return Date", "Category"].join(
+      ",",
+    );
 
     const rows = filteredReturns
       .map(
         (r) =>
           `${r.orderId},${r.chairType},${new Date(
-            r.returnDate
-          ).toLocaleDateString()},${r.category}`
+            r.returnDate,
+          ).toLocaleDateString()},${r.category}`,
       )
       .join("\n");
 
@@ -240,59 +236,67 @@ const Return = () => {
 
         {/* ================= TABLE ================= */}
         <div className="bg-neutral-800 m-5 border border-neutral-700 rounded-lg overflow-hidden">
-  <table className="w-full">
-    <thead className="border-b border-neutral-700">
-      <tr>
-        {[
-          "Order ID",
-          "Returned From",
-          "Chair",
-          "Delivery Date",
-          "Qty",
-          "Return Date",
-          "Category",
-          "Action",
-        ].map((h) => (
-          <th
-            key={h}
-            className="text-center p-4 text-xs font-medium text-neutral-400 uppercase"
-          >
-            {h}
-          </th>
-        ))}
-      </tr>
-    </thead>
+          <table className="w-full">
+            <thead className="border-b border-neutral-700">
+              <tr>
+                {[
+                  "Order ID",
+                  "Returned From",
+                  "Chair",
+                  "Delivery Date",
+                  "Qty",
+                  "Return Date",
+                  "Category",
+                  "Action",
+                ].map((h) => (
+                  <th
+                    key={h}
+                    className="text-center p-4 text-xs font-medium text-neutral-400 uppercase"
+                  >
+                    {h}
+                  </th>
+                ))}
+              </tr>
+            </thead>
 
-    <tbody>
-      {filteredReturns.map((r) => (
-        <tr
-          key={r._id}
-          className="border-b text-center border-neutral-700 hover:bg-neutral-750"
-        >
-          <td className="px-6 py-4 text-white">{r.orderId}</td>
-          <td className="px-6 py-4">{r.returnedFrom}</td>
-          <td className="px-6 py-4">{r.chairType}</td>
-          <td className="px-6 py-4">
-            {new Date(r.deliveryDate).toLocaleDateString()}
-          </td>
-          <td className="px-6 py-4">{r.quantity}</td>
-          <td className="px-6 py-4">
-            {new Date(r.returnDate).toLocaleDateString()}
-          </td>
-          <td className="px-6 py-4">{r.category}</td>
-          <td
-  onClick={() => moveToFitting(r._id)}
-  className="px-6 py-4 font-medium text-blue-400 cursor-pointer hover:underline"
->
-  Move to Fitting
-</td>
+            <tbody>
+              {filteredReturns.map((r) => (
+                <tr
+                  key={r._id}
+                  className="border-b text-center border-neutral-700 hover:bg-neutral-750"
+                >
+                  <td className="px-6 py-4 text-white">{r.orderId}</td>
+                  <td className="px-6 py-4">{r.returnedFrom}</td>
+                  <td className="px-6 py-4">{r.chairType}</td>
+                  <td className="px-6 py-4">
+                    {new Date(r.deliveryDate).toLocaleDateString()}
+                  </td>
+                  <td className="px-6 py-4">{r.quantity}</td>
+                  <td className="px-6 py-4">
+                    {new Date(r.returnDate).toLocaleDateString()}
+                  </td>
+                  <td className="px-6 py-4">{r.category}</td>
+                  <td className="px-6 py-4 font-medium text-center">
+                    {r.status === "Pending" && (
+                      <span
+                        onClick={() => moveToFitting(r._id)}
+                        className="text-blue-400 cursor-pointer hover:underline"
+                      >
+                        Move to Fitting
+                      </span>
+                    )}
 
-        </tr>
-      ))}
-    </tbody>
-  </table>
-</div>
-
+                    {r.status === "In-Fitting" && (
+                      <span className="text-amber-400 font-semibold">
+                        In Fitting (Pending Decision)
+                      </span>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </div>
 
       {/* ================= MODAL ================= */}
@@ -323,9 +327,7 @@ const Return = () => {
 
               <select
                 value={form.reason}
-                onChange={(e) =>
-                  setForm({ ...form, reason: e.target.value })
-                }
+                onChange={(e) => setForm({ ...form, reason: e.target.value })}
                 className="w-full px-4 py-2 bg-neutral-800 border border-neutral-700 rounded"
               >
                 <option value="">Select Return Reason</option>
@@ -368,9 +370,7 @@ const Return = () => {
 
               <select
                 value={form.category}
-                onChange={(e) =>
-                  setForm({ ...form, category: e.target.value })
-                }
+                onChange={(e) => setForm({ ...form, category: e.target.value })}
                 className="w-full px-4 py-2 bg-neutral-800 border border-neutral-700 rounded"
               >
                 <option>Functional</option>

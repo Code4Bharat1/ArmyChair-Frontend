@@ -2,11 +2,11 @@
 import ProtectedRoute from "@/components/ProtectedRoutes/ProtectedRoutes.jsx";
 import useIdleWorkTimer from "@/hooks/useIdleWorkTimer";
 
-export default function InventoryLayout({ children }) {
-  useIdleWorkTimer("Warehouse");   // 🔥 ONE LINE – that’s it
+export default function ProductionLayout({ children }) {
+  useIdleWorkTimer("Production");
 
   return (
-    <ProtectedRoute allowedRoles={["warehouse"]}>
+    <ProtectedRoute allowedRoles={["production"]}>
       {children}
     </ProtectedRoute>
   );

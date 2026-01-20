@@ -13,7 +13,6 @@ import {
 } from "lucide-react";
 import axios from "axios";
 import SalesSidebar from "./sidebar";
-
 import { UserCircle } from "lucide-react";
 import { useRouter } from "next/navigation";
 

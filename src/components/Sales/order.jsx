@@ -21,6 +21,7 @@ export default function Orders() {
   const [vendors, setVendors] = useState([]);
   const [vendorSearch, setVendorSearch] = useState("");
   const [chairModels, setChairModels] = useState([]);
+  const [spareParts, setSpareParts] = useState([]);
 
   const router = useRouter();
 
@@ -39,6 +40,7 @@ export default function Orders() {
   const initialFormData = {
     dispatchedTo: "",
     chairModel: "",
+    orderType: "FULL",
     orderDate: "",
     deliveryDate: "",
     quantity: "",
@@ -92,7 +94,6 @@ export default function Orders() {
   }
   const CHAIR_MODELS = chairModels;
 
-
   const [formData, setFormData] = useState(initialFormData);
 
   const API = process.env.NEXT_PUBLIC_API_URL;
@@ -116,6 +117,24 @@ export default function Orders() {
   useEffect(() => {
     fetchOrders();
   }, []);
+
+  const fetchSpareParts = async () => {
+    try {
+      const res = await axios.get(`${API}/inventory/spare-part-names`, {
+        headers,
+      });
+      setSpareParts(res.data.parts || []);
+    } catch (err) {
+      console.error("Fetch spare parts failed", err);
+    }
+  };
+  useEffect(() => {
+    fetchOrders();
+    fetchVendors();
+    fetchChairModels();
+    fetchSpareParts(); // 👈 ADD THIS
+  }, []);
+
   const fetchVendors = async () => {
     try {
       const res = await axios.get(`${API}/vendors`, { headers });
@@ -130,19 +149,19 @@ export default function Orders() {
     fetchOrders();
     fetchVendors();
   }, []);
-const fetchChairModels = async () => {
-  try {
-    const res = await axios.get(`${API}/inventory/chair-models`, { headers });
-    setChairModels(res.data.models || []);
-  } catch (err) {
-    console.error("Fetch chair models failed", err);
-  }
-};
-useEffect(() => {
-  fetchOrders();
-  fetchVendors();
-  fetchChairModels();   // 👈 add this
-}, []);
+  const fetchChairModels = async () => {
+    try {
+      const res = await axios.get(`${API}/inventory/chair-models`, { headers });
+      setChairModels(res.data.models || []);
+    } catch (err) {
+      console.error("Fetch chair models failed", err);
+    }
+  };
+  useEffect(() => {
+    fetchOrders();
+    fetchVendors();
+    fetchChairModels(); // 👈 add this
+  }, []);
 
   /* ================= EDIT ================= */
   const handleEditOrder = (order) => {
@@ -162,6 +181,16 @@ useEffect(() => {
   /* ================= FORM CHANGE ================= */
   const handleFormChange = (e) => {
     const { name, value } = e.target;
+
+    if (name === "orderType") {
+      setFormData((prev) => ({
+        ...prev,
+        orderType: value,
+        chairModel: "", // 🔥 reset dropdown
+      }));
+      return;
+    }
+
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
@@ -173,6 +202,7 @@ useEffect(() => {
       const payload = {
         dispatchedTo: formData.dispatchedTo,
         chairModel: formData.chairModel,
+        orderType: formData.orderType, // 👈 REQUIRED
         orderDate: formData.orderDate || new Date().toISOString().split("T")[0],
         deliveryDate: formData.deliveryDate,
         quantity: Number(formData.quantity),
@@ -217,7 +247,7 @@ useEffect(() => {
       await axios.patch(
         `${API}/orders/${orderId}/progress`,
         { progress: "DISPATCHED" },
-        { headers }
+        { headers },
       );
       fetchOrders();
     } catch (err) {
@@ -255,15 +285,15 @@ useEffect(() => {
   const delayed = filteredOrders.filter(isDelayed).length;
 
   const readyToDispatch = filteredOrders.filter(
-    (o) => o.progress === "READY_FOR_DISPATCH"
+    (o) => o.progress === "READY_FOR_DISPATCH",
   ).length;
 
   const completed = filteredOrders.filter(
-    (o) => o.progress === "DISPATCHED"
+    (o) => o.progress === "DISPATCHED",
   ).length;
 
   const inProgress = filteredOrders.filter(
-    (o) => !["DISPATCHED", "PARTIAL"].includes(o.progress) && !isDelayed(o)
+    (o) => !["DISPATCHED", "PARTIAL"].includes(o.progress) && !isDelayed(o),
   ).length;
 
   /* ================= ORDER STEPS ================= */
@@ -631,7 +661,7 @@ useEffect(() => {
                             <td colSpan={9} className="p-6">
                               {(() => {
                                 const currentIndex = ORDER_STEPS.findIndex(
-                                  (s) => s.key === o.progress
+                                  (s) => s.key === o.progress,
                                 );
 
                                 const safeIndex =
@@ -703,7 +733,7 @@ useEffect(() => {
                                       <span className="text-amber-400 font-medium">
                                         {
                                           ORDER_STEPS.find(
-                                            (s) => s.key === o.progress
+                                            (s) => s.key === o.progress,
                                           )?.label
                                         }
                                       </span>
@@ -756,7 +786,7 @@ useEffect(() => {
                       .filter((v) =>
                         v.name
                           .toLowerCase()
-                          .includes(vendorSearch.toLowerCase())
+                          .includes(vendorSearch.toLowerCase()),
                       )
                       .map((v) => (
                         <div
@@ -788,31 +818,64 @@ useEffect(() => {
                   </div>
                 )}
               </div>
+              <select
+                name="orderType"
+                value={formData.orderType}
+                onChange={handleFormChange}
+                className="w-full px-4 py-3 bg-neutral-800 border-2 border-neutral-600 rounded-lg"
+              >
+                <option value="FULL">Full Chair</option>
+                <option value="SPARE">Spare Part</option>
+              </select>
 
               <div>
                 <label className="block text-base text-neutral-300 mb-2 font-semibold">
                   Chair Model
                 </label>
-                <select
-                  name="chairModel"
-                  value={formData.chairModel}
-                  onChange={handleFormChange}
-                  className="w-full px-4 py-3 bg-neutral-800 border-2 border-neutral-600 rounded-lg text-base text-neutral-100 focus:border-amber-600 focus:ring-2 focus:ring-amber-600/50 outline-none"
-                  required
-                >
-                  <option value="" className="bg-neutral-800">
-                    Select Chair Model
-                  </option>
-                  {CHAIR_MODELS.map((model) => (
-                    <option
-                      key={model}
-                      value={model}
-                      className="bg-neutral-800"
+                {/* ================= PRODUCT SELECTION ================= */}
+                {formData.orderType === "FULL" && (
+                  <div>
+                    <label className="block text-base text-neutral-300 mb-2 font-semibold">
+                      Chair Model
+                    </label>
+                    <select
+                      name="chairModel"
+                      value={formData.chairModel}
+                      onChange={handleFormChange}
+                      className="w-full px-4 py-3 bg-neutral-800 border-2 border-neutral-600 rounded-lg"
+                      required
                     >
-                      {model}
-                    </option>
-                  ))}
-                </select>
+                      <option value="">Select Chair Model</option>
+                      {chairModels.map((model) => (
+                        <option key={model} value={model}>
+                          {model}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
+                {formData.orderType === "SPARE" && (
+                  <div>
+                    <label className="block text-base text-neutral-300 mb-2 font-semibold">
+                      Spare Part
+                    </label>
+                    <select
+                      name="chairModel"
+                      value={formData.chairModel}
+                      onChange={handleFormChange}
+                      className="w-full px-4 py-3 bg-neutral-800 border-2 border-neutral-600 rounded-lg"
+                      required
+                    >
+                      <option value="">Select Spare Part</option>
+                      {spareParts.map((part) => (
+                        <option key={part} value={part}>
+                          {part}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
               </div>
 
               <div>

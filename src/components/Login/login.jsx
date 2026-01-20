@@ -84,16 +84,21 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen bg-neutral-900 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-red-50 flex items-center justify-center p-4">
       <div className="w-full max-w-md">
         {/* Header */}
-        <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-white mb-2">Army Industry</h1>
+        <div className="text-center mb-8 flex flex-col items-center">
+          <img
+            src="/image.png"
+            alt="Army Industry Logo"
+            className="w-28 mb-4 mx-auto"
+          />
+          {/* <h1 className="text-3xl font-bold text-black mb-2">Army Industry</h1> */}
           <p className="text-neutral-400 text-sm">Sign in to your account</p>
         </div>
 
         {/* Card */}
-        <div className="bg-neutral-800 border border-neutral-700 rounded-lg p-8 shadow-xl">
+        <div className="bg-gray-100  rounded-lg p-8 shadow-xl">
           {/* Error */}
           {error && (
             <div className="mb-4 bg-red-900/20 border border-red-800 rounded-lg p-3 flex gap-2">
@@ -113,7 +118,7 @@ export default function Login() {
           <form onSubmit={handleSubmit}>
             {/* Email */}
             <div className="mb-4">
-              <label className="block text-sm text-neutral-300 mb-2">
+              <label className="block text-sm text-black  mb-4">
                 Email Address
               </label>
               <div className="relative">
@@ -123,14 +128,14 @@ export default function Login() {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="you@example.com"
-                  className="w-full bg-neutral-900 border border-neutral-700 rounded-lg pl-10 pr-4 py-3 text-sm text-neutral-200 focus:border-amber-600 focus:outline-none"
+                  className="w-full bg-white border  border-neutral-200 rounded-lg pl-10 pr-4 py-3 text-sm text-black focus:border-amber-600 focus:outline-none"
                 />
               </div>
             </div>
 
             {/* Password */}
             <div className="mb-6">
-              <label className="block text-sm text-neutral-300 mb-2">
+              <label className="block text-sm text-black mb-4">
                 Password
               </label>
               <div className="relative">
@@ -140,7 +145,7 @@ export default function Login() {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••"
-                  className="w-full bg-neutral-900 border border-neutral-700 rounded-lg pl-10 pr-12 py-3 text-sm text-neutral-200 focus:border-amber-600 focus:outline-none"
+                  className="w-full bg-white border border-neutral-200 rounded-lg pl-10 pr-12 py-3 text-sm text-neutral-200 focus:border-amber-600 focus:outline-none"
                 />
                 <button
                   type="button"

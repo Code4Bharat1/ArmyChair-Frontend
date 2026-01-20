@@ -39,15 +39,16 @@ export default function CompletedOrders() {
 
   /* ================= FILTER ================= */
   const filteredOrders = useMemo(() => {
-    return orders.filter((o) => {
-      const q = search.toLowerCase();
-      return (
-        o.orderId?.toLowerCase().includes(q) ||
-        o.dispatchedTo?.toLowerCase().includes(q) ||
-        o.chairModel?.toLowerCase().includes(q)
-      );
-    });
-  }, [orders, search]);
+  return orders.filter((o) => {
+    const q = search.toLowerCase();
+    return (
+      o.orderId?.toLowerCase().includes(q) ||
+      o.dispatchedTo?.name?.toLowerCase().includes(q) ||
+      o.chairModel?.toLowerCase().includes(q)
+    );
+  });
+}, [orders, search]);
+
 
   /* ================= STATS ================= */
   const totalOrders = filteredOrders.length;
@@ -72,7 +73,7 @@ export default function CompletedOrders() {
 
     const rows = filteredOrders.map((o) => [
       o.orderId,
-      o.dispatchedTo,
+       o.dispatchedTo?.name,
       o.chairModel,
       new Date(o.orderDate).toLocaleDateString(),
       o.quantity,
@@ -184,7 +185,8 @@ export default function CompletedOrders() {
                       className="border-b border-neutral-700 hover:bg-neutral-850 transition"
                     >
                       <td className="p-4 font-medium">{o.orderId}</td>
-                      <td className="p-4">{o.dispatchedTo}</td>
+                     <td className="p-4">{o.dispatchedTo?.name || "-"}</td>
+
                       <td className="p-4">{o.chairModel}</td>
                       <td className="p-4">
                         {new Date(o.orderDate).toLocaleDateString()}

@@ -50,25 +50,28 @@ export default function InventoryPage() {
   const headers = token ? { Authorization: `Bearer ${token}` } : {};
 
   /* ================= FETCH ================= */
-  const fetchInventory = async () => {
-    try {
-      const res = await axios.get(`${API}/inventory`, { headers });
+ const fetchInventory = async () => {
+  try {
+    const res = await axios.get(`${API}/inventory`, { headers });
 
-      const data = res.data.inventory || res.data || [];
+    const data = res.data.inventory || [];
 
-      // 🔥 normalize quantity immediately
-      const safeData = data.map((i) => ({
-        ...i,
-        quantity: Number(i.quantity || 0),
-      }));
+    const safeData = data.map(i => ({
+      ...i,
+      quantity: Number(i.quantity || 0),
+    }));
 
-      setInventory(safeData);
-    } catch (err) {
-      console.error("Fetch failed", err);
-    } finally {
-      setLoading(false);
-    }
-  };
+    // ✅ ONLY FULL CHAIRS
+    const onlyFullChairs = safeData.filter(i => i.type === "FULL");
+
+    setInventory(onlyFullChairs);
+  } catch (err) {
+    console.error("Fetch failed", err);
+  } finally {
+    setLoading(false);
+  }
+};
+
 
   useEffect(() => {
     fetchInventory();
@@ -83,12 +86,14 @@ export default function InventoryPage() {
 
       const payload = {
   chairType: form.chairType,
-  vendor: form.vendor,      // vendor NAME (backend converts to ObjectId)
+  vendor: form.vendor,
   quantity: Number(form.quantity),
-  color: "Default",         // REQUIRED
-  minQuantity: 50,          // REQUIRED
+  color: "Default",
+  minQuantity: 50,
+  location: "WAREHOUSE", // 🔥 REQUIRED
   type: "FULL",
 };
+
 
 
       if (editId) {
