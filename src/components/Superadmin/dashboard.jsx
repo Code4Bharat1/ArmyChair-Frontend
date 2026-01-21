@@ -1,6 +1,7 @@
 "use client";
 import React, { useEffect, useState, useRef } from "react";
 import axios from "axios";
+import CountUp from "react-countup";
 import {
   Calendar,
   TrendingUp,
@@ -284,7 +285,16 @@ const Kpi = ({ title, value, icon, onClick, accentColor = "red", clickable = fal
       <p className="text-sm text-gray-600 font-medium">{title}</p>
       {React.cloneElement(icon, { size: 24 })}
     </div>
-    <p className="text-3xl font-bold text-gray-900 mb-1">{value}</p>
+    {typeof value === 'number' ? (
+      <CountUp
+        end={value}
+        duration={1.5}
+        className="text-3xl font-bold text-gray-900 mb-1"
+        separator=","
+      />
+    ) : (
+      <p className="text-3xl font-bold text-gray-900 mb-1">{value}</p>
+    )}
     {clickable && (
       <div className="mt-2 text-xs text-gray-500 flex items-center gap-1">
         <span>Click to view details</span>
@@ -400,7 +410,9 @@ const TableView = ({
                     <span className="inline-block w-4 h-4 rounded-full bg-gray-400 mr-2" style={{ backgroundColor: r.color }} />
                     {r.color}
                   </td>
-                  <td className="p-4 text-gray-900 font-semibold">{r.quantity}</td>
+                  <td className="p-4 text-gray-900 font-semibold">
+                    <CountUp end={r.quantity} duration={1} separator="," />
+                  </td>
                   <td className="p-4 text-gray-700">{r.vendor?.name || "—"}</td>
                   <td className="p-4">
                     <span className="px-2 py-1 bg-[#fef2f2] text-[#991b1b] text-xs rounded-full font-medium">
@@ -417,7 +429,9 @@ const TableView = ({
                   </td>
                   <td className="p-4 text-gray-900 font-medium">{r.chairType}</td>
                   <td className="p-4 text-gray-700">{r.location}</td>
-                  <td className="p-4 text-gray-900 font-semibold">{r.quantity}</td>
+                  <td className="p-4 text-gray-900 font-semibold">
+                    <CountUp end={r.quantity} duration={1} separator="," />
+                  </td>
                 </>
               )}
 
@@ -427,7 +441,9 @@ const TableView = ({
                     {new Date(r.createdAt).toLocaleDateString()}
                   </td>
                   <td className="p-4 text-gray-900 font-medium">{r.chairModel}</td>
-                  <td className="p-4 text-gray-900 font-semibold">{r.quantity}</td>
+                  <td className="p-4 text-gray-900 font-semibold">
+                    <CountUp end={r.quantity} duration={1} separator="," />
+                  </td>
                   <td className="p-4 text-gray-700">{r.dispatchedTo?.name}</td>
                   <td className="p-4">
                     <span className="px-2 py-1 bg-green-100 text-green-800 text-xs rounded-full font-medium">

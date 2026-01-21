@@ -1,6 +1,6 @@
 "use client";
 import React, { useEffect, useMemo, useState } from "react";
-import { Search, Download, Plus, X } from "lucide-react";
+import { Search, Download, Plus, X, AlertCircle } from "lucide-react";
 import Sidebar from "@/components/Superadmin/sidebar";
 import axios from "axios";
 
@@ -17,11 +17,9 @@ const getAuthHeaders = () => {
 const Return = () => {
   const [search, setSearch] = useState("");
   const [selectedType, setSelectedType] = useState("All");
-
   const [returns, setReturns] = useState([]);
   const [loading, setLoading] = useState(false);
   const [openModal, setOpenModal] = useState(false);
-
   const [form, setForm] = useState({
     orderId: "",
     chairType: "",
@@ -52,8 +50,8 @@ const Return = () => {
         quantity: order.quantity,
         vendor: order.salesPerson?.name || "Sales",
         location: order.dispatchedTo,
-        returnedFrom: order.dispatchedTo, // ✅ STRING NOW
-        deliveryDate: order.deliveryDate, // ✅ ADD THIS
+        returnedFrom: order.dispatchedTo,
+        deliveryDate: order.deliveryDate,
       }));
     } catch (error) {
       console.error("Order not found");
@@ -118,7 +116,7 @@ const Return = () => {
         orderId: form.orderId,
         returnDate: form.returnDate,
         category: form.category,
-        description: form.reason, // ✅ FIX
+        description: form.reason,
       };
 
       await axios.post(`${API}/returns`, payload, {
@@ -173,216 +171,263 @@ const Return = () => {
   };
 
   return (
-    <div className="flex h-screen bg-gradient-to-b from-amber-900 via-black to-neutral-900 text-neutral-100">
+    <div className="flex min-h-screen bg-gray-50 text-gray-900">
       <Sidebar />
 
       <div className="flex-1 overflow-auto">
         {/* ================= HEADER ================= */}
-        <div className="bg-neutral-800 border-b border-neutral-700 mb-8 p-4 flex items-center justify-between">
-          <div className="flex-1">
-            <h1 className="text-2xl font-semibold text-white">
-              Returns Management
+        <div className="sticky top-0 z-10 bg-white/80 backdrop-blur border-b border-gray-200 p-6 shadow-sm flex justify-between items-center">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-2">
+              <span>Returns Management</span>
             </h1>
-            <p className="text-sm text-neutral-400">
-              Track returned orders and route functional items to inventory and
-              non-functional items to defects.
+            <p className="text-gray-600 mt-2">
+              Track returned orders and route functional items to inventory and non-functional items to defects.
             </p>
           </div>
 
-          <div className="flex gap-3">
+          <div className="flex items-center gap-3">
             <button
               onClick={() => setOpenModal(true)}
-              className="flex items-center gap-2 bg-neutral-700 hover:bg-neutral-600 px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+              className="bg-[#c62d23] text-white px-5 py-3 rounded-xl border-2 border-gray-200 shadow-sm hover:bg-[#a8241c] hover:shadow-md transition-all duration-200 cursor-pointer group flex items-center gap-2 font-medium"
             >
-              <Plus size={16} />
+              <Plus size={18} className=" group-hover:scale-110 transition-transform" />
               Add Returns
             </button>
 
             <button
               onClick={exportCSV}
-              className="flex items-center gap-2 bg-amber-600 hover:bg-amber-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+              className="bg-white px-5 py-3 rounded-xl border-2 border-gray-200 shadow-sm hover:border-[#c62d23] hover:shadow-md transition-all duration-200 cursor-pointer group flex items-center gap-2 font-medium"
             >
-              <Download size={16} />
+              <Download size={18} className="text-[#c62d23] group-hover:scale-110 transition-transform" />
               Export Report
             </button>
           </div>
         </div>
 
-        {/* ================= FILTERS ================= */}
-        <div className="flex flex-wrap items-end gap-6 mb-6">
-          <div className="relative ml-5 w-full sm:w-[320px]">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-500 w-4 h-4" />
-            <input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search return by ID or product..."
-              className="w-full h-[42px] bg-neutral-900 border border-neutral-700 rounded-lg pl-10 pr-4 text-sm text-neutral-200 placeholder-neutral-500 focus:outline-none focus:border-amber-600"
-            />
-          </div>
+        {/* ================= CONTENT ================= */}
+        <div className="p-8 space-y-8">
+          {/* ================= FILTERS ================= */}
+          <div className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm hover:shadow-md transition-shadow">
+            <div className="flex flex-wrap items-end gap-6 mb-6">
+              <div className="flex-1 min-w-[280px]">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
+                  <input
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    placeholder="Search return by ID or product..."
+                    className="w-full p-3 pl-10 bg-white rounded-xl border-2 border-gray-200 focus:border-[#c62d23] focus:ring-2 focus:ring-[#c62d23]/20 outline-none transition-all"
+                  />
+                </div>
+              </div>
 
-          <div className="flex flex-col">
-            <label className="mb-1 text-xs text-neutral-400">Type</label>
-            <select
-              value={selectedType}
-              onChange={(e) => setSelectedType(e.target.value)}
-              className="h-[42px] px-4 bg-neutral-800 border border-neutral-700 rounded-lg text-sm text-neutral-200 focus:outline-none focus:border-amber-600"
-            >
-              <option value="All">All</option>
-              <option value="Functional">Functional</option>
-              <option value="Non-Functional">Non-Functional</option>
-            </select>
-          </div>
-        </div>
-
-        {/* ================= TABLE ================= */}
-        <div className="bg-neutral-800 m-5 border border-neutral-700 rounded-lg overflow-hidden">
-          <table className="w-full">
-            <thead className="border-b border-neutral-700">
-              <tr>
-                {[
-                  "Order ID",
-                  "Returned From",
-                  "Chair",
-                  "Delivery Date",
-                  "Qty",
-                  "Return Date",
-                  "Category",
-                  "Action",
-                ].map((h) => (
-                  <th
-                    key={h}
-                    className="text-center p-4 text-xs font-medium text-neutral-400 uppercase"
-                  >
-                    {h}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-
-            <tbody>
-              {filteredReturns.map((r) => (
-                <tr
-                  key={r._id}
-                  className="border-b text-center border-neutral-700 hover:bg-neutral-750"
+              <div className="flex flex-col min-w-[200px]">
+                <label className="mb-2 text-sm font-medium text-gray-700">Type</label>
+                <select
+                  value={selectedType}
+                  onChange={(e) => setSelectedType(e.target.value)}
+                  className="p-3 bg-white rounded-xl border-2 border-gray-200 focus:border-[#c62d23] focus:ring-2 focus:ring-[#c62d23]/20 outline-none transition-all"
                 >
-                  <td className="px-6 py-4 text-white">{r.orderId}</td>
-                  <td className="px-6 py-4">{r.returnedFrom}</td>
-                  <td className="px-6 py-4">{r.chairType}</td>
-                  <td className="px-6 py-4">
-                    {new Date(r.deliveryDate).toLocaleDateString()}
-                  </td>
-                  <td className="px-6 py-4">{r.quantity}</td>
-                  <td className="px-6 py-4">
-                    {new Date(r.returnDate).toLocaleDateString()}
-                  </td>
-                  <td className="px-6 py-4">{r.category}</td>
-                  <td className="px-6 py-4 font-medium text-center">
-                    {r.status === "Pending" && (
-                      <span
-                        onClick={() => moveToFitting(r._id)}
-                        className="text-blue-400 cursor-pointer hover:underline"
-                      >
-                        Move to Fitting
-                      </span>
-                    )}
+                  <option value="All">All</option>
+                  <option value="Functional">Functional</option>
+                  <option value="Non-Functional">Non-Functional</option>
+                </select>
+              </div>
+            </div>
 
-                    {r.status === "In-Fitting" && (
-                      <span className="text-amber-400 font-semibold">
-                        In Fitting (Pending Decision)
-                      </span>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+            {/* ================= TABLE ================= */}
+            <div className="overflow-auto rounded-lg border border-gray-200">
+              {loading ? (
+                <div className="p-8 text-center text-gray-500">Loading...</div>
+              ) : filteredReturns.length === 0 ? (
+                <div className="p-8 text-center text-gray-500">
+                  No returns found
+                </div>
+              ) : (
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="bg-gray-50">
+                      {[
+                        "Order ID",
+                        "Returned From",
+                        "Chair",
+                        "Delivery Date",
+                        "Qty",
+                        "Return Date",
+                        "Category",
+                        "Status",
+                        "Action",
+                      ].map((h) => (
+                        <th
+                          key={h}
+                          className="text-left p-4 font-semibold text-gray-700"
+                        >
+                          {h}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+
+                  <tbody>
+                    {filteredReturns.map((r, index) => (
+                      <tr
+                        key={r._id}
+                        className={`border-b border-gray-100 hover:bg-gray-50 transition-colors ${
+                          index % 2 === 0 ? "bg-white" : "bg-gray-50"
+                        }`}
+                      >
+                        <td className="p-4 font-medium text-gray-900">{r.orderId}</td>
+                        <td className="p-4 text-gray-700">{r.returnedFrom}</td>
+                        <td className="p-4 text-gray-700">{r.chairType}</td>
+                        <td className="p-4 text-gray-700">
+                          {new Date(r.deliveryDate).toLocaleDateString()}
+                        </td>
+                        <td className="p-4 font-semibold text-gray-900">{r.quantity}</td>
+                        <td className="p-4 text-gray-700">
+                          {new Date(r.returnDate).toLocaleDateString()}
+                        </td>
+                        <td className="p-4">
+                          <span className={`px-3 py-1.5 rounded-full text-xs font-medium ${
+                            r.category === "Functional" 
+                              ? "bg-green-100 text-green-800" 
+                              : "bg-red-100 text-red-800"
+                          }`}>
+                            {r.category}
+                          </span>
+                        </td>
+                        <td className="p-4">
+                          <span className={`px-3 py-1.5 rounded-full text-xs font-medium ${
+                            r.status === "Pending" 
+                              ? "bg-amber-100 text-amber-800" 
+                              : r.status === "In-Fitting"
+                              ? "bg-blue-100 text-blue-800"
+                              : "bg-gray-100 text-gray-800"
+                          }`}>
+                            {r.status}
+                          </span>
+                        </td>
+                        <td className="p-4">
+                          {r.status === "Pending" && (
+                            <button
+                              onClick={() => moveToFitting(r._id)}
+                              className="text-blue-600 hover:text-blue-800 font-medium hover:underline cursor-pointer"
+                            >
+                              Move to Fitting
+                            </button>
+                          )}
+
+                          {r.status === "In-Fitting" && (
+                            <span className="text-amber-600 font-medium">
+                              In Fitting
+                            </span>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          </div>
         </div>
       </div>
 
       {/* ================= MODAL ================= */}
       {openModal && (
-        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50">
-          <div className="bg-neutral-900 w-full max-w-lg rounded-lg p-6 border border-neutral-700">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-lg font-semibold text-white">
-                Add Return Order
-              </h2>
-              <X
-                className="cursor-pointer text-neutral-400"
-                onClick={() => setOpenModal(false)}
-              />
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl w-full max-w-md border border-gray-200 shadow-lg">
+            <div className="p-6 border-b border-gray-200">
+              <div className="flex justify-between items-center">
+                <h2 className="text-xl font-bold text-gray-900">
+                  Add Return Order
+                </h2>
+                <button
+                  onClick={() => setOpenModal(false)}
+                  className="p-2 rounded-lg hover:bg-gray-100 transition-colors cursor-pointer"
+                >
+                  <X size={20} className="text-gray-500" />
+                </button>
+              </div>
             </div>
 
-            <div className="space-y-4">
-              <input
-                placeholder="Order ID"
-                value={form.orderId}
-                onChange={(e) => {
-                  const value = e.target.value;
-                  setForm({ ...form, orderId: value });
-                  if (value.length >= 10) fetchOrderDetails(value);
-                }}
-                className="w-full px-4 py-2 bg-neutral-800 border border-neutral-700 rounded"
-              />
+            <div className="space-y-4 p-6">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Order ID
+                </label>
+                <input
+                  placeholder="Enter Order ID"
+                  value={form.orderId}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    setForm({ ...form, orderId: value });
+                    if (value.length >= 10) fetchOrderDetails(value);
+                  }}
+                  className="w-full p-3 bg-white rounded-xl border-2 border-gray-200 focus:border-[#c62d23] focus:ring-2 focus:ring-[#c62d23]/20 outline-none transition-all"
+                />
+              </div>
 
-              <select
-                value={form.reason}
-                onChange={(e) => setForm({ ...form, reason: e.target.value })}
-                className="w-full px-4 py-2 bg-neutral-800 border border-neutral-700 rounded"
-              >
-                <option value="">Select Return Reason</option>
-                <option>Damaged</option>
-                <option>Wrong Product</option>
-                <option>Manufacturing Defect</option>
-                <option>Transport Damage</option>
-                <option>Customer Rejected</option>
-              </select>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Return Reason
+                </label>
+                <select
+                  value={form.reason}
+                  onChange={(e) => setForm({ ...form, reason: e.target.value })}
+                  className="w-full p-3 bg-white rounded-xl border-2 border-gray-200 focus:border-[#c62d23] focus:ring-2 focus:ring-[#c62d23]/20 outline-none transition-all"
+                >
+                  <option value="">Select Return Reason</option>
+                  <option>Damaged</option>
+                  <option>Wrong Product</option>
+                  <option>Manufacturing Defect</option>
+                  <option>Transport Damage</option>
+                  <option>Customer Rejected</option>
+                </select>
+              </div>
 
-              {/* <input
-                placeholder="Product"
-                value={form.chairType}
-                disabled
-                className="w-full px-4 py-2 bg-neutral-800 border border-neutral-700 rounded"
-              /> */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Return Date
+                </label>
+                <input
+                  type="date"
+                  value={form.returnDate}
+                  onChange={(e) =>
+                    setForm({ ...form, returnDate: e.target.value })
+                  }
+                  className="w-full p-3 bg-white rounded-xl border-2 border-gray-200 focus:border-[#c62d23] focus:ring-2 focus:ring-[#c62d23]/20 outline-none transition-all"
+                />
+              </div>
 
-              {/* <input
-                placeholder="Vendor"
-                value={form.vendor}
-                disabled
-                className="w-full px-4 py-2 bg-neutral-800 border border-neutral-700 rounded"
-              /> */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Category
+                </label>
+                <select
+                  value={form.category}
+                  onChange={(e) => setForm({ ...form, category: e.target.value })}
+                  className="w-full p-3 bg-white rounded-xl border-2 border-gray-200 focus:border-[#c62d23] focus:ring-2 focus:ring-[#c62d23]/20 outline-none transition-all"
+                >
+                  <option>Functional</option>
+                  <option>Non-Functional</option>
+                </select>
+              </div>
 
-              {/* <input
-                placeholder="Location"
-                value={form.location}
-                disabled
-                className="w-full px-4 py-2 bg-neutral-800 border border-neutral-700 rounded"
-              /> */}
-
-              <input
-                type="date"
-                value={form.returnDate}
-                onChange={(e) =>
-                  setForm({ ...form, returnDate: e.target.value })
-                }
-                className="w-full px-4 py-2 bg-neutral-800 border border-neutral-700 rounded"
-              />
-
-              <select
-                value={form.category}
-                onChange={(e) => setForm({ ...form, category: e.target.value })}
-                className="w-full px-4 py-2 bg-neutral-800 border border-neutral-700 rounded"
-              >
-                <option>Functional</option>
-                <option>Non-Functional</option>
-              </select>
-
-              <button
-                onClick={submitReturn}
-                className="w-full bg-amber-600 hover:bg-amber-700 py-2 rounded font-medium"
-              >
-                Add Return
-              </button>
+              <div className="flex justify-end gap-3 pt-6 border-t border-gray-200">
+                <button
+                  onClick={() => setOpenModal(false)}
+                  className="px-5 py-2.5 text-gray-700 font-medium rounded-xl border-2 border-gray-200 hover:bg-gray-50 transition-all duration-200 cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={submitReturn}
+                  className="bg-[#c62d23] hover:bg-[#a8241c] text-white px-5 py-2.5 font-medium rounded-xl transition-all duration-200 shadow-sm hover:shadow-md cursor-pointer"
+                >
+                  Add Return
+                </button>
+              </div>
             </div>
           </div>
         </div>

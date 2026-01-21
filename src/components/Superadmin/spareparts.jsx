@@ -72,11 +72,10 @@ export default function SparePartsInventory() {
       }
 
       const payload = {
-  partName: form.partName,
-  location: form.location,
-  quantity: Number(form.quantity),
-};
-
+        partName: form.partName,
+        location: form.location,
+        quantity: Number(form.quantity),
+      };
 
       if (editId) {
         await axios.patch(
@@ -174,223 +173,241 @@ export default function SparePartsInventory() {
 
   /* ================= UI ================= */
   return (
-    <div className="flex h-screen bg-gradient-to-b from-amber-900 via-black to-neutral-900 text-neutral-100">
+    <div className="flex min-h-screen bg-gray-50 text-gray-900">
       <InventorySidebar />
 
       {/* MAIN */}
       <div className="flex-1 overflow-auto">
         {/* HEADER */}
-        <div className="bg-neutral-800 border-b border-neutral-700 p-4 flex items-center justify-between ">
+        <div className="sticky top-0 z-10 bg-white/80 backdrop-blur border-b border-gray-200 p-6 shadow-sm flex justify-between items-center">
           <div>
-            <h1 className="text-2xl font-bold">Spare Parts Inventory</h1>
-            <p className="text-sm mb-5 text-neutral-400">
+            <h1 className="text-3xl font-bold text-gray-900">Spare Parts Inventory</h1>
+            <p className="text-gray-600 mt-2">
               Manage your spare parts stock levels and details
             </p>
           </div>
 
           <button
             onClick={() => setShowForm(true)}
-            className="bg-amber-600 hover:bg-amber-700 px-4 py-2 rounded-lg flex items-center gap-2 shadow"
+            className="bg-[#c62d23] hover:bg-[#a8241c] text-white px-5 py-3 rounded-xl font-medium flex items-center gap-2 transition-all duration-200 shadow-sm hover:shadow-md"
           >
-            <Plus size={16} /> Add Inventory
+            <Plus size={18} /> Add Inventory
           </button>
         </div>
 
-        {/* STATS */}
-        <div className="p-6">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-            <StatCard title="Total Parts" value={totalParts} icon={<Boxes />} />
-            <StatCard
-              title="Total Quantity"
-              value={totalQty}
-              icon={<Warehouse />}
+        {/* CONTENT */}
+        <div className="p-8 space-y-8">
+          {/* STATS */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <KpiCard 
+              title="Total Parts" 
+              value={totalParts} 
+              icon={<Boxes className="text-[#c62d23]" />}
             />
-            <StatCard
-              title="Low / Critical"
-              value={lowStock}
-              danger
-              icon={<TrendingDown />}
+            <KpiCard 
+              title="Total Quantity" 
+              value={totalQty} 
+              icon={<Warehouse className="text-[#c62d23]" />}
+            />
+            <KpiCard 
+              title="Low / Critical" 
+              value={lowStock} 
+              icon={<TrendingDown className="text-[#c62d23]" />}
+              danger={true}
             />
           </div>
 
           {/* ALERT */}
           {lowStock > 0 && (
-            <div className="bg-amber-950/60 border border-amber-800 p-4 mb-4 flex gap-3 rounded-lg">
-              <AlertCircle className="text-amber-400" />
-              {lowStock} spare parts need restocking
+            <div className="bg-red-50 border border-red-200 rounded-2xl p-4 flex gap-3 items-center">
+              <AlertCircle className="text-red-500" />
+              <span className="text-red-700 font-medium">
+                {lowStock} spare parts need restocking
+              </span>
             </div>
           )}
 
           {/* TABLE */}
-          <div className="bg-neutral-800 rounded-xl overflow-hidden border border-neutral-700">
-            {loading ? (
-              <div className="p-6 text-center">Loading...</div>
-            ) : (
-              <table className="w-full">
-                <thead className="bg-neutral-850 border-b border-neutral-700">
-                  <tr>
-                    {[
-                      "Part",
-                      "Source",
-                      "Qty",
-                      "Location",
-                      "Status",
-                      "Actions",
-                    ].map((h) => (
-                      <th
-                        key={h}
-                        className="p-4 text-left text-xs text-neutral-400 uppercase tracking-wide"
-                      >
-                        {h}
-                      </th>
-                    ))}
+          <div className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm">
+            <h2 className="font-bold text-lg text-gray-900 mb-6">Spare Parts Overview</h2>
+            
+            <div className="overflow-auto rounded-lg border border-gray-200">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="bg-gray-50">
+                    <th className="text-left p-4 font-semibold text-gray-700">Part</th>
+                    <th className="text-left p-4 font-semibold text-gray-700">Source</th>
+                    <th className="text-left p-4 font-semibold text-gray-700">Qty</th>
+                    <th className="text-left p-4 font-semibold text-gray-700">Location</th>
+                    <th className="text-left p-4 font-semibold text-gray-700">Status</th>
+                    <th className="text-left p-4 font-semibold text-gray-700">Actions</th>
                   </tr>
                 </thead>
 
                 <tbody>
-                  {data.map((i) => (
-                    <tr
-                      key={i.id}
-                      className="border-b border-neutral-700 hover:bg-neutral-850 transition"
-                    >
-                      <td className="p-4 font-medium">{i.name}</td>
-
-                      <td className="p-4 flex items-center gap-2 text-sm">
-                        <Building2 size={14} className="text-neutral-400" />
-                        {i.source}
-                      </td>
-
-                      <td className="p-4">{i.quantity}</td>
-                      <td className="p-4 flex items-center gap-2 text-sm">
-                        <MapPin size={14} className="text-neutral-400" />
-                        {i.location}
-                      </td>
-
-                      <td className="p-4">
-                        <StatusBadge status={i.status} />
-                      </td>
-
-                      <td className="p-4 flex gap-3">
-                        {/* EDIT */}
-                        <button
-                          onClick={() => {
-                            setEditId(i.id);
-                            setForm({
-                              partName: i.name,
-                              location: i.location,
-                              quantity: i.quantity,
-                            });
-
-                            setShowForm(true);
-                          }}
-                          className="text-amber-400 hover:text-amber-300"
-                        >
-                          <Pencil size={16} />
-                        </button>
-
-                        {/* DELETE */}
-                        <button
-                          onClick={() => deletePart(i.id)}
-                          className="text-red-400 hover:text-red-300"
-                        >
-                          <Trash2 size={16} />
-                        </button>
-
-                        {/* TRANSFER */}
-                        <button
-                          onClick={() => {
-                            setTransferItem(i);
-                            setShowTransfer(true);
-                          }}
-                          title="Transfer Location"
-                          className="text-sky-400 hover:text-sky-300"
-                        >
-                          <ArrowLeftRight size={16} />
-                        </button>
+                  {loading ? (
+                    <tr>
+                      <td colSpan="6" className="p-8 text-center text-gray-500">
+                        Loading...
                       </td>
                     </tr>
-                  ))}
+                  ) : data.length === 0 ? (
+                    <tr>
+                      <td colSpan="6" className="p-8 text-center text-gray-500">
+                        No spare parts available
+                      </td>
+                    </tr>
+                  ) : (
+                    data.map((i, index) => (
+                      <tr
+                        key={i.id}
+                        className={`border-b border-gray-100 hover:bg-gray-50 transition-colors ${
+                          index % 2 === 0 ? "bg-white" : "bg-gray-50"
+                        }`}
+                      >
+                        <td className="p-4 font-medium text-gray-900">{i.name}</td>
+
+                        <td className="p-4 text-gray-700 flex items-center gap-2">
+                          <Building2 size={16} className="text-gray-400" />
+                          {i.source}
+                        </td>
+
+                        <td className="p-4 font-semibold text-gray-900">{i.quantity}</td>
+                        
+                        <td className="p-4 text-gray-700 flex items-center gap-2">
+                          <MapPin size={16} className="text-gray-400" />
+                          {i.location}
+                        </td>
+
+                        <td className="p-4">
+                          <StatusBadge status={i.status} />
+                        </td>
+
+                        <td className="p-4 flex gap-3">
+                          {/* EDIT */}
+                          <button
+                            onClick={() => {
+                              setEditId(i.id);
+                              setForm({
+                                partName: i.name,
+                                location: i.location,
+                                quantity: i.quantity,
+                              });
+                              setShowForm(true);
+                            }}
+                            className="p-2 rounded-lg hover:bg-gray-100 transition-colors"
+                            title="Edit"
+                          >
+                            <Pencil size={16} className="text-gray-600 hover:text-[#c62d23]" />
+                          </button>
+
+                          {/* TRANSFER */}
+                          <button
+                            onClick={() => {
+                              setTransferItem(i);
+                              setShowTransfer(true);
+                            }}
+                            className="p-2 rounded-lg hover:bg-gray-100 transition-colors"
+                            title="Transfer Location"
+                          >
+                            <ArrowLeftRight size={16} className="text-gray-600 hover:text-[#c62d23]" />
+                          </button>
+
+                          {/* DELETE */}
+                          <button
+                            onClick={() => deletePart(i.id)}
+                            className="p-2 rounded-lg hover:bg-gray-100 transition-colors"
+                            title="Delete"
+                          >
+                            <Trash2 size={16} className="text-gray-600 hover:text-red-600" />
+                          </button>
+                        </td>
+                      </tr>
+                    ))
+                  )}
                 </tbody>
               </table>
-            )}
-          </div>
-        </div>
-
-        {/* ADD / EDIT MODAL */}
-        {showForm && (
-          <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
-            <div className="bg-neutral-900 p-6 rounded-xl w-[380px] border border-neutral-700">
-              <h2 className="text-lg font-semibold mb-4">
-                {editId ? "Update Spare Part" : "Add Spare Part"}
-              </h2>
-
-             
-
-              <Input  
-                label="Spare Part Name"
-                value={form.partName}
-                onChange={(v) => setForm({ ...form, partName: v })}
-              />
-
-              <Input
-                label="Location"
-                value={form.location}
-                onChange={(v) => setForm({ ...form, location: v })}
-              />
-              <Input
-                label="Quantity"
-                type="number"
-                value={form.quantity}
-                onChange={(v) => setForm({ ...form, quantity: v })}
-              />
-
-              <div className="flex justify-end gap-2 mt-4">
-                <button
-                  onClick={() => {
-                    setShowForm(false);
-                    setEditId(null);
-                  }}
-                  className="px-4 py-2 text-neutral-300"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={submitPart}
-                  className="bg-amber-600 hover:bg-amber-700 px-4 py-2 rounded"
-                >
-                  Save
-                </button>
-              </div>
             </div>
           </div>
-        )}
+        </div>
+      </div>
 
-        {/* TRANSFER MODAL */}
-        {showTransfer && transferItem && (
-          <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
-            <div className="bg-neutral-900 p-6 rounded-xl w-[380px] border border-neutral-700">
-              <h2 className="text-lg font-semibold mb-4">Transfer Location</h2>
+      {/* ADD / EDIT MODAL */}
+      {showForm && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
+          <div className="bg-white p-6 rounded-2xl w-full max-w-md border border-gray-200 shadow-lg">
+            <h2 className="font-bold text-xl text-gray-900 mb-6">
+              {editId ? "Update Spare Part" : "Add Spare Part"}
+            </h2>
 
-              <p className="text-sm text-neutral-400 mb-2">
-                Part:{" "}
-                <span className="text-neutral-200">{transferItem.name}</span>
-              </p>
-              <p className="text-sm text-neutral-400 mb-4">
-                From:{" "}
-                <span className="text-neutral-200">
-                  {transferItem.location}
-                </span>
-              </p>
+            <Input
+              label="Spare Part Name"
+              value={form.partName}
+              onChange={(v) => setForm({ ...form, partName: v })}
+              placeholder="Enter part name"
+            />
 
-              {/* DROPDOWN LOCATION */}
-              <div className="mb-3">
-                <label className="text-xs text-neutral-400">To Location</label>
+            <Input
+              label="Location"
+              value={form.location}
+              onChange={(v) => setForm({ ...form, location: v })}
+              placeholder="Enter location"
+            />
+
+            <Input
+              label="Quantity"
+              type="number"
+              value={form.quantity}
+              onChange={(v) => setForm({ ...form, quantity: v })}
+              placeholder="Enter quantity"
+            />
+
+            <div className="flex justify-end gap-3 mt-8 pt-6 border-t border-gray-200">
+              <button
+                onClick={() => {
+                  setShowForm(false);
+                  setEditId(null);
+                  setForm({ partName: "", location: "", quantity: "" });
+                }}
+                className="px-5 py-2.5 text-gray-700 font-medium rounded-xl border border-gray-300 hover:bg-gray-50 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={submitPart}
+                className="bg-[#c62d23] hover:bg-[#a8241c] text-white px-5 py-2.5 font-medium rounded-xl transition-all duration-200 shadow-sm hover:shadow-md"
+              >
+                {editId ? "Update" : "Save"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* TRANSFER MODAL */}
+      {showTransfer && transferItem && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
+          <div className="bg-white p-6 rounded-2xl w-full max-w-md border border-gray-200 shadow-lg">
+            <h2 className="font-bold text-xl text-gray-900 mb-6">Transfer Location</h2>
+
+            <div className="mb-4 p-4 bg-gray-50 rounded-xl">
+              <p className="text-sm text-gray-600">Part</p>
+              <p className="font-medium text-gray-900">{transferItem.name}</p>
+              <p className="text-sm text-gray-600 mt-2">Current Location</p>
+              <p className="font-medium text-gray-900">{transferItem.location}</p>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  To Location
+                </label>
                 <select
                   value={transfer.toLocation}
                   onChange={(e) =>
                     setTransfer({ ...transfer, toLocation: e.target.value })
                   }
-                  className="w-full mt-1 p-2 bg-neutral-800 rounded outline-none"
+                  className="w-full p-3 bg-white rounded-xl border border-gray-300 focus:border-[#c62d23] focus:ring-2 focus:ring-[#c62d23]/20 outline-none transition-all"
                 >
                   <option value="">Select Location</option>
                   {locations
@@ -408,75 +425,80 @@ export default function SparePartsInventory() {
                 type="number"
                 value={transfer.quantity}
                 onChange={(v) => setTransfer({ ...transfer, quantity: v })}
+                placeholder="Enter quantity to transfer"
               />
+            </div>
 
-              <div className="flex justify-end gap-2 mt-4">
-                <button
-                  onClick={() => {
-                    setShowTransfer(false);
-                    setTransfer({ toLocation: "", quantity: "" });
-                    setTransferItem(null);
-                  }}
-                  className="px-4 py-2 text-neutral-300"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={submitTransfer}
-                  className="bg-sky-600 hover:bg-sky-700 px-4 py-2 rounded"
-                >
-                  Transfer
-                </button>
-              </div>
+            <div className="flex justify-end gap-3 mt-8 pt-6 border-t border-gray-200">
+              <button
+                onClick={() => {
+                  setShowTransfer(false);
+                  setTransfer({ toLocation: "", quantity: "" });
+                  setTransferItem(null);
+                }}
+                className="px-5 py-2.5 text-gray-700 font-medium rounded-xl border border-gray-300 hover:bg-gray-50 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={submitTransfer}
+                className="bg-[#c62d23] hover:bg-[#a8241c] text-white px-5 py-2.5 font-medium rounded-xl transition-all duration-200 shadow-sm hover:shadow-md"
+              >
+                Transfer
+              </button>
             </div>
           </div>
-        )}
-      </div>
+        </div>
+      )}
     </div>
   );
 }
 
 /* ================= SMALL COMPONENTS ================= */
 
-const StatCard = ({ title, value, icon, danger }) => (
-  <div
-    className={`p-5 rounded-xl border ${
-      danger
-        ? "bg-red-950/40 border-red-800"
-        : "bg-neutral-800 border-neutral-700"
-    }`}
+const KpiCard = ({ title, value, icon, danger = false }) => (
+  <div className="bg-white border border-gray-200 rounded-2xl p-6 transition-all duration-200 shadow-sm hover:shadow-md flex flex-col justify-between h-full"
+    style={{
+      borderLeft: '4px solid #c62d23'
+    }}
   >
-    <div className="flex items-center justify-between mb-3">
-      <p className="text-sm text-neutral-400">{title}</p>
-      <span className="text-neutral-400">{icon}</span>
+    <div className="flex justify-between items-start mb-4">
+      <p className="text-sm text-gray-600 font-medium">{title}</p>
+      {React.cloneElement(icon, { size: 24 })}
     </div>
-    <p className="text-3xl font-bold">{value}</p>
+    <p className={`text-3xl font-bold mb-1 ${danger ? 'text-red-600' : 'text-gray-900'}`}>
+      {value}
+    </p>
   </div>
 );
 
 const StatusBadge = ({ status }) => {
   const map = {
-    Healthy: "bg-green-900 text-green-300",
-    "Low Stock": "bg-amber-900 text-amber-300",
-    Critical: "bg-red-900 text-red-300",
+    Healthy: "bg-green-100 text-green-800",
+    "Low Stock": "bg-amber-100 text-amber-800",
+    Critical: "bg-red-100 text-red-800",
   };
+  
   return (
     <span
-      className={`px-3 py-1 rounded-full text-xs font-medium ${map[status]}`}
+      className={`px-3 py-1.5 rounded-full text-xs font-medium ${map[status] || 'bg-gray-100 text-gray-800'}`}
     >
       {status}
     </span>
   );
 };
 
-const Input = ({ label, value, onChange, type = "text" }) => (
-  <div className="mb-3">
-    <label className="text-xs text-neutral-400">{label}</label>
+const Input = ({ label, value, onChange, type = "text", placeholder = "" }) => (
+  <div className="mb-4">
+    <label className="block text-sm font-medium text-gray-700 mb-2">
+      {label}
+    </label>
     <input
       type={type}
       value={value}
       onChange={(e) => onChange(e.target.value)}
-      className="w-full mt-1 p-2 bg-neutral-800 rounded outline-none"
+      placeholder={placeholder}
+      className="w-full p-3 bg-white rounded-xl border border-gray-300 focus:border-[#c62d23] focus:ring-2 focus:ring-[#c62d23]/20 outline-none transition-all"
     />
   </div>
 );

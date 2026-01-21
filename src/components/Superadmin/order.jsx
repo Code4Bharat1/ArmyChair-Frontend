@@ -1,7 +1,6 @@
 "use client";
 import React, { useEffect, useMemo, useState } from "react";
 import { Upload, Download } from "lucide-react";
-
 import {
   Pencil,
   Trash2,
@@ -10,6 +9,7 @@ import {
   Clock,
   CheckCircle,
   Truck,
+  AlertCircle,
 } from "lucide-react";
 import axios from "axios";
 import SalesSidebar from "./sidebar";
@@ -19,25 +19,19 @@ import { useRouter } from "next/navigation";
 export default function Orders() {
   const [salesUsers, setSalesUsers] = useState([]);
   const [spareParts, setSpareParts] = useState([]);
-
   const [vendors, setVendors] = useState([]);
   const [vendorSearch, setVendorSearch] = useState("");
   const [chairModels, setChairModels] = useState([]);
   const [chairSearch, setChairSearch] = useState("");
   const [showChairDropdown, setShowChairDropdown] = useState(false);
   const [showVendorDropdown, setShowVendorDropdown] = useState(false);
-
   const router = useRouter();
-
   const [uploading, setUploading] = useState(false);
-
   const [statusFilter, setStatusFilter] = useState("ALL");
-
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [expandedOrderId, setExpandedOrderId] = useState(null);
   const [user, setUser] = useState(null);
-
   const [search, setSearch] = useState("");
   const [showForm, setShowForm] = useState(false);
   const [editingOrderId, setEditingOrderId] = useState(null);
@@ -272,17 +266,13 @@ export default function Orders() {
 
   /* ================= STATS ================= */
   const totalOrders = filteredOrders.length;
-
   const delayed = filteredOrders.filter(isDelayed).length;
-
   const readyToDispatch = filteredOrders.filter(
     (o) => o.progress === "READY_FOR_DISPATCH",
   ).length;
-
   const completed = filteredOrders.filter(
     (o) => o.progress === "DISPATCHED",
   ).length;
-
   const inProgress = filteredOrders.filter(
     (o) => !["DISPATCHED", "PARTIAL"].includes(o.progress) && !isDelayed(o),
   ).length;
@@ -312,7 +302,7 @@ export default function Orders() {
   const ProgressTracker = ({ progress }) => {
     if (progress === "PARTIAL") {
       return (
-        <span className="text-sm font-medium text-amber-400">
+        <span className="text-sm font-medium text-amber-600">
           Partial / On Hold
         </span>
       );
@@ -326,9 +316,8 @@ export default function Orders() {
 
     return (
       <span
-        className={`text-sm font-medium ${
-          isCompleted ? "text-green-400" : "text-amber-400"
-        }`}
+        className={`text-sm font-medium ${isCompleted ? "text-green-600" : "text-amber-600"
+          }`}
       >
         {ORDER_STEPS[safeIndex]?.label}
       </span>
@@ -391,7 +380,7 @@ export default function Orders() {
   };
 
   return (
-    <div className="flex h-screen bg-gradient-to-b from-amber-900 via-black to-neutral-900 text-neutral-100">
+    <div className="flex min-h-screen bg-gray-50 text-gray-900">
       <SalesSidebar />
       <div className="flex-1 overflow-auto">
         {/* ================= HIDDEN UPLOAD INPUT ================= */}
@@ -406,10 +395,10 @@ export default function Orders() {
         />
 
         {/* HEADER */}
-        <div className="bg-neutral-800 border-b border-neutral-700 p-4 flex items-center justify-between">
+        <div className="sticky top-0 z-10 bg-white/80 backdrop-blur border-b border-gray-200 p-6 shadow-sm flex justify-between items-center">
           <div>
-            <h1 className="text-2xl font-bold">Orders Management</h1>
-            <p className="text-sm mb-1 text-neutral-400">
+            <h1 className="text-3xl font-bold text-gray-900">Orders Management</h1>
+            <p className="text-gray-600 mt-2">
               Create, track and manage all orders
             </p>
           </div>
@@ -420,9 +409,9 @@ export default function Orders() {
               onClick={() =>
                 document.getElementById("orderUploadInput").click()
               }
-              className="bg-amber-600 hover:bg-amber-700 px-4 py-2 rounded-lg flex items-center gap-2 shadow"
+              className="bg-gray-100 hover:bg-gray-200 text-gray-800 px-4 py-2.5 rounded-xl font-medium flex items-center gap-2 transition-all duration-200 border border-gray-300"
             >
-              <Upload size={16} />
+              <Upload size={18} />
               {uploading ? "Uploading..." : "Upload Orders"}
             </button>
 
@@ -434,18 +423,18 @@ export default function Orders() {
                 setEditingOrderId(null);
                 setShowForm(true);
               }}
-              className="bg-amber-600 hover:bg-amber-700 px-4 py-2 rounded-lg flex items-center gap-2 shadow"
+              className="bg-[#c62d23] hover:bg-[#a8241c] text-white px-5 py-2.5 rounded-xl font-medium flex items-center gap-2 transition-all duration-200 shadow-sm hover:shadow-md"
             >
-              <Plus size={16} />
+              <Plus size={18} />
               Add Order
             </button>
 
             {/* EXPORT CSV */}
             <button
               onClick={handleExportCSV}
-              className="bg-emerald-700 hover:bg-emerald-600 px-4 py-2 rounded-lg flex items-center gap-2 border border-emerald-600"
+              className="bg-gray-100 hover:bg-gray-200 text-gray-800 px-4 py-2.5 rounded-xl font-medium flex items-center gap-2 transition-all duration-200 border border-gray-300"
             >
-              <Download size={16} />
+              <Download size={18} />
               Export CSV
             </button>
 
@@ -453,223 +442,273 @@ export default function Orders() {
             <button
               onClick={() => router.push("/sales/profile")}
               title="My Profile"
-              className="text-neutral-300 hover:text-amber-400 transition"
+              className="p-2 rounded-xl hover:bg-gray-100 transition-colors"
             >
-              <UserCircle size={34} />
+              <UserCircle size={32} className="text-gray-600" />
             </button>
           </div>
         </div>
 
-        {/* STATS */}
-        <div className="p-6">
-          <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
-            <StatCard
+        {/* CONTENT */}
+        <div className="p-8 space-y-8">
+          {/* STATS */}
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
+            <KpiCard
               title="Total Orders"
               value={totalOrders}
-              icon={<Package />}
+              icon={<Package className="text-[#c62d23]" />}
               onClick={() => setStatusFilter("ALL")}
               active={statusFilter === "ALL"}
             />
 
-            <StatCard
+            <KpiCard
               title="In Progress"
               value={inProgress}
-              icon={<Clock />}
+              icon={<Clock className="text-[#c62d23]" />}
               onClick={() => setStatusFilter("IN_PROGRESS")}
               active={statusFilter === "IN_PROGRESS"}
             />
 
-            <StatCard
+            <KpiCard
               title="Delayed"
               value={delayed}
-              icon={<Clock />}
+              icon={<Clock className="text-[#c62d23]" />}
               danger={delayed > 0}
               onClick={() => setStatusFilter("DELAYED")}
               active={statusFilter === "DELAYED"}
             />
 
-            <StatCard
+            <KpiCard
               title="Ready to Dispatch"
               value={readyToDispatch}
-              icon={<Truck />}
+              icon={<Truck className="text-[#c62d23]" />}
               onClick={() => setStatusFilter("READY")}
               active={statusFilter === "READY"}
             />
 
-            <StatCard
+            <KpiCard
               title="Completed"
               value={completed}
-              icon={<CheckCircle />}
+              icon={<CheckCircle className="text-[#c62d23]" />}
               onClick={() => setStatusFilter("COMPLETED")}
               active={statusFilter === "COMPLETED"}
             />
           </div>
 
+          {/* DELAYED ALERT */}
+          {delayed > 0 && (
+            <div className="bg-red-50 border border-red-200 rounded-2xl p-4 flex gap-3 items-center">
+              <AlertCircle className="text-red-500" />
+              <span className="text-red-700 font-medium">
+                {delayed} {delayed > 1 ? "orders are" : "order is"} delayed
+              </span>
+            </div>
+          )}
+
           {/* SEARCH */}
-          <div className="mb-4">
-            <input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search orders..."
-              className="w-full bg-neutral-800 border border-neutral-700 px-4 py-2 rounded-lg outline-none focus:border-amber-600"
-            />
-          </div>
+          <div className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm">
+            <div className="mb-4">
+              <input
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search orders by ID, customer, or product..."
+                className="w-full p-3 bg-white rounded-xl border border-gray-300 focus:border-[#c62d23] focus:ring-2 focus:ring-[#c62d23]/20 outline-none transition-all"
+              />
+            </div>
 
-          {/* TABLE */}
-          <div className="bg-neutral-800 rounded-xl overflow-hidden border border-neutral-700">
-            {loading ? (
-              <div className="p-6 text-center">Loading...</div>
-            ) : filteredOrders.length === 0 ? (
-              <div className="text-center text-neutral-400 py-10">
-                No orders found
-              </div>
-            ) : (
-              <table className="w-full">
-                <thead className="bg-neutral-850 border-b border-neutral-700">
-                  <tr>
-                    {[
-                      "Order ID",
-                      "Dispatched To",
-                      "Chair",
-                      "Order Date",
-                      "Delivery Date",
-                      "Qty",
-                      "Progress",
-                    ].map((h) => (
-                      <th
-                        key={h}
-                        className="p-4 text-left text-xs text-neutral-400 uppercase tracking-wide"
-                      >
-                        {h}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
+            {/* TABLE */}
+            <div className="overflow-auto rounded-lg border border-gray-200">
+              {loading ? (
+                <div className="p-8 text-center text-gray-500">Loading...</div>
+              ) : filteredOrders.length === 0 ? (
+                <div className="p-8 text-center text-gray-500">
+                  No orders found
+                </div>
+              ) : (
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="bg-gray-50">
+                      {[
+                        "Order ID",
+                        "Dispatched To",
+                        "Chair",
+                        "Order Date",
+                        "Delivery Date",
+                        "Qty",
+                        "Progress",
+                        "Actions",
+                      ].map((h) => (
+                        <th
+                          key={h}
+                          className="text-left p-4 font-semibold text-gray-700"
+                        >
+                          {h}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
 
-                <tbody>
-                  {filteredOrders.map((o) => (
-                    <React.Fragment key={o._id}>
-                      {/* MAIN ROW */}
-                      <tr
-                        onClick={() => handleRowClick(o._id)}
-                        className="border-b border-neutral-700 hover:bg-neutral-850 transition cursor-pointer"
-                      >
-                        <td className="p-4 font-medium">{o.orderId}</td>
-                        <td className="p-4">
-                          {o.dispatchedTo?.name || o.dispatchedTo}
-                        </td>
+                  <tbody>
+                    {filteredOrders.map((o, index) => (
+                      <React.Fragment key={o._id}>
+                        {/* MAIN ROW */}
+                        <tr
+                          onClick={() => handleRowClick(o._id)}
+                          className={`border-b border-gray-100 hover:bg-gray-50 transition-colors cursor-pointer ${index % 2 === 0 ? "bg-white" : "bg-gray-50"
+                            }`}
+                        >
+                          <td className="p-4 font-medium text-gray-900">
+                            {o.orderId}
+                          </td>
+                          <td className="p-4 text-gray-700">
+                            {o.dispatchedTo?.name || o.dispatchedTo}
+                          </td>
+                          <td className="p-4 text-gray-700">{o.chairModel}</td>
+                          <td className="p-4 text-gray-700">
+                            {new Date(o.orderDate).toLocaleDateString()}
+                          </td>
+                          <td className="p-4 text-gray-700">
+                            {o.deliveryDate
+                              ? new Date(o.deliveryDate).toLocaleDateString()
+                              : "-"}
+                          </td>
+                          <td className="p-4 font-semibold text-gray-900">
+                            {o.quantity}
+                          </td>
+                          <td className="p-4">
+                            <ProgressTracker progress={o.progress} />
+                          </td>
+                          <td className="p-4 flex gap-2">
+                            {/* EDIT BUTTON - Always visible but disabled when locked */}
+                            <button
+                              onClick={(e) => {
+                                if (isOrderLocked(o.progress)) return;
+                                e.stopPropagation();
+                                handleEditOrder(o);
+                              }}
+                              className={`p-2 rounded-lg transition-colors ${isOrderLocked(o.progress)
+                                  ? "cursor-not-allowed opacity-50"
+                                  : "hover:bg-gray-100"
+                                }`}
+                              title={isOrderLocked(o.progress) ? "Cannot edit in current status" : "Edit"}
+                              disabled={isOrderLocked(o.progress)}
+                            >
+                              <Pencil
+                                size={16}
+                                className={
+                                  isOrderLocked(o.progress)
+                                    ? "text-gray-400"
+                                    : "text-gray-600 hover:text-[#c62d23]"
+                                }
+                              />
+                            </button>
 
-                        <td className="p-4">{o.chairModel}</td>
-                        <td className="p-4">
-                          {new Date(o.orderDate).toLocaleDateString()}
-                        </td>
-                        <td className="p-4">
-                          {o.deliveryDate
-                            ? new Date(o.deliveryDate).toLocaleDateString()
-                            : "-"}
-                        </td>
-                        <td className="p-4">{o.quantity}</td>
+                            {/* DELETE BUTTON */}
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDeleteOrder(o._id);
+                              }}
+                              className="p-2 rounded-lg hover:bg-gray-100 transition-colors"
+                              title="Delete"
+                            >
+                              <Trash2 size={16} className="text-gray-600 hover:text-red-600" />
+                            </button>
 
-                        <td className="p-4">
-                          <ProgressTracker progress={o.progress} />
-                        </td>
-                      </tr>
+                            {/* DISPATCH BUTTON - Only for READY_FOR_DISPATCH orders */}
+                            {o.progress === "READY_FOR_DISPATCH" && (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleDispatch(o._id);
+                                }}
+                                className="p-2 rounded-lg hover:bg-gray-100 transition-colors"
+                                title="Dispatch"
+                              >
+                                <Truck size={16} className="text-gray-600 hover:text-green-600" />
+                              </button>
+                            )}
+                          </td>
+                        </tr>
 
-                      {/* EXPANDED PROGRESS ROW */}
-                      {expandedOrderId === o._id &&
-                        o.progress !== "PARTIAL" && (
-                          <tr className="bg-neutral-850">
-                            <td colSpan={9} className="p-6">
-                              {(() => {
-                                const currentIndex = ORDER_STEPS.findIndex(
-                                  (s) => s.key === o.progress,
-                                );
+                        {/* EXPANDED PROGRESS ROW */}
+                        {expandedOrderId === o._id &&
+                          o.progress !== "PARTIAL" && (
+                            <tr className="bg-gray-50">
+                              <td colSpan={8} className="p-6">
+                                <div className="w-full space-y-6">
+                                  <p className="text-sm text-gray-700 font-medium">
+                                    Order Progress
+                                  </p>
 
-                                const safeIndex =
-                                  currentIndex === -1
-                                    ? ORDER_STEPS.length - 1
-                                    : currentIndex;
-
-                                const percent =
-                                  ((safeIndex + 1) / ORDER_STEPS.length) * 100;
-
-                                return (
-                                  <div className="w-full space-y-6">
-                                    <p className="text-sm text-neutral-300 font-medium">
-                                      Order Progress
-                                    </p>
-
-                                    <div className="flex justify-between text-xs text-neutral-400">
-                                      {ORDER_STEPS.map((step, index) => (
-                                        <span
-                                          key={step.key}
-                                          className={
-                                            index <= safeIndex
-                                              ? "text-neutral-200 font-medium"
-                                              : ""
-                                          }
-                                        >
-                                          {step.label}
-                                        </span>
-                                      ))}
-                                    </div>
-
-                                    {/* TRACK */}
-                                    <div className="relative w-full h-10 flex items-center mt-6">
-                                      {/* BASE LINE */}
-                                      <div className="absolute left-0 right-0 h-[4px] bg-neutral-600 rounded-full" />
-
-                                      {/* PROGRESS LINE */}
-                                      <div
-                                        className="absolute left-0 h-[4px] rounded-full transition-all duration-500"
-                                        style={{
-                                          width: `${percent}%`,
-                                          background:
-                                            percent === 100
-                                              ? "#22c55e"
-                                              : "linear-gradient(90deg,#22c55e,#f59e0b)",
-                                        }}
-                                      />
-
-                                      {/* MOVING NUMBER (REPLACES DOT) */}
-                                      <div
-                                        className="absolute w-7 h-7 rounded-full border-2 border-black shadow
-               flex items-center justify-center text-xs font-bold text-black"
-                                        style={{
-                                          left: `calc(${percent}% - 14px)`,
-                                          backgroundColor:
-                                            safeIndex === ORDER_STEPS.length - 1
-                                              ? "#22c55e"
-                                              : "#f59e0b",
-                                        }}
-                                      >
-                                        {safeIndex + 1}
-                                      </div>
-                                    </div>
-
-                                    <p className="text-sm">
-                                      <span className="text-neutral-400">
-                                        Current Stage:
-                                      </span>{" "}
-                                      <span className="text-amber-400 font-medium">
-                                        {
-                                          ORDER_STEPS.find(
-                                            (s) => s.key === o.progress,
-                                          )?.label
+                                  <div className="flex justify-between text-xs text-gray-500">
+                                    {ORDER_STEPS.map((step, index) => (
+                                      <span
+                                        key={step.key}
+                                        className={
+                                          index <= ORDER_STEPS.findIndex((s) => s.key === o.progress)
+                                            ? "text-gray-900 font-medium"
+                                            : ""
                                         }
+                                      >
+                                        {step.label}
                                       </span>
-                                    </p>
+                                    ))}
                                   </div>
-                                );
-                              })()}
-                            </td>
-                          </tr>
-                        )}
-                    </React.Fragment>
-                  ))}
-                </tbody>
-              </table>
-            )}
+
+                                  {/* PROGRESS TRACKER */}
+                                  <div className="relative w-full h-10 flex items-center mt-6">
+                                    {/* BASE LINE */}
+                                    <div className="absolute left-0 right-0 h-[4px] bg-gray-300 rounded-full" />
+
+                                    {/* PROGRESS LINE */}
+                                    <div
+                                      className="absolute left-0 h-[4px] rounded-full transition-all duration-500"
+                                      style={{
+                                        width: `${((ORDER_STEPS.findIndex((s) => s.key === o.progress) + 1) / ORDER_STEPS.length) * 100}%`,
+                                        background:
+                                          o.progress === "DISPATCHED"
+                                            ? "#16a34a"
+                                            : "linear-gradient(90deg,#16a34a,#c62d23)",
+                                      }}
+                                    />
+
+                                    {/* MOVING NUMBER */}
+                                    <div
+                                      className="absolute w-7 h-7 rounded-full border-2 border-white shadow
+                                        flex items-center justify-center text-xs font-bold text-white"
+                                      style={{
+                                        left: `calc(${((ORDER_STEPS.findIndex((s) => s.key === o.progress) + 1) / ORDER_STEPS.length) * 100}% - 14px)`,
+                                        backgroundColor:
+                                          o.progress === "DISPATCHED"
+                                            ? "#16a34a"
+                                            : "#c62d23",
+                                      }}
+                                    >
+                                      {ORDER_STEPS.findIndex((s) => s.key === o.progress) + 1}
+                                    </div>
+                                  </div>
+
+                                  <p className="text-sm text-gray-700">
+                                    <span className="font-medium">Current Stage:</span>{" "}
+                                    <span className="text-[#c62d23] font-semibold">
+                                      {
+                                        ORDER_STEPS.find(
+                                          (s) => s.key === o.progress,
+                                        )?.label
+                                      }
+                                    </span>
+                                  </p>
+                                </div>
+                              </td>
+                            </tr>
+                          )}
+                      </React.Fragment>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
           </div>
         </div>
       </div>
@@ -677,16 +716,16 @@ export default function Orders() {
       {/* MODAL */}
       {showForm && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div
-            className="bg-neutral-900 rounded-2xl w-full max-w-[520px] border-2 border-amber-600 shadow-2xl
-                max-h-[85vh] flex flex-col"
-          >
-            <h2 className="text-2xl font-bold m-5 ml-7 mt-6 text-amber-400">
-              {editingOrderId ? "Update Order" : "Create Order"}
-            </h2>
-            <div className="space-y-4 overflow-y-auto px-8 py-6 flex-1">
+          <div className="bg-white rounded-2xl w-full max-w-[520px] border border-gray-200 shadow-lg max-h-[85vh] flex flex-col">
+            <div className="p-6 border-b border-gray-200">
+              <h2 className="text-2xl font-bold text-gray-900">
+                {editingOrderId ? "Update Order" : "Create Order"}
+              </h2>
+            </div>
+
+            <div className="space-y-4 overflow-y-auto px-6 py-4 flex-1">
               <div>
-                <label className="text-base text-neutral-300 font-semibold block mb-2">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
                   Dispatched To
                 </label>
 
@@ -699,13 +738,12 @@ export default function Orders() {
                   }
                   onChange={(e) => {
                     setVendorSearch(e.target.value);
-                    // ❌ DO NOT touch dispatchedTo here
                   }}
-                  className="w-full px-4 py-3 bg-neutral-800 rounded-lg outline-none border-2 border-neutral-600 focus:border-amber-600"
+                  className="w-full p-3 bg-white rounded-xl border border-gray-300 focus:border-[#c62d23] focus:ring-2 focus:ring-[#c62d23]/20 outline-none transition-all"
                 />
 
                 {showVendorDropdown && (
-                  <div className="bg-neutral-800 border border-neutral-700 mt-1 rounded-lg max-h-48 overflow-auto">
+                  <div className="bg-white border border-gray-200 mt-1 rounded-xl shadow-lg max-h-48 overflow-auto">
                     {vendors
                       .filter((v) =>
                         v.name
@@ -720,7 +758,7 @@ export default function Orders() {
                             setVendorSearch(v.name);
                             setShowVendorDropdown(false);
                           }}
-                          className="px-4 py-2 hover:bg-amber-600 cursor-pointer"
+                          className="px-4 py-3 hover:bg-gray-50 cursor-pointer border-b border-gray-100 last:border-0"
                         >
                           {v.name}
                         </div>
@@ -740,7 +778,7 @@ export default function Orders() {
                             setVendorSearch(vendorSearch.trim());
                             setShowVendorDropdown(false);
                           }}
-                          className="px-4 py-2 bg-neutral-900 hover:bg-emerald-700 cursor-pointer text-emerald-400"
+                          className="px-4 py-3 bg-gray-50 hover:bg-green-50 cursor-pointer border-b border-gray-100 last:border-0 text-green-700 font-medium"
                         >
                           ➕ Add "{vendorSearch}" as new vendor
                         </div>
@@ -751,7 +789,7 @@ export default function Orders() {
 
               {user?.role === "admin" && (
                 <div>
-                  <label className="text-sm text-neutral-300 block mb-1">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
                     Assign Sales Person
                   </label>
 
@@ -760,7 +798,7 @@ export default function Orders() {
                     onChange={(e) =>
                       setFormData({ ...formData, salesPerson: e.target.value })
                     }
-                    className="w-full px-4 py-2 bg-neutral-800 border border-neutral-700 rounded-lg"
+                    className="w-full p-3 bg-white rounded-xl border border-gray-300 focus:border-[#c62d23] focus:ring-2 focus:ring-[#c62d23]/20 outline-none transition-all"
                   >
                     <option value="">Select Sales Person</option>
                     {salesUsers.map((u) => (
@@ -771,8 +809,9 @@ export default function Orders() {
                   </select>
                 </div>
               )}
+
               <div>
-                <label className="text-sm text-neutral-300 block mb-1">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
                   Order Type
                 </label>
 
@@ -785,7 +824,7 @@ export default function Orders() {
                       chairModel: "",
                     })
                   }
-                  className="w-full px-4 py-2 bg-neutral-800 border border-neutral-700 rounded-lg"
+                  className="w-full p-3 bg-white rounded-xl border border-gray-300 focus:border-[#c62d23] focus:ring-2 focus:ring-[#c62d23]/20 outline-none transition-all"
                 >
                   <option value="FULL">Full Chair</option>
                   <option value="SPARE">Spare Part</option>
@@ -795,7 +834,7 @@ export default function Orders() {
               {/* FULL CHAIR */}
               {formData.orderType === "FULL" && (
                 <div>
-                  <label className="text-sm text-neutral-300 block mb-1">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
                     Chair Model
                   </label>
 
@@ -804,7 +843,7 @@ export default function Orders() {
                     onChange={(e) =>
                       setFormData({ ...formData, chairModel: e.target.value })
                     }
-                    className="w-full px-4 py-2 bg-neutral-800 border border-neutral-700 rounded-lg"
+                    className="w-full p-3 bg-white rounded-xl border border-gray-300 focus:border-[#c62d23] focus:ring-2 focus:ring-[#c62d23]/20 outline-none transition-all"
                     required
                   >
                     <option value="">Select Chair Model</option>
@@ -820,7 +859,7 @@ export default function Orders() {
               {/* SPARE PART */}
               {formData.orderType === "SPARE" && (
                 <div>
-                  <label className="text-sm text-neutral-300 block mb-1">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
                     Spare Part
                   </label>
 
@@ -829,7 +868,7 @@ export default function Orders() {
                     onChange={(e) =>
                       setFormData({ ...formData, chairModel: e.target.value })
                     }
-                    className="w-full px-4 py-2 bg-neutral-800 border border-neutral-700 rounded-lg"
+                    className="w-full p-3 bg-white rounded-xl border border-gray-300 focus:border-[#c62d23] focus:ring-2 focus:ring-[#c62d23]/20 outline-none transition-all"
                     required
                   >
                     <option value="">Select Spare Part</option>
@@ -843,13 +882,12 @@ export default function Orders() {
               )}
 
               <div>
-                <label className="text-base text-neutral-300 font-semibold block mb-2">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
                   Order Date
                 </label>
 
                 <div
-                  className="w-full px-4 py-3 bg-neutral-700 border-2 border-neutral-600
-                  rounded-lg text-neutral-300 cursor-not-allowed select-none"
+                  className="w-full p-3 bg-gray-50 rounded-xl border border-gray-300 text-gray-700"
                 >
                   {formData.orderDate || new Date().toISOString().split("T")[0]}
                 </div>
@@ -871,7 +909,8 @@ export default function Orders() {
                 onChange={handleFormChange}
               />
             </div>
-            <div className="flex justify-end gap-3 px-8 py-4 border-t border-neutral-700 bg-neutral-900">
+
+            <div className="flex justify-end gap-3 px-6 py-4 border-t border-gray-200 bg-gray-50 rounded-b-2xl">
               <button
                 type="button"
                 onClick={() => {
@@ -879,14 +918,14 @@ export default function Orders() {
                   setEditingOrderId(null);
                   setFormData(initialFormData);
                 }}
-                className="px-6 py-2.5 text-base text-neutral-300 hover:text-neutral-100 hover:bg-neutral-800 rounded-lg transition font-medium border-2 border-neutral-700"
+                className="px-5 py-2.5 text-gray-700 font-medium rounded-xl border border-gray-300 hover:bg-gray-100 transition-colors"
               >
                 Cancel
               </button>
 
               <button
                 onClick={handleCreateOrder}
-                className="bg-amber-600 hover:bg-amber-700 text-white px-6 py-2.5 rounded-lg transition font-semibold shadow-lg text-base border-2 border-amber-500"
+                className="bg-[#c62d23] hover:bg-[#a8241c] text-white px-5 py-2.5 font-medium rounded-xl transition-all duration-200 shadow-sm hover:shadow-md"
               >
                 {editingOrderId ? "Update" : "Create"}
               </button>
@@ -900,31 +939,28 @@ export default function Orders() {
 
 /* ================= SMALL COMPONENTS ================= */
 
-const StatCard = ({ title, value, icon, danger, onClick, active }) => (
+const KpiCard = ({ title, value, icon, danger = false, onClick, active }) => (
   <div
     onClick={onClick}
-    className={`p-5 rounded-xl border cursor-pointer transition
-      ${
-        active
-          ? "border-amber-500 bg-amber-900/30"
-          : danger
-            ? "bg-amber-950/40 border-amber-800"
-            : "bg-neutral-800 border-neutral-700"
-      }
-      hover:border-amber-500 hover:bg-neutral-750
-    `}
+    className={`bg-white border border-gray-200 rounded-2xl p-6 transition-all duration-200 shadow-sm hover:shadow-md flex flex-col justify-between h-full cursor-pointer ${active ? "border-[#c62d23] ring-2 ring-[#c62d23]/20" : ""
+      }`}
+    style={{
+      borderLeft: '4px solid #c62d23'
+    }}
   >
-    <div className="flex items-center justify-between mb-3">
-      <p className="text-sm text-neutral-400">{title}</p>
-      <span className="text-neutral-400">{icon}</span>
+    <div className="flex justify-between items-start mb-4">
+      <p className="text-sm text-gray-600 font-medium">{title}</p>
+      {React.cloneElement(icon, { size: 24 })}
     </div>
-    <p className="text-3xl font-bold">{value}</p>
+    <p className={`text-3xl font-bold mb-1 ${danger ? 'text-red-600' : 'text-gray-900'}`}>
+      {value}
+    </p>
   </div>
 );
 
 const Input = ({ label, name, value, onChange, type = "text" }) => (
   <div>
-    <label className="text-base text-neutral-300 font-semibold block mb-2">
+    <label className="block text-sm font-medium text-gray-700 mb-2">
       {label}
     </label>
     <input
@@ -932,7 +968,7 @@ const Input = ({ label, name, value, onChange, type = "text" }) => (
       name={name}
       value={value}
       onChange={onChange}
-      className="w-full px-4 py-3 bg-neutral-800 rounded-lg outline-none border-2 border-neutral-600 focus:border-amber-600 focus:ring-2 focus:ring-amber-600/50 text-base text-neutral-100"
+      className="w-full p-3 bg-white rounded-xl border border-gray-300 focus:border-[#c62d23] focus:ring-2 focus:ring-[#c62d23]/20 outline-none transition-all"
     />
   </div>
 );

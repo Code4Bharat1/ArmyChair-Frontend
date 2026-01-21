@@ -77,88 +77,133 @@ export default function AssignTasks() {
   };
 
   return (
-    <div className="flex min-h-screen bg-neutral-950 text-neutral-100">
+    <div className="flex min-h-screen bg-gray-50 text-gray-900">
       <Sidebar />
 
-      <div className="flex-1 p-10 space-y-10 overflow-auto">
-        <div>
-          <h1 className="text-3xl font-semibold tracking-tight">Task Management</h1>
-          <p className="text-neutral-400 mt-1">Assign work to staff and track completion in real-time.</p>
+      <div className="flex-1 overflow-auto">
+        {/* HEADER */}
+        <div className="sticky top-0 z-10 bg-white/80 backdrop-blur border-b border-gray-200 p-6 shadow-sm">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-2">
+              <span>Task Management</span>
+            </h1>
+            <p className="text-gray-600 mt-2">
+              Assign work to staff and track completion in real-time.
+            </p>
+          </div>
         </div>
 
-        <div className="grid grid-cols-1 xl:grid-cols-3 gap-10">
-          {/* ASSIGN CARD */}
-          <div className="xl:col-span-1 bg-neutral-900/70 backdrop-blur border border-neutral-800 rounded-2xl p-8 shadow-lg">
-            <h2 className="text-lg font-semibold mb-6">Assign New Task</h2>
+        <div className="p-8 space-y-8">
+          <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
+            {/* ASSIGN CARD */}
+            <div className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm hover:shadow-md transition-shadow">
+              <h2 className="text-xl font-bold text-gray-900 mb-6">Assign New Task</h2>
 
-            <div className="space-y-5">
-              <div>
-                <label className="text-sm text-neutral-400">Department</label>
-                <select value={department} onChange={(e) => setDepartment(e.target.value)} className="w-full mt-2 bg-neutral-950 border border-neutral-800 p-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-600">
-                  <option>Sales</option>
-                  <option>Warehouse</option>
-                  <option>Fitting</option>
-                  <option>Production</option>
-                </select>
-              </div>
+              <div className="space-y-5">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Department</label>
+                  <select 
+                    value={department} 
+                    onChange={(e) => setDepartment(e.target.value)} 
+                    className="w-full p-3 bg-white rounded-xl border-2 border-gray-200 focus:border-[#c62d23] focus:ring-2 focus:ring-[#c62d23]/20 outline-none transition-all cursor-pointer"
+                  >
+                    <option>Sales</option>
+                    <option>Warehouse</option>
+                    <option>Fitting</option>
+                    <option>Production</option>
+                  </select>
+                </div>
 
-              <div>
-                <label className="text-sm text-neutral-400">Staff Member</label>
-                <select value={userId} onChange={(e) => setUserId(e.target.value)} className="w-full mt-2 bg-neutral-950 border border-neutral-800 p-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-600">
-                  <option value="">{loadingStaff ? "Loading staff..." : "Select staff"}</option>
-                  {staff.map((u) => (
-                    <option key={u._id} value={u._id}>{u.name} ({u.email})</option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="text-sm text-neutral-400">Task Description</label>
-                <textarea value={task} onChange={(e) => setTask(e.target.value)} rows={4} placeholder="Describe the task clearly..." className="w-full mt-2 bg-neutral-950 border border-neutral-800 p-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-600 resize-none" />
-              </div>
-
-              <button onClick={assignTask} disabled={!userId || !task} className="w-full bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 transition py-3 rounded-xl flex items-center justify-center gap-2 font-medium">
-                <Send size={18} /> Assign Task
-              </button>
-            </div>
-          </div>
-
-          {/* TABLE */}
-          <div className="xl:col-span-2 bg-neutral-900/70 backdrop-blur border border-neutral-800 rounded-2xl p-8 shadow-lg">
-            <h2 className="text-lg font-semibold mb-6">Assigned Tasks</h2>
-
-            {loading ? (
-              <p>Loading...</p>
-            ) : tasks.length === 0 ? (
-              <p className="text-neutral-400">No tasks assigned yet.</p>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead className="text-neutral-400 border-b border-neutral-800">
-                    <tr>
-                      <th className="text-left p-4">Department</th>
-                      <th className="text-left p-4">Employee</th>
-                      <th className="text-left p-4">Task</th>
-                      <th className="text-left p-4">Status</th>
-                      <th className="text-left p-4">Assigned</th>
-                      <th className="text-left p-4">Completed</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {tasks.map((t) => (
-                      <tr key={t._id} className="border-b border-neutral-800 hover:bg-neutral-800/50 transition">
-                        <td className="p-4">{t.department}</td>
-                        <td className="p-4"><div className="font-medium">{t.assignedTo?.name}</div><div className="text-xs text-neutral-400">{t.assignedTo?.email}</div></td>
-                        <td className="p-4 max-w-md">{t.task}</td>
-                        <td className="p-4">{t.status === "Completed" ? <span className="inline-flex items-center gap-2 text-emerald-400"><CheckCircle size={16}/> Completed</span> : <span className="inline-flex items-center gap-2 text-amber-400"><Clock size={16}/> Pending</span>}</td>
-                        <td className="p-4">{new Date(t.createdAt).toLocaleDateString()}</td>
-                        <td className="p-4">{t.completedAt ? new Date(t.completedAt).toLocaleDateString() : "—"}</td>
-                      </tr>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Staff Member</label>
+                  <select 
+                    value={userId} 
+                    onChange={(e) => setUserId(e.target.value)} 
+                    className="w-full p-3 bg-white rounded-xl border-2 border-gray-200 focus:border-[#c62d23] focus:ring-2 focus:ring-[#c62d23]/20 outline-none transition-all cursor-pointer"
+                  >
+                    <option value="">{loadingStaff ? "Loading staff..." : "Select staff"}</option>
+                    {staff.map((u) => (
+                      <option key={u._id} value={u._id}>{u.name} ({u.email})</option>
                     ))}
-                  </tbody>
-                </table>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Task Description</label>
+                  <textarea 
+                    value={task} 
+                    onChange={(e) => setTask(e.target.value)} 
+                    rows={4} 
+                    placeholder="Describe the task clearly..." 
+                    className="w-full p-3 bg-white rounded-xl border-2 border-gray-200 focus:border-[#c62d23] focus:ring-2 focus:ring-[#c62d23]/20 outline-none transition-all resize-none" 
+                  />
+                </div>
+
+                <button 
+                  onClick={assignTask} 
+                  disabled={!userId || !task} 
+                  className="w-full bg-[#c62d23] hover:bg-[#a8241c] disabled:opacity-50 disabled:cursor-not-allowed text-white py-3 rounded-xl flex items-center justify-center gap-2 font-medium transition-all duration-200 shadow-sm hover:shadow-md cursor-pointer"
+                >
+                  <Send size={18} /> Assign Task
+                </button>
               </div>
-            )}
+            </div>
+
+            {/* TABLE */}
+            <div className="xl:col-span-2 bg-white border border-gray-200 rounded-2xl p-6 shadow-sm hover:shadow-md transition-shadow">
+              <h2 className="text-xl font-bold text-gray-900 mb-6">Assigned Tasks</h2>
+
+              {loading ? (
+                <div className="p-8 text-center text-gray-500">Loading...</div>
+              ) : tasks.length === 0 ? (
+                <div className="p-8 text-center text-gray-500">No tasks assigned yet.</div>
+              ) : (
+                <div className="overflow-auto rounded-lg border border-gray-200">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="bg-gray-50">
+                        <th className="text-left p-4 font-semibold text-gray-700">Department</th>
+                        <th className="text-left p-4 font-semibold text-gray-700">Employee</th>
+                        <th className="text-left p-4 font-semibold text-gray-700">Task</th>
+                        <th className="text-left p-4 font-semibold text-gray-700">Status</th>
+                        <th className="text-left p-4 font-semibold text-gray-700">Assigned</th>
+                        <th className="text-left p-4 font-semibold text-gray-700">Completed</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {tasks.map((t, index) => (
+                        <tr 
+                          key={t._id} 
+                          className={`border-b border-gray-100 hover:bg-gray-50 transition-colors ${
+                            index % 2 === 0 ? "bg-white" : "bg-gray-50"
+                          }`}
+                        >
+                          <td className="p-4 text-gray-700">{t.department}</td>
+                          <td className="p-4">
+                            <div className="font-medium text-gray-900">{t.assignedTo?.name}</div>
+                            <div className="text-xs text-gray-500">{t.assignedTo?.email}</div>
+                          </td>
+                          <td className="p-4 text-gray-700 max-w-md">{t.task}</td>
+                          <td className="p-4">
+                            {t.status === "Completed" ? (
+                              <span className="inline-flex items-center gap-2 text-green-600">
+                                <CheckCircle size={16}/> Completed
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-2 text-amber-600">
+                                <Clock size={16}/> Pending
+                              </span>
+                            )}
+                          </td>
+                          <td className="p-4 text-gray-700">{new Date(t.createdAt).toLocaleDateString()}</td>
+                          <td className="p-4 text-gray-700">{t.completedAt ? new Date(t.completedAt).toLocaleDateString() : "—"}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </div>
