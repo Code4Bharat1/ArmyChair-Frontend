@@ -4,7 +4,7 @@ import axios from "axios";
 import ProtectedRoute from "@/components/ProtectedRoutes/ProtectedRoutes";
 import toast from "react-hot-toast";
 
-
+import Sidebar from "@/components/Superadmin/sidebar";
 export default function ActivityLogPage() {
   const [logs, setLogs] = useState([]);
   const [files, setFiles] = useState([]);
@@ -43,10 +43,9 @@ export default function ActivityLogPage() {
   // 1️⃣ Export CSV (current table)
   const exportCSV = () => {
     if (!logs.length) {
-  toast.error("No logs available to export");
-  return;
-}
-
+      toast.error("No logs available to export");
+      return;
+    }
 
     const headers = ["Time", "User", "Role", "Action", "Module", "Description"];
     const rows = logs.map((l) => [
@@ -61,7 +60,7 @@ export default function ActivityLogPage() {
     const csv =
       headers.join(",") +
       "\n" +
-      rows.map((r) => r.map(v => `"${v}"`).join(",")).join("\n");
+      rows.map((r) => r.map((v) => `"${v}"`).join(",")).join("\n");
 
     const blob = new Blob([csv], { type: "text/csv" });
     const url = URL.createObjectURL(blob);
@@ -74,53 +73,54 @@ export default function ActivityLogPage() {
   };
 
   // 2️⃣ Download Excel by date
-const downloadByDate = async () => {
-  if (!selectedDate) {
-    toast.error("Please select a date");
-    return;
-  }
-
-  try {
-    const res = await fetch(
-      `${API}/activity/exports/${selectedDate}?token=${token}`
-    );
-
-    if (!res.ok) {
-      toast.error("No activity records found for selected date");
+  const downloadByDate = async () => {
+    if (!selectedDate) {
+      toast.error("Please select a date");
       return;
     }
 
-    const blob = await res.blob();
+    try {
+      const res = await fetch(
+        `${API}/activity/exports/${selectedDate}?token=${token}`,
+      );
 
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `activity-${selectedDate}.xlsx`;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    window.URL.revokeObjectURL(url);
+      if (!res.ok) {
+        toast.error("No activity records found for selected date");
+        return;
+      }
 
-    toast.success("Excel downloaded successfully");
-  } catch (err) {
-    toast.error("Failed to download Excel");
-  }
-};
+      const blob = await res.blob();
 
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `activity-${selectedDate}.xlsx`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
 
-
+      toast.success("Excel downloaded successfully");
+    } catch (err) {
+      toast.error("Failed to download Excel");
+    }
+  };
 
   // 3️⃣ Download archived Excel
   const downloadFile = (file) => {
-    window.open(
-      `${API}/activity/files/${file}?token=${token}`,
-      "_blank"
-    );
+    window.open(`${API}/activity/files/${file}?token=${token}`, "_blank");
   };
 
-  return (
-    <ProtectedRoute allowedRoles={["admin"]}>
-      <div className="p-6 text-neutral-100 space-y-6">
+ 
+    return (
+  <ProtectedRoute allowedRoles={["admin"]}>
+    <div className="flex h-screen bg-neutral-900 text-neutral-100">
+      
+      {/* SIDEBAR */}
+      <Sidebar />
+
+      {/* MAIN CONTENT */}
+      <div className="flex-1 overflow-y-auto p-6 space-y-6">
         <h1 className="text-2xl font-bold">Activity Log</h1>
 
         {/* 🔘 BUTTON BAR */}
@@ -146,17 +146,17 @@ const downloadByDate = async () => {
             Download Excel by Date
           </button>
 
-         <button
-  onClick={() => {
-    if (!token) {
-      toast.error("Session expired. Please re-login.");
-      return;
-    }
-    loadData(token);
-    toast.success("Logs refreshed");
-  }}
->
-
+          <button
+            onClick={() => {
+              if (!token) {
+                toast.error("Session expired. Please re-login.");
+                return;
+              }
+              loadData(token);
+              toast.success("Logs refreshed");
+            }}
+            className="bg-neutral-700 hover:bg-neutral-600 px-4 py-2 rounded"
+          >
             Refresh Logs
           </button>
         </div>
@@ -208,6 +208,8 @@ const downloadByDate = async () => {
           </div>
         </div>
       </div>
-    </ProtectedRoute>
-  );
+    </div>
+  </ProtectedRoute>
+);
+
 }

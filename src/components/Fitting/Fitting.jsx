@@ -1,6 +1,6 @@
 "use client";
 import React, { useEffect, useMemo, useState } from "react";
-import { Wrench, CheckCircle, Package, Clock, TrendingUp } from "lucide-react";
+import { Wrench, CheckCircle, Package, Clock, TrendingUp, Search } from "lucide-react";
 import axios from "axios";
 import FittingSidebar from "@/components/Fitting/sidebar";
 
@@ -73,13 +73,13 @@ export default function Fitting() {
   const getWarehouseBadge = (progress) => {
     if (progress === "WAREHOUSE_COLLECTED") {
       return (
-        <span className="px-3 py-1 bg-emerald-900 text-emerald-300 rounded-full text-xs">
+        <span className="px-2 py-1 bg-emerald-50 text-emerald-700 rounded-full text-xs font-medium">
           Collected
         </span>
       );
     }
     return (
-      <span className="px-3 py-1 bg-neutral-700 text-neutral-300 rounded-full text-xs">
+      <span className="px-2 py-1 bg-gray-100 text-gray-600 rounded-full text-xs font-medium">
         Processing
       </span>
     );
@@ -88,131 +88,163 @@ export default function Fitting() {
   const getFittingBadge = (progress) => {
     if (progress === "FITTING_COMPLETED") {
       return (
-        <span className="px-3 py-1 bg-green-900 text-green-300 rounded-full text-xs">
+        <span className="px-2 py-1 bg-green-50 text-green-700 rounded-full text-xs font-medium">
           Completed
         </span>
       );
     }
     if (progress === "FITTING_IN_PROGRESS") {
       return (
-        <span className="px-3 py-1 bg-amber-900 text-amber-300 rounded-full text-xs">
+        <span className="px-2 py-1 bg-amber-50 text-amber-700 rounded-full text-xs font-medium">
           In Progress
         </span>
       );
     }
     return (
-      <span className="px-3 py-1 bg-neutral-700 text-neutral-300 rounded-full text-xs">
+      <span className="px-2 py-1 bg-gray-100 text-gray-600 rounded-full text-xs font-medium">
         Pending
       </span>
     );
   };
 
   return (
-    <div className="flex h-screen bg-gradient-to-b from-amber-900 via-black to-neutral-900 text-neutral-100">
-
-
+    <div className="flex min-h-screen bg-gray-50 text-gray-900">
       <FittingSidebar />
 
       <div className="flex-1 overflow-auto">
-        <div className="bg-neutral-800 border-b border-neutral-700 p-4">
-          <h1 className="text-2xl font-bold">Fitting / Assembly</h1>
-          <p className="text-sm text-neutral-400">
-            Assemble products after warehouse material collection
-          </p>
+        {/* Header */}
+        <div className="sticky top-0 z-10 bg-white/80 backdrop-blur border-b border-gray-200 p-6 shadow-sm">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-2">
+              <Wrench size={32} className="text-[#c62d23]" />
+              <span>Fitting / Assembly</span>
+            </h1>
+            <p className="text-sm text-gray-600 mt-1">
+              Assemble products after warehouse material collection
+            </p>
+          </div>
         </div>
 
-        <div className="p-6">
+        <div className="p-8 space-y-8">
           {/* STATS */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-            <StatCard title="Total Orders" value={totalOrders} icon={<Package />} />
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <StatCard 
+              title="Total Orders" 
+              value={totalOrders} 
+              icon={<Package className="text-[#c62d23]" />} 
+            />
             <StatCard
               title="In Progress"
               value={inProgress}
-              icon={<Clock />}
+              icon={<Clock className="text-[#c62d23]" />}
               danger={inProgress > 0}
             />
             <StatCard
               title="Completed"
               value={completed}
-              icon={<TrendingUp />}
+              icon={<TrendingUp className="text-[#c62d23]" />}
             />
           </div>
 
           {/* SEARCH */}
-          <input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search fitting orders..."
-            className="w-full mb-4 bg-neutral-800 border border-neutral-700 px-4 py-2 rounded-lg"
-          />
+          <div className="relative">
+            <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search fitting orders by Order ID, Client, or Chair Model..."
+              className="w-full bg-white border border-gray-200 pl-12 pr-4 py-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#c62d23] focus:border-transparent shadow-sm"
+            />
+          </div>
 
           {/* TABLE */}
-          <div className="bg-neutral-800 rounded-xl border border-neutral-700 overflow-x-auto">
+          <div className="bg-white border border-gray-200 rounded-2xl shadow-sm overflow-hidden">
             {loading ? (
-              <div className="p-6 text-center">Loading...</div>
+              <div className="p-8 text-center text-gray-500">
+                <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-[#c62d23]"></div>
+                <p className="mt-2">Loading...</p>
+              </div>
             ) : (
-              <table className="w-full min-w-[900px]">
-                <thead className="bg-neutral-850 border-b border-neutral-700">
-                  <tr>
-                    {[
-                      "Order",
-                      "Dispatch",
-                      "Chair",
-                      "Qty",
-                      "Warehouse",
-                      "Fitting",
-                      "Action",
-                    ].map((h) => (
-                      <th key={h} className="p-4 text-xs text-neutral-400 text-left">
-                        {h}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-
-                <tbody>
-                  {filteredOrders.map((o) => (
-                    <tr key={o._id} className="border-b border-neutral-700">
-                      <td className="p-4">{o.orderId}</td>
-                      <td className="p-4">{o.dispatchedTo?.name}</td>
-                      <td className="p-4">{o.chairModel}</td>
-                      <td className="p-4">{o.quantity}</td>
-                      <td className="p-4">{getWarehouseBadge(o.progress)}</td>
-                      <td className="p-4">{getFittingBadge(o.progress)}</td>
-                      <td className="p-4">
-                        {o.progress === "WAREHOUSE_COLLECTED" && (
-                          <button
-                            onClick={() =>
-                              updateProgress(o._id, "FITTING_IN_PROGRESS")
-                            }
-                            className="bg-blue-600 px-3 py-2 rounded"
-                          >
-                            Start
-                          </button>
-                        )}
-                        {o.progress === "FITTING_IN_PROGRESS" && (
-                          <button
-                            onClick={() =>
-                              updateProgress(o._id, "FITTING_COMPLETED")
-                            }
-                            className="bg-amber-600 px-3 py-2 rounded"
-                          >
-                            Complete
-                          </button>
-                        )}
-                        {o.progress === "FITTING_COMPLETED" && (
-                          <span className="text-green-400">✔ Done</span>
-                        )}
-                      </td>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="bg-gray-50 border-b border-gray-200">
+                      {[
+                        "Order ID",
+                        "Client",
+                        "Chair Model",
+                        "Quantity",
+                        "Warehouse Status",
+                        "Fitting Status",
+                        "Action",
+                      ].map((h) => (
+                        <th key={h} className="p-4 text-left font-semibold text-gray-700">
+                          {h}
+                        </th>
+                      ))}
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+
+                  <tbody>
+                    {filteredOrders.length === 0 ? (
+                      <tr>
+                        <td colSpan="7" className="p-8 text-center text-gray-500">
+                          No fitting orders found
+                        </td>
+                      </tr>
+                    ) : (
+                      filteredOrders.map((o, index) => (
+                        <tr 
+                          key={o._id} 
+                          className={`border-b border-gray-100 hover:bg-gray-50 transition-colors ${
+                            index % 2 === 0 ? 'bg-white' : 'bg-gray-50'
+                          }`}
+                        >
+                          <td className="p-4 font-medium text-gray-900">{o.orderId}</td>
+                          <td className="p-4 text-gray-700">{o.dispatchedTo?.name || "—"}</td>
+                          <td className="p-4 text-gray-900">{o.chairModel}</td>
+                          <td className="p-4 font-semibold text-gray-900">{o.quantity}</td>
+                          <td className="p-4">{getWarehouseBadge(o.progress)}</td>
+                          <td className="p-4">{getFittingBadge(o.progress)}</td>
+                          <td className="p-4">
+                            {o.progress === "WAREHOUSE_COLLECTED" && (
+                              <button
+                                onClick={() => updateProgress(o._id, "FITTING_IN_PROGRESS")}
+                                disabled={processingId === o._id}
+                                className="bg-[#c62d23] hover:bg-[#a82419] text-white px-4 py-2 rounded-lg font-medium transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                              >
+                                {processingId === o._id ? "Processing..." : "Start Fitting"}
+                              </button>
+                            )}
+                            {o.progress === "FITTING_IN_PROGRESS" && (
+                              <button
+                                onClick={() => updateProgress(o._id, "FITTING_COMPLETED")}
+                                disabled={processingId === o._id}
+                                className="bg-amber-600 hover:bg-amber-700 text-white px-4 py-2 rounded-lg font-medium transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                              >
+                                {processingId === o._id ? "Processing..." : "Mark Complete"}
+                              </button>
+                            )}
+                            {o.progress === "FITTING_COMPLETED" && (
+                              <span className="flex items-center gap-1 text-green-600 font-medium">
+                                <CheckCircle size={16} />
+                                Done
+                              </span>
+                            )}
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
             )}
           </div>
 
-          <div className="mt-4 text-xs text-neutral-500">
-            * Orders move to dispatch after fitting completion.
+          <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
+            <p className="text-sm text-blue-800">
+              <strong>Note:</strong> Orders automatically move to dispatch after fitting completion.
+            </p>
           </div>
         </div>
       </div>
@@ -222,16 +254,17 @@ export default function Fitting() {
 
 const StatCard = ({ title, value, icon, danger }) => (
   <div
-    className={`p-5 rounded-xl border ${
-      danger
-        ? "bg-amber-950/40 border-amber-800"
-        : "bg-neutral-800 border-neutral-700"
+    className={`bg-white border rounded-2xl p-6 transition-all duration-200 shadow-sm hover:shadow-md flex flex-col justify-between h-full ${
+      danger ? 'border-amber-300 bg-amber-50' : 'border-gray-200'
     }`}
+    style={{
+      borderLeft: '4px solid #c62d23'
+    }}
   >
-    <div className="flex items-center justify-between mb-3">
-      <p className="text-sm text-neutral-400">{title}</p>
-      {icon}
+    <div className="flex justify-between items-start mb-4">
+      <p className="text-sm text-gray-600 font-medium">{title}</p>
+      {React.cloneElement(icon, { size: 24 })}
     </div>
-    <p className="text-3xl font-bold">{value}</p>
+    <p className="text-3xl font-bold text-gray-900">{value}</p>
   </div>
 );

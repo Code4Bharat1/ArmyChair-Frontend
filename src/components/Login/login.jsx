@@ -8,6 +8,7 @@ import {
   Mail,
   AlertCircle,
   CheckCircle,
+  ArrowRight,
 } from "lucide-react";
 import axios from "axios";
 import { useRouter } from "next/navigation";
@@ -84,73 +85,77 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen bg-red-50 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-100 flex items-center justify-center p-4">
       <div className="w-full max-w-md">
         {/* Header */}
         <div className="text-center mb-8 flex flex-col items-center">
-          <img
-            src="/image.png"
-            alt="Army Industry Logo"
-            className="w-28 mb-4 mx-auto"
-          />
-          {/* <h1 className="text-3xl font-bold text-black mb-2">Army Industry</h1> */}
-          <p className="text-neutral-400 text-sm">Sign in to your account</p>
+          <div className="bg-white rounded-2xl p-4 shadow-lg mb-6 border border-gray-200">
+            <img
+              src="/image.png"
+              alt="Army Industry Logo"
+              className="w-24 h-24 object-contain"
+            />
+          </div>
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">Welcome Back</h1>
+          <p className="text-gray-600">Sign in to your account to continue</p>
         </div>
 
         {/* Card */}
-        <div className="bg-gray-100  rounded-lg p-8 shadow-xl">
+        <div className="bg-white rounded-2xl p-8 shadow-xl border border-gray-200">
           {/* Error */}
           {error && (
-            <div className="mb-4 bg-red-900/20 border border-red-800 rounded-lg p-3 flex gap-2">
-              <AlertCircle className="w-5 h-5 text-red-500 mt-0.5" />
-              <p className="text-sm text-red-300">{error}</p>
+            <div className="mb-6 bg-red-50 border border-red-200 rounded-xl p-4 flex gap-3">
+              <AlertCircle className="w-5 h-5 text-red-600 mt-0.5 flex-shrink-0" />
+              <p className="text-sm text-red-800">{error}</p>
             </div>
           )}
 
           {/* Success */}
           {success && (
-            <div className="mb-4 bg-green-900/20 border border-green-800 rounded-lg p-3 flex gap-2">
-              <CheckCircle className="w-5 h-5 text-green-500 mt-0.5" />
-              <p className="text-sm text-green-300">{success}</p>
+            <div className="mb-6 bg-green-50 border border-green-200 rounded-xl p-4 flex gap-3">
+              <CheckCircle className="w-5 h-5 text-green-600 mt-0.5 flex-shrink-0" />
+              <p className="text-sm text-green-800">{success}</p>
             </div>
           )}
 
-          <form onSubmit={handleSubmit}>
+          <div className="space-y-5">
             {/* Email */}
-            <div className="mb-4">
-              <label className="block text-sm text-black  mb-4">
+            <div>
+              <label className="block text-sm font-semibold text-gray-900 mb-2">
                 Email Address
               </label>
               <div className="relative">
-                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-500 w-5 h-5" />
+                <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
                 <input
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="you@example.com"
-                  className="w-full bg-white border  border-neutral-200 rounded-lg pl-10 pr-4 py-3 text-sm text-black focus:border-amber-600 focus:outline-none"
+                  className="w-full bg-white border border-gray-200 rounded-xl pl-12 pr-4 py-3.5 text-sm text-gray-900 placeholder-gray-400 focus:border-[#c62d23] focus:ring-2 focus:ring-[#c62d23]/20 focus:outline-none transition-all"
+                  onKeyDown={(e) => e.key === 'Enter' && handleSubmit(e)}
                 />
               </div>
             </div>
 
             {/* Password */}
-            <div className="mb-6">
-              <label className="block text-sm text-black mb-4">
+            <div>
+              <label className="block text-sm font-semibold text-gray-900 mb-2">
                 Password
               </label>
               <div className="relative">
-                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-500 w-5 h-5" />
+                <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
                 <input
                   type={showPassword ? "text" : "password"}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  placeholder="••••••••"
-                  className="w-full bg-white border border-neutral-200 rounded-lg pl-10 pr-12 py-3 text-sm text-neutral-200 focus:border-amber-600 focus:outline-none"
+                  placeholder="Enter your password"
+                  className="w-full bg-white border border-gray-200 rounded-xl pl-12 pr-12 py-3.5 text-sm text-gray-900 placeholder-gray-400 focus:border-[#c62d23] focus:ring-2 focus:ring-[#c62d23]/20 focus:outline-none transition-all"
+                  onKeyDown={(e) => e.key === 'Enter' && handleSubmit(e)}
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-500 hover:text-neutral-300"
+                  className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
                 >
                   {showPassword ? (
                     <EyeOff className="w-5 h-5" />
@@ -161,23 +166,12 @@ export default function Login() {
               </div>
             </div>
 
-            <div className="mt-6 text-center mb-4">
-              <p className="text-sm text-neutral-400">
-                New user?{" "}
-                <Link
-                  href="/signup"
-                  className="text-amber-500 hover:text-amber-400 font-medium"
-                >
-                  Create an account
-                </Link>
-              </p>
-            </div>
-
             {/* Button */}
             <button
-              type="submit"
+              type="button"
+              onClick={handleSubmit}
               disabled={isLoading}
-              className="w-full bg-amber-600 hover:bg-amber-700 disabled:opacity-60 text-white py-3 rounded-lg font-medium flex justify-center items-center gap-2"
+              className="w-full bg-[#c62d23] hover:bg-[#a82419] disabled:opacity-60 disabled:cursor-not-allowed text-white py-3.5 rounded-xl font-semibold flex justify-center items-center gap-2 shadow-lg shadow-[#c62d23]/20 transition-all hover:shadow-xl hover:shadow-[#c62d23]/30 mt-6"
             >
               {isLoading ? (
                 <>
@@ -185,15 +179,36 @@ export default function Login() {
                   Signing in...
                 </>
               ) : (
-                "Sign In"
+                <>
+                  Sign In
+                  <ArrowRight className="w-5 h-5" />
+                </>
               )}
             </button>
-          </form>
+          </div>
+
+          {/* Divider */}
+          <div className="relative my-6">
+            <div className="absolute inset-0 flex items-center">
+              <div className="w-full border-t border-gray-200"></div>
+            </div>
+            <div className="relative flex justify-center text-sm">
+              <span className="px-4 bg-white text-gray-500">New to Army Industry?</span>
+            </div>
+          </div>
+
+          {/* Sign Up Link */}
+          <Link
+            href="/signup"
+            className="block w-full text-center py-3 rounded-xl border-2 border-gray-200 text-gray-700 font-medium hover:border-[#c62d23] hover:text-[#c62d23] hover:bg-red-50 transition-all"
+          >
+            Create an account
+          </Link>
         </div>
 
         {/* Footer */}
-        <p className="mt-8 text-center text-xs text-neutral-500">
-          © 2024 Army Industry. All rights reserved.
+        <p className="mt-8 text-center text-sm text-gray-500">
+          © 2026 Army Industry. All rights reserved.
         </p>
       </div>
     </div>

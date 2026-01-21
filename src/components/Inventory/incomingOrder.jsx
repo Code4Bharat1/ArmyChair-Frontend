@@ -7,6 +7,19 @@ import {
   Package,
   Clock,
   TrendingUp,
+  ChevronDown,
+  ChevronUp,
+  AlertCircle,
+  Plus,
+  Trash2,
+  Pencil,
+  Boxes,
+  TrendingDown,
+  Warehouse,
+  MapPin,
+  Building2,
+  ArrowLeftRight,
+  X,
 } from "lucide-react";
 import axios from "axios";
 import InventorySidebar from "./sidebar";
@@ -27,7 +40,6 @@ export default function WarehouseOrders() {
   const [currentPage, setCurrentPage] = useState(1);
   const ITEMS_PER_PAGE = 5;
 
-  // 🔥 NEW — do NOT remove anything else
   const [expandedOrderId, setExpandedOrderId] = useState(null);
   const [inventoryPreview, setInventoryPreview] = useState({});
 
@@ -140,6 +152,7 @@ export default function WarehouseOrders() {
       setProcessingId(null);
     }
   };
+
   const updatePartialPick = (inventoryId, value) => {
     const qty = Number(value);
     setPartialPicks((prev) => ({
@@ -165,6 +178,7 @@ export default function WarehouseOrders() {
       setProcessingId(null);
     }
   };
+
   const fetchPickPreview = async (orderId) => {
     try {
       const res = await axios.get(
@@ -175,14 +189,13 @@ export default function WarehouseOrders() {
       const parts = res.data.parts || [];
       const order = res.data.order;
 
-      // 👇 Merge previously picked parts into locations
       if (order.partialParts?.length) {
         parts.forEach((p) => {
           p.locations.forEach((l) => {
             const found = order.partialParts.find(
               (x) => x.inventoryId === l.inventoryId,
             );
-            if (found) l.picked = found.qty; // 👈 THIS IS THE MAGIC
+            if (found) l.picked = found.qty;
           });
         });
       }
@@ -200,7 +213,6 @@ export default function WarehouseOrders() {
   const filteredOrders = useMemo(() => {
     let data = [...orders];
 
-    // 🔥 CARD FILTERS
     if (activeFilter === "DELAYED") {
       data = data.filter((o) => isDelayed(o));
     }
@@ -209,7 +221,6 @@ export default function WarehouseOrders() {
       data = data.filter((o) => o.progress === "READY_FOR_DISPATCH");
     }
 
-    // 🔍 SEARCH
     const q = (search || "").toLowerCase();
     if (q) {
       data = data.filter(
@@ -250,40 +261,40 @@ export default function WarehouseOrders() {
     const statusMap = {
       ORDER_PLACED: {
         label: "Pending Picking",
-        color: "bg-amber-900 text-amber-300",
+        color: "bg-amber-50 text-amber-700 border-amber-200",
       },
       WAREHOUSE_COLLECTED: {
         label: "Sent to Fitting",
-        color: "bg-blue-900 text-blue-300",
+        color: "bg-blue-50 text-blue-700 border-blue-200",
       },
       FITTING_IN_PROGRESS: {
         label: "Fitting In Progress",
-        color: "bg-blue-900 text-blue-300",
+        color: "bg-blue-50 text-blue-700 border-blue-200",
       },
       FITTING_COMPLETED: {
         label: "Returned from Fitting",
-        color: "bg-emerald-900 text-emerald-300",
+        color: "bg-emerald-50 text-emerald-700 border-emerald-200",
       },
       READY_FOR_DISPATCH: {
         label: "Ready for Dispatch",
-        color: "bg-green-900 text-green-300",
+        color: "bg-green-50 text-green-700 border-green-200",
       },
-      DISPATCHED: { label: "Dispatched", color: "bg-green-900 text-green-300" },
+      DISPATCHED: { label: "Dispatched", color: "bg-green-50 text-green-700 border-green-200" },
       PARTIAL: {
         label: "Partial / Issue",
-        color: "bg-amber-900 text-amber-300",
+        color: "bg-amber-50 text-amber-700 border-amber-200",
       },
-      COMPLETED: { label: "Completed", color: "bg-green-900 text-green-300" },
+      COMPLETED: { label: "Completed", color: "bg-green-50 text-green-700 border-green-200" },
     };
 
     const status = statusMap[progress] || {
       label: "Processing",
-      color: "bg-neutral-700 text-neutral-300",
+      color: "bg-gray-50 text-gray-700 border-gray-200",
     };
 
     return (
       <span
-        className={`px-3 py-1 rounded-full text-xs font-medium ${status.color}`}
+        className={`px-3 py-1 rounded-full text-xs font-medium border ${status.color}`}
       >
         {status.label}
       </span>
@@ -301,7 +312,6 @@ export default function WarehouseOrders() {
     for (const l of part.locations) {
       const picked = Number(l.picked || 0);
 
-      // 🔥 HARD BLOCK
       if (picked > l.available) {
         throw new Error(
           `Picked quantity for ${partName} at ${l.location} exceeds available stock`,
@@ -337,7 +347,6 @@ export default function WarehouseOrders() {
       return alert(e.message);
     }
 
-    // ❌ OVER PICK BLOCK
     if (buildable > order.quantity) {
       return alert(
         `You selected parts for ${buildable} chairs but order requires only ${order.quantity}.
@@ -345,7 +354,6 @@ Please reduce picks to exactly ${order.quantity}.`,
       );
     }
 
-    // 🔥 FULL ORDER CASE
     if (buildable >= order.quantity) {
       if (!confirm("All parts available. Send full order to fitting?")) return;
 
@@ -369,7 +377,6 @@ Please reduce picks to exactly ${order.quantity}.`,
       return;
     }
 
-    // 🔥 PARTIAL CASE
     if (buildable === 0) return alert("Not enough parts to build even 1 chair");
 
     if (
@@ -410,10 +417,6 @@ Please reduce picks to exactly ${order.quantity}.`,
     if (o.progress === "ORDER_PLACED") {
       return (
         <div className="flex gap-2">
-          {/* <button onClick={() => router.push(`/inventory/order/${o._id}`)}>
-            Pick Parts
-          </button> */}
-
           <button
             onClick={() => {
               if (expandedOrderId === o._id) {
@@ -425,15 +428,26 @@ Please reduce picks to exactly ${order.quantity}.`,
                 fetchPickPreview(o._id);
               }
             }}
+            className="bg-[#c62d23] hover:bg-[#a82419] text-white px-4 py-2 rounded-lg text-sm font-medium transition-all shadow-sm hover:shadow-md flex items-center gap-2"
           >
-            Check Inventory
+            {expandedOrderId === o._id ? (
+              <>
+                <ChevronUp size={16} />
+                Hide Inventory
+              </>
+            ) : (
+              <>
+                <Package size={16} />
+                Check Inventory
+              </>
+            )}
           </button>
         </div>
       );
     }
 
     if (o.progress === "WAREHOUSE_COLLECTED") {
-      return <span className="text-blue-400 text-sm">Sent to Fitting</span>;
+      return <span className="text-blue-600 text-sm font-medium">Sent to Fitting</span>;
     }
 
     if (o.progress === "FITTING_COMPLETED") {
@@ -442,7 +456,7 @@ Please reduce picks to exactly ${order.quantity}.`,
           <button
             disabled={isLoading}
             onClick={() => handleMarkReady(o._id)}
-            className="bg-emerald-600 hover:bg-emerald-700 px-4 py-2 rounded-lg text-sm disabled:opacity-50"
+            className="bg-emerald-600 hover:bg-emerald-700 px-4 py-2 rounded-lg text-sm font-medium disabled:opacity-50 text-white transition-all shadow-sm hover:shadow-md"
           >
             {isLoading ? "Processing..." : "Mark Complete"}
           </button>
@@ -452,16 +466,16 @@ Please reduce picks to exactly ${order.quantity}.`,
 
     if (o.progress === "READY_FOR_DISPATCH") {
       return (
-        <span className="text-green-400 text-sm flex items-center gap-1">
-          <CheckCircle size={14} /> Waiting for Sales Dispatch
+        <span className="text-green-600 text-sm flex items-center gap-1 font-medium">
+          <CheckCircle size={16} /> Waiting for Sales Dispatch
         </span>
       );
     }
 
     if (o.progress === "DISPATCHED" || o.progress === "COMPLETED") {
       return (
-        <span className="inline-flex items-center gap-1 text-green-400 text-sm">
-          <CheckCircle size={14} />
+        <span className="inline-flex items-center gap-1 text-green-600 text-sm font-medium">
+          <CheckCircle size={16} />
           Completed
         </span>
       );
@@ -479,16 +493,16 @@ Please reduce picks to exactly ${order.quantity}.`,
                 setExpandedOrderId(o._id);
                 setShowDecisionPanel(true);
                 fetchPickPreview(o._id);
-              } // same API as ORDER_PLACED
+              }
             }}
-            className="bg-amber-600 px-3 py-1 rounded text-black text-sm"
+            className="bg-amber-600 hover:bg-amber-700 px-3 py-1.5 rounded-lg text-white text-sm font-medium transition-all shadow-sm hover:shadow-md"
           >
             Recheck Inventory
           </button>
 
           <button
             onClick={() => router.push(`/inventory/order/${o._id}`)}
-            className="bg-emerald-600 px-3 py-1 rounded text-white text-sm"
+            className="bg-emerald-600 hover:bg-emerald-700 px-3 py-1.5 rounded-lg text-white text-sm font-medium transition-all shadow-sm hover:shadow-md"
           >
             Pick Parts
           </button>
@@ -496,27 +510,36 @@ Please reduce picks to exactly ${order.quantity}.`,
       );
     }
 
-    return <span className="text-neutral-400 text-sm">In Progress</span>;
+    return <span className="text-gray-500 text-sm font-medium">In Progress</span>;
   };
 
   /* ================= UI ================= */
   return (
-    <div className="flex h-screen bg-gradient-to-b from-amber-900 via-black to-neutral-900 text-neutral-100">
+    <div className="flex min-h-screen bg-gray-50 text-gray-900">
       <InventorySidebar />
 
       <div className="flex-1 overflow-auto">
-        <div className="bg-neutral-800 border-b border-neutral-700 p-4">
-          <h1 className="text-2xl font-bold">Warehouse Orders</h1>
-          <p className="text-sm text-neutral-400">
-            Manual picking & fitting workflow
-          </p>
+        <div className="sticky top-0 z-10 bg-white/80 backdrop-blur border-b border-gray-200 p-6 shadow-sm">
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-2">
+                <Truck size={32} className="text-[#c62d23]" />
+                <span>Warehouse Orders</span>
+              </h1>
+              <p className="text-sm text-gray-600 mt-1">
+                Manual picking & fitting workflow
+              </p>
+            </div>
+          </div>
         </div>
-        <div className="px-6 lg:px-10 py-6 space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+
+        <div className="p-8 space-y-8">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <StatCard
               title="Total Orders"
               value={totalOrders}
-              icon={<Package />}
+              icon={<Package className="text-[#c62d23]" />}
+              clickable={true}
               active={activeFilter === "ALL"}
               onClick={() => setActiveFilter("ALL")}
             />
@@ -524,8 +547,9 @@ Please reduce picks to exactly ${order.quantity}.`,
             <StatCard
               title="Delayed Orders"
               value={delayedOrders}
-              icon={<Clock />}
+              icon={<Clock className="text-[#c62d23]" />}
               danger={delayedOrders > 0}
+              clickable={true}
               active={activeFilter === "DELAYED"}
               onClick={() => setActiveFilter("DELAYED")}
             />
@@ -533,28 +557,65 @@ Please reduce picks to exactly ${order.quantity}.`,
             <StatCard
               title="Ready for Dispatch"
               value={readyForDispatch}
-              icon={<TrendingUp />}
+              icon={<TrendingUp className="text-[#c62d23]" />}
+              clickable={true}
               active={activeFilter === "READY"}
               onClick={() => setActiveFilter("READY")}
             />
           </div>
 
+          {/* FILTER BADGE */}
+          {activeFilter !== "ALL" && (
+            <div className="flex items-center gap-3">
+              <div className={`${activeFilter === "DELAYED" ? "bg-amber-100 border-amber-300" : "bg-green-100 border-green-300"} px-4 py-2 rounded-xl flex items-center gap-2 border`}>
+                <AlertCircle className={activeFilter === "DELAYED" ? "text-amber-700" : "text-green-700"} size={18} />
+                <span className={`text-sm font-medium ${activeFilter === "DELAYED" ? "text-amber-800" : "text-green-800"}`}>
+                  {activeFilter === "DELAYED" ? "Showing only delayed orders" : "Showing only ready for dispatch"}
+                </span>
+              </div>
+              <button
+                onClick={() => setActiveFilter("ALL")}
+                className="text-sm text-gray-600 hover:text-[#c62d23] font-medium"
+              >
+                Clear filter
+              </button>
+            </div>
+          )}
+
+          {/* ALERT */}
+          {delayedOrders > 0 && activeFilter !== "DELAYED" && (
+            <div className="bg-amber-50 border border-amber-200 p-4 flex gap-3 rounded-xl">
+              <AlertCircle className="text-amber-600 flex-shrink-0" size={20} />
+              <div className="flex-1">
+                <span className="text-sm text-amber-800 font-medium">
+                  {delayedOrders} orders are delayed
+                </span>
+                <button
+                  onClick={() => setActiveFilter("DELAYED")}
+                  className="ml-3 text-sm text-amber-700 hover:text-amber-900 font-semibold underline"
+                >
+                  View orders
+                </button>
+              </div>
+            </div>
+          )}
+
           <div className="mb-4">
             <input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search orders..."
-              className="w-full bg-neutral-800 border border-neutral-700 px-4 py-2 rounded-lg outline-none focus:border-amber-600"
+              placeholder="Search orders by ID, client, or chair model..."
+              className="w-full bg-white border border-gray-200 px-4 py-3 rounded-xl outline-none text-gray-900 placeholder-gray-400 focus:border-[#c62d23] focus:ring-2 focus:ring-[#c62d23]/20 transition-all shadow-sm"
             />
           </div>
-          {/* TABS */}
-          <div className="flex gap-6 mb-4 border-b border-neutral-700">
+
+          <div className="flex gap-6 mb-4 bg-white p-2 rounded-xl border border-gray-200 shadow-sm">
             <button
               onClick={() => setActiveTab("FULL")}
-              className={`pb-2 font-medium ${
+              className={`flex-1 py-2.5 rounded-lg font-semibold transition-all ${
                 activeTab === "FULL"
-                  ? "border-b-2 border-amber-500 text-amber-400"
-                  : "text-neutral-400"
+                  ? "bg-[#c62d23] text-white shadow-md"
+                  : "text-gray-600 hover:bg-gray-50"
               }`}
             >
               Full Chair Orders ({fullChairOrders.length})
@@ -562,10 +623,10 @@ Please reduce picks to exactly ${order.quantity}.`,
 
             <button
               onClick={() => setActiveTab("SPARE")}
-              className={`pb-2 font-medium ${
+              className={`flex-1 py-2.5 rounded-lg font-semibold transition-all ${
                 activeTab === "SPARE"
-                  ? "border-b-2 border-amber-500 text-amber-400"
-                  : "text-neutral-400"
+                  ? "bg-[#c62d23] text-white shadow-md"
+                  : "text-gray-600 hover:bg-gray-50"
               }`}
             >
               Spare Part Orders ({sparePartOrders.length})
@@ -581,43 +642,42 @@ Please reduce picks to exactly ${order.quantity}.`,
             inventoryPreview={inventoryPreview}
             handlePartialAccepted={handlePartialAccepted}
             setExpandedOrderId={setExpandedOrderId}
-              setInventoryPreview={setInventoryPreview}
-
+            setInventoryPreview={setInventoryPreview}
             setShowDecisionPanel={setShowDecisionPanel}
+            loading={loading}
+            orders_data={orders}
           />
 
-          {/* PAGINATION */}
           {totalPages > 1 && (
-            <div className="flex justify-end items-center gap-2 mt-4">
+            <div className="flex justify-end items-center gap-3 mt-6">
               <button
                 disabled={currentPage === 1}
                 onClick={() => setCurrentPage((p) => p - 1)}
-                className="px-3 py-1 rounded bg-neutral-700 disabled:opacity-40"
+                className="px-4 py-2 rounded-lg bg-white border border-gray-300 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-gray-50 transition-all shadow-sm font-medium"
               >
-                Prev
+                Previous
               </button>
 
-              <span className="text-sm text-neutral-400">
+              <span className="text-sm text-gray-700 font-medium px-3">
                 Page {currentPage} of {totalPages}
               </span>
 
               <button
                 disabled={currentPage === totalPages}
                 onClick={() => setCurrentPage((p) => p + 1)}
-                className="px-3 py-1 rounded bg-neutral-700 disabled:opacity-40"
+                className="px-4 py-2 rounded-lg bg-white border border-gray-300 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-gray-50 transition-all shadow-sm font-medium"
               >
                 Next
               </button>
             </div>
           )}
-        </div>{" "}
-        {/* closes px wrapper */}
+        </div>
       </div>
     </div>
   );
 }
 
-/* ================= SMALL COMPONENT ================= */
+/* ================= ORDERS TABLE COMPONENT ================= */
 const OrdersTable = ({
   orders,
   renderAction,
@@ -625,206 +685,302 @@ const OrdersTable = ({
   expandedOrderId,
   showDecisionPanel,
   inventoryPreview,
-  setInventoryPreview,   // ✅ MUST BE HERE
+  setInventoryPreview,
   handlePartialAccepted,
   setExpandedOrderId,
   setShowDecisionPanel,
+  loading,
+  orders_data,
 }) => {
 
-  if (!orders.length)
+  if (loading) {
     return (
-      <div className="text-center text-neutral-400 py-10">No orders found</div>
+      <div className="bg-white rounded-2xl overflow-hidden border border-gray-200 shadow-sm p-8 text-center">
+        <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-[#c62d23]"></div>
+        <p className="mt-2 text-gray-500">Loading...</p>
+      </div>
     );
+  }
+
+  if (!orders.length) {
+    return (
+      <div className="text-center text-gray-500 py-16 bg-white rounded-xl border border-gray-200">
+        <Package size={48} className="mx-auto mb-4 text-gray-300" />
+        <p className="text-lg font-medium">No orders found</p>
+      </div>
+    );
+  }
 
   return (
-    <div className="bg-neutral-800 rounded-xl overflow-hidden border border-neutral-700">
-      <table className="w-full">
-        <thead className="bg-neutral-850 border-b border-neutral-700">
-          <tr>
-            {[
-              "Order ID",
-              "Dispatched To",
-              "Chair / Part",
-              "Order Date",
-              "Delivery Date",
-              "Qty",
-              "Status",
-              "Action",
-            ].map((h) => (
-              <th
-                key={h}
-                className="p-4 text-left text-xs text-neutral-400 uppercase"
-              >
-                {h}
-              </th>
-            ))}
-          </tr>
-        </thead>
-
-        <tbody>
-          {orders.map((o) => (
-            <React.Fragment key={`order-row-${o._id}`}>
-              {/* MAIN ROW */}
-              <tr className="border-b border-neutral-700 hover:bg-neutral-850">
-                <td className="p-4 font-medium">{o.orderId}</td>
-                <td className="p-4">{o.dispatchedTo?.name}</td>
-                <td className="p-4">{o.chairModel || "Spare Parts"}</td>
-                <td className="p-4">
-                  {new Date(o.orderDate).toLocaleDateString()}
-                </td>
-                <td className="p-4">
-                  {o.deliveryDate
-                    ? new Date(o.deliveryDate).toLocaleDateString()
-                    : "-"}
-                </td>
-                <td className="p-4">{o.quantity}</td>
-                <td className="p-4">{getStatusBadge(o.progress)}</td>
-                <td className="p-4">{renderAction(o)}</td>
-              </tr>
-
-              {/* 🔥 EXPANDED INVENTORY ROW */}
-          {expandedOrderId === o._id &&
- showDecisionPanel &&
- ["ORDER_PLACED", "PARTIAL"].includes(o.progress) && (
-  <tr>
-    <td colSpan={8} className="p-0">
-      <div className="bg-neutral-900 p-6 border-t border-neutral-700">
-
-        {/* ORDER INFO */}
-        <div className="mb-4 text-sm text-neutral-300">
-          <p><b>Chair:</b> {o.chairModel}</p>
-          <p><b>Required Qty:</b> {o.quantity}</p>
-        </div>
-
-        {/* INVENTORY GRID */}
-        <div className="bg-neutral-800 p-5 rounded mb-4">
-          <p className="text-amber-400 font-semibold mb-4 text-lg">
-            Parts Availability
-          </p>
-
-          {!Array.isArray(inventoryPreview[o._id]) ? (
-            <p className="text-neutral-400">Loading inventory…</p>
-          ) : inventoryPreview[o._id].length === 0 ? (
-            <p className="text-neutral-400">No spare parts available</p>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-              {inventoryPreview[o._id].map((part) => (
-                <div
-                  key={`${o._id}-${part.partName}`}
-                  className="bg-neutral-900 border border-neutral-700 rounded-xl p-5"
+    <div className="bg-white rounded-2xl overflow-hidden border border-gray-200 shadow-sm">
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="bg-gray-50 border-b border-gray-200">
+              {[
+                "Order ID",
+                "Dispatched To",
+                "Chair / Part",
+                "Order Date",
+                "Delivery Date",
+                "Qty",
+                "Status",
+                "Action",
+              ].map((h) => (
+                <th
+                  key={h}
+                  className="p-4 text-left font-semibold text-gray-700"
                 >
-                  <h3 className="font-semibold mb-4 text-amber-400 text-lg">
-                    {part.partName}
-                  </h3>
-
-                  <div className="space-y-3">
-                    {part.locations.map((loc) => (
-                      <div
-                        key={loc.inventoryId}
-                        className="flex items-center justify-between bg-black/40 px-4 py-3 rounded-lg"
-                      >
-                        <div>
-                          <p className="font-medium text-sm">
-                            Location: {loc.location}
-                          </p>
-                          <p className="text-neutral-400 text-xs">
-                            Available: {loc.available}
-                          </p>
-                        </div>
-
-                        <input
-                          type="number"
-                          min="0"
-                          max={loc.available}
-                          value={loc.picked || ""}
-                          className="w-24 bg-neutral-800 border border-neutral-700 px-3 py-1 rounded"
-                          onChange={(e) => {
-                            let qty = Number(e.target.value);
-                            if (qty < 0) qty = 0;
-                            if (qty > loc.available) qty = loc.available;
-
-                            setInventoryPreview(prev => {
-                              const parts = prev[o._id].map(p => {
-                                if (p.partName !== part.partName) return p;
-
-                                let remaining = o.quantity;
-
-                                const locations = p.locations.map(l => {
-                                  if (l.inventoryId === loc.inventoryId) {
-                                    remaining -= qty;
-                                    return { ...l, picked: qty };
-                                  }
-
-                                  const safe = Math.min(l.picked || 0, remaining);
-                                  remaining -= safe;
-                                  return { ...l, picked: safe };
-                                });
-
-                                return { ...p, locations };
-                              });
-
-                              return { ...prev, [o._id]: parts };
-                            });
-                          }}
-                        />
-                      </div>
-                    ))}
-                  </div>
-                </div>
+                  {h}
+                </th>
               ))}
-            </div>
-          )}
-        </div>
+            </tr>
+          </thead>
 
-        {/* ACTIONS */}
-        <div className="flex gap-3">
-          <button
-            onClick={() => handlePartialAccepted(o._id)}
-            className="bg-amber-600 px-4 py-2 rounded text-black"
-          >
-            Partial Accepted
-          </button>
+          <tbody>
+            {orders.map((o, index) => (
+              <React.Fragment key={`order-row-${o._id}`}>
+                <tr className={`border-b border-gray-100 hover:bg-gray-50 transition-colors ${
+                  index % 2 === 0 ? 'bg-white' : 'bg-gray-50'
+                }`}>
+                  <td className="p-4 font-semibold text-gray-900">{o.orderId}</td>
+                  <td className="p-4 text-gray-700">{o.dispatchedTo?.name}</td>
+                  <td className="p-4 font-medium text-gray-900">{o.chairModel || "Spare Parts"}</td>
+                  <td className="p-4 text-gray-700">
+                    {new Date(o.orderDate).toLocaleDateString()}
+                  </td>
+                  <td className="p-4 text-gray-700">
+                    {o.deliveryDate
+                      ? new Date(o.deliveryDate).toLocaleDateString()
+                      : "-"}
+                  </td>
+                  <td className="p-4 font-semibold text-gray-900">{o.quantity}</td>
+                  <td className="p-4">{getStatusBadge(o.progress)}</td>
+                  <td className="p-4">{renderAction(o)}</td>
+                </tr>
 
-          <button
-            onClick={() => {
-              setExpandedOrderId(null);
-              setShowDecisionPanel(false);
-            }}
-            className="bg-neutral-700 px-4 py-2 rounded"
-          >
-            Cancel
-          </button>
-        </div>
+                {expandedOrderId === o._id &&
+                  showDecisionPanel &&
+                  ["ORDER_PLACED", "PARTIAL"].includes(o.progress) && (
+                    <tr>
+                      <td colSpan={8} className="p-0">
+                        <div 
+                          className="bg-gradient-to-br from-gray-50 to-white border-t border-gray-200 overflow-hidden"
+                          style={{
+                            animation: 'slideDown 0.3s ease-out'
+                          }}
+                        >
+                          <style>
+                            {`
+                              @keyframes slideDown {
+                                from {
+                                  opacity: 0;
+                                  max-height: 0;
+                                }
+                                to {
+                                  opacity: 1;
+                                  max-height: 2000px;
+                                }
+                              }
+                              @keyframes fadeIn {
+                                from { opacity: 0; transform: translateY(-10px); }
+                                to { opacity: 1; transform: translateY(0); }
+                              }
+                            `}
+                          </style>
+                          
+                          <div className="p-8">
+                            {/* Header Section */}
+                            <div 
+                              className="mb-6 pb-6 border-b border-gray-200"
+                              style={{ animation: 'fadeIn 0.4s ease-out' }}
+                            >
+                              <div className="flex items-start justify-between">
+                                <div>
+                                  <h3 className="text-2xl font-bold text-gray-900 mb-2">
+                                    Inventory Check
+                                  </h3>
+                                  <div className="flex flex-wrap gap-4 text-sm">
+                                    <div className="flex items-center gap-2">
+                                      <span className="text-gray-500 font-medium">Chair Model:</span>
+                                      <span className="font-semibold text-gray-900">{o.chairModel}</span>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                      <span className="text-gray-500 font-medium">Required Quantity:</span>
+                                      <span className="font-semibold text-[#c62d23] text-lg">{o.quantity}</span>
+                                    </div>
+                                  </div>
+                                </div>
+                                
+                                {o.progress === "PARTIAL" && (
+                                  <div className="flex items-center gap-2 bg-amber-50 border border-amber-200 px-4 py-2 rounded-lg">
+                                    <AlertCircle size={18} className="text-amber-600" />
+                                    <span className="text-sm font-semibold text-amber-800">Partial Order</span>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
 
+                            {/* Inventory Grid */}
+                            <div 
+                              className="mb-6"
+                              style={{ animation: 'fadeIn 0.5s ease-out' }}
+                            >
+                              <h4 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
+                                <Package size={20} className="text-[#c62d23]" />
+                                Parts Availability
+                              </h4>
+
+                              {!Array.isArray(inventoryPreview[o._id]) ? (
+                                <div className="flex items-center justify-center py-12">
+                                  <div className="animate-spin rounded-full h-12 w-12 border-4 border-gray-200 border-t-[#c62d23]"></div>
+                                </div>
+                              ) : inventoryPreview[o._id].length === 0 ? (
+                                <div className="text-center py-12 bg-gray-50 rounded-xl border border-gray-200">
+                                  <Package size={48} className="mx-auto mb-4 text-gray-300" />
+                                  <p className="text-gray-600 font-medium">No spare parts available</p>
+                                </div>
+                              ) : (
+                                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                                  {inventoryPreview[o._id].map((part, idx) => (
+                                    <div
+                                      key={`${o._id}-${part.partName}`}
+                                      className="bg-white border-2 border-gray-200 rounded-xl p-5 hover:border-[#c62d23] transition-all hover:shadow-md"
+                                      style={{ 
+                                        animation: `fadeIn ${0.6 + idx * 0.1}s ease-out` 
+                                      }}
+                                    >
+                                      <div className="flex items-center justify-between mb-4 pb-3 border-b border-gray-200">
+                                        <h5 className="font-bold text-gray-900 text-lg capitalize">
+                                          {part.partName}
+                                        </h5>
+                                        <div className="bg-[#c62d23] text-white text-xs font-bold px-2.5 py-1 rounded-full">
+                                          {part.locations.reduce((sum, l) => sum + (l.picked || 0), 0)} picked
+                                        </div>
+                                      </div>
+
+                                      <div className="space-y-3">
+                                        {part.locations.map((loc) => (
+                                          <div
+                                            key={loc.inventoryId}
+                                            className="bg-gray-50 border border-gray-200 rounded-lg p-3 hover:bg-gray-100 transition-colors"
+                                          >
+                                            <div className="flex items-center justify-between mb-2">
+                                              <div className="flex-1">
+                                                <p className="font-semibold text-sm text-gray-900">
+                                                  {loc.location}
+                                                </p>
+                                                <p className="text-xs text-gray-600 mt-0.5">
+                                                  Available: <span className="font-semibold text-gray-900">{loc.available}</span>
+                                                </p>
+                                              </div>
+
+                                              <input
+                                                type="number"
+                                                min="0"
+                                                max={loc.available}
+                                                value={loc.picked || ""}
+                                                placeholder="0"
+                                                className="w-20 bg-white border-2 border-gray-300 px-3 py-2 rounded-lg text-center font-bold focus:border-[#c62d23] focus:ring-2 focus:ring-[#c62d23]/20 transition-all outline-none"
+                                                onChange={(e) => {
+                                                  let qty = Number(e.target.value);
+                                                  if (qty < 0) qty = 0;
+                                                  if (qty > loc.available) qty = loc.available;
+
+                                                  setInventoryPreview(prev => {
+                                                    const parts = prev[o._id].map(p => {
+                                                      if (p.partName !== part.partName) return p;
+
+                                                      let remaining = o.quantity;
+
+                                                      const locations = p.locations.map(l => {
+                                                        if (l.inventoryId === loc.inventoryId) {
+                                                          remaining -= qty;
+                                                          return { ...l, picked: qty };
+                                                        }
+
+                                                        const safe = Math.min(l.picked || 0, remaining);
+                                                        remaining -= safe;
+                                                        return { ...l, picked: safe };
+                                                      });
+
+                                                      return { ...p, locations };
+                                                    });
+
+                                                    return { ...prev, [o._id]: parts };
+                                                  });
+                                                }}
+                                              />
+                                            </div>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+
+                            {/* Action Buttons */}
+                            <div 
+                              className="flex gap-3 pt-6 border-t border-gray-200"
+                              style={{ animation: 'fadeIn 0.7s ease-out' }}
+                            >
+                              <button
+                                onClick={() => handlePartialAccepted(o._id)}
+                                className="bg-[#c62d23] hover:bg-[#a82419] text-white px-6 py-3 rounded-xl font-semibold transition-all shadow-md hover:shadow-lg flex items-center gap-2"
+                              >
+                                <CheckCircle size={18} />
+                                Partial Accepted
+                              </button>
+
+                              <button
+                                onClick={() => {
+                                  setExpandedOrderId(null);
+                                  setShowDecisionPanel(false);
+                                }}
+                                className="bg-white border-2 border-gray-300 hover:border-gray-400 text-gray-700 px-6 py-3 rounded-xl font-semibold transition-all hover:bg-gray-50"
+                              >
+                                Cancel
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      </td>
+                    </tr>
+                  )}
+              </React.Fragment>
+            ))}
+          </tbody>
+        </table>
       </div>
-    </td>
-  </tr>
-)}
-
-            </React.Fragment>
-          ))}
-        </tbody>
-      </table>
     </div>
   );
 };
 
-const StatCard = ({ title, value, icon, danger, active, onClick }) => (
+/* ================= STAT CARD COMPONENT ================= */
+const StatCard = ({ title, value, icon, danger, clickable, onClick, active }) => (
   <div
-    onClick={onClick}
-    className={`p-5 rounded-xl border cursor-pointer transition
-      ${active ? "ring-2 ring-amber-500" : ""}
-      ${
-        danger
-          ? "bg-amber-950/40 border-amber-800"
-          : "bg-neutral-800 border-neutral-700"
-      }
-    `}
+    onClick={clickable ? onClick : undefined}
+    className={`bg-white border rounded-2xl p-6 transition-all duration-200 shadow-sm hover:shadow-md flex flex-col justify-between h-full ${
+      danger ? 'border-amber-300 bg-amber-50' : 'border-gray-200'
+    } ${clickable ? 'cursor-pointer hover:bg-gray-50 hover:border-[#c62d23]' : ''} ${
+      active ? 'ring-2 ring-[#c62d23]' : ''
+    }`}
+    style={{
+      borderLeft: '4px solid #c62d23'
+    }}
   >
-    <div className="flex items-center justify-between mb-3">
-      <p className="text-sm text-neutral-400">{title}</p>
-      <span className="text-neutral-400">{icon}</span>
+    <div className="flex justify-between items-start mb-4">
+      <p className="text-sm text-gray-600 font-medium">{title}</p>
+      {React.cloneElement(icon, { size: 24 })}
     </div>
-    <p className="text-3xl font-bold">{value}</p>
+    <p className="text-3xl font-bold text-gray-900 mb-1">{value}</p>
+    {clickable && (
+      <div className="mt-2 text-xs text-gray-500 flex items-center gap-1">
+        <span>{active ? 'Click to show all' : 'Click to view details'}</span>
+        <span className="text-[#c62d23]">→</span>
+      </div>
+    )}
   </div>
 );

@@ -11,6 +11,8 @@ import {
   Building2,
   Search,
   Filter,
+  X,
+  Package,
 } from "lucide-react";
 import axios from "axios";
 import InventorySidebar from "./sidebar";
@@ -34,14 +36,13 @@ export default function InventoryPage() {
   });
 
   const VENDORS = [
-  "Ramesh",
-  "Suresh",
-  "Mahesh",
-  "Akash",
-  "Vikram",
-  "Amit",
-];
-
+    "Ramesh",
+    "Suresh",
+    "Mahesh",
+    "Akash",
+    "Vikram",
+    "Amit",
+  ];
 
   const API = process.env.NEXT_PUBLIC_API_URL;
   const token =
@@ -50,28 +51,27 @@ export default function InventoryPage() {
   const headers = token ? { Authorization: `Bearer ${token}` } : {};
 
   /* ================= FETCH ================= */
- const fetchInventory = async () => {
-  try {
-    const res = await axios.get(`${API}/inventory`, { headers });
+  const fetchInventory = async () => {
+    try {
+      const res = await axios.get(`${API}/inventory`, { headers });
 
-    const data = res.data.inventory || [];
+      const data = res.data.inventory || [];
 
-    const safeData = data.map(i => ({
-      ...i,
-      quantity: Number(i.quantity || 0),
-    }));
+      const safeData = data.map(i => ({
+        ...i,
+        quantity: Number(i.quantity || 0),
+      }));
 
-    // ✅ ONLY FULL CHAIRS
-    const onlyFullChairs = safeData.filter(i => i.type === "FULL");
+      // ✅ ONLY FULL CHAIRS
+      const onlyFullChairs = safeData.filter(i => i.type === "FULL");
 
-    setInventory(onlyFullChairs);
-  } catch (err) {
-    console.error("Fetch failed", err);
-  } finally {
-    setLoading(false);
-  }
-};
-
+      setInventory(onlyFullChairs);
+    } catch (err) {
+      console.error("Fetch failed", err);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
     fetchInventory();
@@ -85,16 +85,14 @@ export default function InventoryPage() {
       }
 
       const payload = {
-  chairType: form.chairType,
-  vendor: form.vendor,
-  quantity: Number(form.quantity),
-  color: "Default",
-  minQuantity: 50,
-  location: "WAREHOUSE", // 🔥 REQUIRED
-  type: "FULL",
-};
-
-
+        chairType: form.chairType,
+        vendor: form.vendor,
+        quantity: Number(form.quantity),
+        color: "Default",
+        minQuantity: 50,
+        location: "WAREHOUSE",
+        type: "FULL",
+      };
 
       if (editId) {
         await axios.patch(`${API}/inventory/update/${editId}`, payload, {
@@ -134,25 +132,23 @@ export default function InventoryPage() {
       else if (qty < 100) status = "Low Stock";
 
       return {
-  id: item._id,
-  name: item.chairType || "",
-  vendor: item.vendor || null, // keep the OBJECT
-  quantity: qty,
-  status,
-};
-
+        id: item._id,
+        name: item.chairType || "",
+        vendor: item.vendor || null,
+        quantity: qty,
+        status,
+      };
     });
   }, [inventory]);
 
   /* ===== FILTER OPTIONS ===== */
   const vendors = useMemo(() => {
-  const names = inventoryData
-    .map((i) => i.vendor?.name)
-    .filter(Boolean);
+    const names = inventoryData
+      .map((i) => i.vendor?.name)
+      .filter(Boolean);
 
-  return ["All", ...new Set(names)];
-}, [inventoryData]);
-
+    return ["All", ...new Set(names)];
+  }, [inventoryData]);
 
   const statuses = ["All", "Healthy", "Low Stock", "Critical"];
 
@@ -186,231 +182,279 @@ export default function InventoryPage() {
     [inventoryData]
   );
 
+  const closeModal = () => {
+    setShowForm(false);
+    setEditId(null);
+    setForm({ chairType: "", vendor: "", quantity: "" });
+  };
+
   /* ================= UI ================= */
   return (
-    <div className="flex h-screen bg-gradient-to-b from-amber-900 via-black to-neutral-900 text-neutral-100">
+    <div className="flex min-h-screen bg-gray-50 text-gray-900">
       <InventorySidebar />
 
       <div className="flex-1 overflow-auto">
         {/* HEADER */}
-        <div className="bg-neutral-800 border-b border-neutral-700 p-4 flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold">Inventory Management</h1>
-            <p className="text-sm text-neutral-400">
-              Track stock, vendors and availability
-            </p>
-          </div>
+        <div className="sticky top-0 z-10 bg-white/80 backdrop-blur border-b border-gray-200 p-6 shadow-sm">
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-2">
+                <Package size={32} className="text-[#c62d23]" />
+                <span>Inventory Management</span>
+              </h1>
+              <p className="text-sm text-gray-600 mt-1">
+                Track stock, vendors and availability
+              </p>
+            </div>
 
-          <button
-            onClick={() => setShowForm(true)}
-            className="bg-amber-600 hover:bg-amber-700 px-4 py-2 rounded-lg flex items-center gap-2 shadow"
-          >
-            <Plus size={16} /> Add Inventory
-          </button>
+            <button
+              onClick={() => setShowForm(true)}
+              className="bg-[#c62d23] hover:bg-[#a82419] text-white px-5 py-3 rounded-xl flex items-center gap-2 shadow-lg shadow-[#c62d23]/20 font-medium transition-all"
+            >
+              <Plus size={18} /> Add Inventory
+            </button>
+          </div>
         </div>
 
-        <div className="p-6">
+        <div className="p-8 space-y-8">
           {/* ===== TOP CARDS ===== */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-            <StatCard title="Total Stock" value={totalStock} icon={<Warehouse />} />
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <StatCard 
+              title="Total Stock" 
+              value={totalStock} 
+              icon={<Warehouse className="text-[#c62d23]" />} 
+            />
             <StatCard
               title="Total Products"
               value={totalProducts}
-              icon={<Boxes />}
+              icon={<Boxes className="text-[#c62d23]" />}
             />
             <StatCard
               title="Low / Critical"
               value={lowStockCount}
               danger
-              icon={<TrendingDown />}
+              icon={<TrendingDown className="text-[#c62d23]" />}
             />
           </div>
 
           {/* ===== FILTER BAR ===== */}
-          <div className="bg-neutral-800 border border-neutral-700 rounded-xl p-4 mb-6 flex flex-col md:flex-row gap-4">
-            {/* Search */}
-            <div className="flex items-center gap-2 bg-neutral-900 px-3 py-2 rounded-lg flex-1">
-              <Search size={16} className="text-neutral-400" />
-              <input
-                placeholder="Search product..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="bg-transparent outline-none text-sm w-full"
-              />
-            </div>
+          <div className="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm">
+            <div className="flex flex-col md:flex-row gap-4">
+              {/* Search */}
+              <div className="flex items-center gap-3 bg-gray-50 px-4 py-3 rounded-xl border border-gray-200 flex-1">
+                <Search size={18} className="text-gray-400" />
+                <input
+                  placeholder="Search product..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="bg-transparent outline-none text-sm w-full text-gray-900 placeholder-gray-400"
+                />
+              </div>
 
-            {/* Vendor */}
-            <div className="flex items-center gap-2 bg-neutral-900 px-3 py-2 rounded-lg">
-              <Building2 size={16} className="text-neutral-400" />
-              <select
-                value={filterVendor}
-                onChange={(e) => setFilterVendor(e.target.value)}
-                className="bg-transparent outline-none text-sm"
-              >
-                {vendors.map((v) => (
-                  <option key={v} value={v} className="bg-neutral-900">
-                    {v}
-                  </option>
-                ))}
-              </select>
-            </div>
+              {/* Vendor */}
+              <div className="flex items-center gap-3 bg-gray-50 px-4 py-3 rounded-xl border border-gray-200">
+                <Building2 size={18} className="text-gray-400" />
+                <select
+                  value={filterVendor}
+                  onChange={(e) => setFilterVendor(e.target.value)}
+                  className="bg-transparent outline-none text-sm text-gray-900 font-medium cursor-pointer"
+                >
+                  {vendors.map((v) => (
+                    <option key={v} value={v} className="bg-white">
+                      {v}
+                    </option>
+                  ))}
+                </select>
+              </div>
 
-            {/* Status */}
-            <div className="flex items-center gap-2 bg-neutral-900 px-3 py-2 rounded-lg">
-              <Filter size={16} className="text-neutral-400" />
-              <select
-                value={filterStatus}
-                onChange={(e) => setFilterStatus(e.target.value)}
-                className="bg-transparent outline-none text-sm"
-              >
-                {statuses.map((s) => (
-                  <option key={s} value={s} className="bg-neutral-900">
-                    {s}
-                  </option>
-                ))}
-              </select>
+              {/* Status */}
+              <div className="flex items-center gap-3 bg-gray-50 px-4 py-3 rounded-xl border border-gray-200">
+                <Filter size={18} className="text-gray-400" />
+                <select
+                  value={filterStatus}
+                  onChange={(e) => setFilterStatus(e.target.value)}
+                  className="bg-transparent outline-none text-sm text-gray-900 font-medium cursor-pointer"
+                >
+                  {statuses.map((s) => (
+                    <option key={s} value={s} className="bg-white">
+                      {s}
+                    </option>
+                  ))}
+                </select>
+              </div>
             </div>
           </div>
 
           {/* ALERT */}
           {lowStockCount > 0 && (
-            <div className="bg-amber-950/60 border border-amber-800 p-4 mb-5 flex gap-3 rounded-lg">
-              <AlertCircle className="text-amber-400" />
-              <span className="text-sm">
+            <div className="bg-amber-50 border border-amber-200 p-4 flex gap-3 rounded-xl">
+              <AlertCircle className="text-amber-600 flex-shrink-0" size={20} />
+              <span className="text-sm text-amber-800 font-medium">
                 {lowStockCount} items need immediate restocking
               </span>
             </div>
           )}
 
           {/* TABLE */}
-          <div className="bg-neutral-800 rounded-xl overflow-hidden border border-neutral-700">
+          <div className="bg-white rounded-2xl overflow-hidden border border-gray-200 shadow-sm">
             {loading ? (
-              <div className="p-6 text-center">Loading...</div>
+              <div className="p-8 text-center">
+                <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-[#c62d23]"></div>
+                <p className="mt-2 text-gray-500">Loading...</p>
+              </div>
             ) : (
-              <table className="w-full">
-                <thead className="bg-neutral-850 border-b border-neutral-700">
-                  <tr>
-                    {["Product", "Vendor", "Qty", "Status", "Actions"].map((h) => (
-                      <th
-                        key={h}
-                        className="p-4 text-left text-xs text-neutral-400 uppercase tracking-wide"
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="bg-gray-50 border-b border-gray-200">
+                      {["Product", "Vendor", "Quantity", "Status", "Actions"].map((h) => (
+                        <th
+                          key={h}
+                          className="p-4 text-left font-semibold text-gray-700"
+                        >
+                          {h}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+
+                  <tbody>
+                    {filteredData.map((i, index) => (
+                      <tr
+                        key={i.id}
+                        className={`border-b border-gray-100 hover:bg-gray-50 transition-colors ${
+                          index % 2 === 0 ? 'bg-white' : 'bg-gray-50'
+                        }`}
                       >
-                        {h}
-                      </th>
+                        <td className="p-4 font-medium text-gray-900">{i.name}</td>
+                        <td className="p-4">
+                          <div className="flex items-center gap-2 text-gray-700">
+                            <Building2 size={16} className="text-gray-400" />
+                            {i.vendor?.name || "—"}
+                          </div>
+                        </td>
+                        <td className="p-4 font-semibold text-gray-900">{i.quantity}</td>
+                        <td className="p-4">
+                          <StatusBadge status={i.status} />
+                        </td>
+                        <td className="p-4">
+                          <div className="flex gap-2">
+                            <button
+                              onClick={() => {
+                                setEditId(i.id);
+                                setForm({
+                                  chairType: i.name,
+                                  vendor: i.vendor?.name,
+                                  quantity: i.quantity,
+                                });
+                                setShowForm(true);
+                              }}
+                              className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                              title="Edit"
+                            >
+                              <Pencil size={16} />
+                            </button>
+
+                            <button
+                              onClick={() => deleteInventory(i.id)}
+                              className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                              title="Delete"
+                            >
+                              <Trash2 size={16} />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
                     ))}
-                  </tr>
-                </thead>
 
-                <tbody>
-                  {filteredData.map((i) => (
-                    <tr
-                      key={i.id}
-                      className="border-b border-neutral-700 hover:bg-neutral-850 transition"
-                    >
-                      <td className="p-4 font-medium">{i.name}</td>
-                      <td className="p-4 flex items-center gap-2 text-sm">
-                        <Building2 size={14} className="text-neutral-400" />
-                        {i.vendor?.name || "-"}
-                      </td>
-                      <td className="p-4">{i.quantity}</td>
-                      <td className="p-4">
-                        <StatusBadge status={i.status} />
-                      </td>
-                      <td className="p-4 flex gap-3">
-                        <button
-                          onClick={() => {
-                            setEditId(i.id);
-                            setForm({
-                              chairType: i.name,
-                              vendor: i.vendor?.name,
-                              quantity: i.quantity,
-                            });
-                            setShowForm(true);
-                          }}
-                          className="text-amber-400 hover:text-amber-300"
+                    {filteredData.length === 0 && (
+                      <tr>
+                        <td
+                          colSpan={5}
+                          className="p-8 text-center text-gray-500"
                         >
-                          <Pencil size={16} />
-                        </button>
-
-                        <button
-                          onClick={() => deleteInventory(i.id)}
-                          className="text-red-400 hover:text-red-300"
-                        >
-                          <Trash2 size={16} />
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-
-                  {filteredData.length === 0 && (
-                    <tr>
-                      <td
-                        colSpan={5}
-                        className="p-6 text-center text-neutral-400"
-                      >
-                        No inventory found
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
+                          No inventory found
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
             )}
           </div>
         </div>
 
         {/* MODAL */}
         {showForm && (
-          <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
-            <div className="bg-neutral-900 p-6 rounded-xl w-[380px] border border-neutral-700">
-              <h2 className="text-lg font-semibold mb-4">
-                {editId ? "Update Inventory" : "Add Inventory"}
-              </h2>
-
-              <Input
-                label="Chair Type"
-                value={form.chairType}
-                onChange={(v) => setForm({ ...form, chairType: v })}
-              />
-              <div className="mb-3">
-  <label className="text-xs text-neutral-400">Vendor</label>
-
-  <select
-    value={form.vendor}
-    onChange={(e) => setForm({ ...form, vendor: e.target.value })}
-    className="w-full mt-1 p-2 bg-neutral-800 rounded outline-none text-white"
-  >
-    <option value="">Select Vendor</option>
-    {VENDORS.map((v) => (
-      <option key={v} value={v} className="bg-neutral-900">
-        {v}
-      </option>
-    ))}
-  </select>
-</div>
-
-              <Input
-                label="Quantity"
-                type="number"
-                value={form.quantity}
-                onChange={(v) => setForm({ ...form, quantity: v })}
-              />
-
-              <div className="flex justify-end gap-2 mt-4">
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-2xl w-full max-w-md border border-gray-200 shadow-2xl">
+              {/* Modal Header */}
+              <div className="flex items-center justify-between p-6 border-b border-gray-200">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-[#c62d23]/10 rounded-xl flex items-center justify-center">
+                    <Package className="text-[#c62d23]" size={20} />
+                  </div>
+                  <h2 className="text-xl font-bold text-gray-900">
+                    {editId ? "Update Inventory" : "Add Inventory"}
+                  </h2>
+                </div>
                 <button
-                  onClick={() => {
-                    setShowForm(false);
-                    setEditId(null);
-                  }}
-                  className="px-4 py-2 text-neutral-300 hover:text-white"
+                  onClick={closeModal}
+                  className="text-gray-400 hover:text-gray-600 hover:bg-gray-100 p-2 rounded-lg transition-colors"
+                >
+                  <X size={20} />
+                </button>
+              </div>
+
+              {/* Modal Body */}
+              <div className="p-6 space-y-4">
+                <Input
+                  label="Chair Type"
+                  value={form.chairType}
+                  onChange={(v) => setForm({ ...form, chairType: v })}
+                  placeholder="Enter chair type"
+                />
+                
+                <div>
+                  <label className="block text-sm font-semibold text-gray-900 mb-2">
+                    Vendor
+                  </label>
+                  <select
+                    value={form.vendor}
+                    onChange={(e) => setForm({ ...form, vendor: e.target.value })}
+                    className="w-full p-3 bg-white border border-gray-200 rounded-xl outline-none text-gray-900 focus:border-[#c62d23] focus:ring-2 focus:ring-[#c62d23]/20 transition-all"
+                  >
+                    <option value="">Select Vendor</option>
+                    {VENDORS.map((v) => (
+                      <option key={v} value={v} className="bg-white">
+                        {v}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <Input
+                  label="Quantity"
+                  type="number"
+                  value={form.quantity}
+                  onChange={(v) => setForm({ ...form, quantity: v })}
+                  placeholder="Enter quantity"
+                />
+              </div>
+
+              {/* Modal Footer */}
+              <div className="p-6 border-t border-gray-200 flex gap-3">
+                <button
+                  onClick={closeModal}
+                  className="flex-1 py-3 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium transition-colors"
                 >
                   Cancel
                 </button>
-
                 <button
                   onClick={submitInventory}
-                  className="bg-amber-600 px-4 py-2 rounded hover:bg-amber-700"
+                  className="flex-1 py-3 rounded-xl bg-[#c62d23] hover:bg-[#a82419] text-white font-medium transition-colors shadow-sm"
                 >
-                  Save
+                  {editId ? "Update" : "Save"}
                 </button>
               </div>
             </div>
@@ -429,42 +473,46 @@ const StatCard = ({ title, value, icon, danger }) => {
 
   return (
     <div
-      className={`p-5 rounded-xl border transition hover:shadow-md ${
-        danger
-          ? "bg-red-950/40 border-red-800"
-          : "bg-neutral-800 border-neutral-700"
+      className={`bg-white border rounded-2xl p-6 transition-all duration-200 shadow-sm hover:shadow-md flex flex-col justify-between h-full ${
+        danger ? 'border-amber-300 bg-amber-50' : 'border-gray-200'
       }`}
+      style={{
+        borderLeft: '4px solid #c62d23'
+      }}
     >
-      <div className="flex items-center justify-between mb-3">
-        <p className="text-sm text-neutral-400">{title}</p>
-        <span className="text-neutral-400">{icon}</span>
+      <div className="flex justify-between items-start mb-4">
+        <p className="text-sm text-gray-600 font-medium">{title}</p>
+        {React.cloneElement(icon, { size: 24 })}
       </div>
-      <p className="text-3xl font-bold">{safeValue}</p>
+      <p className="text-3xl font-bold text-gray-900">{safeValue}</p>
     </div>
   );
 };
 
 const StatusBadge = ({ status }) => {
   const map = {
-    Healthy: "bg-green-900 text-green-300",
-    "Low Stock": "bg-amber-900 text-amber-300",
-    Critical: "bg-red-900 text-red-300",
+    Healthy: "bg-green-50 text-green-700 border-green-200",
+    "Low Stock": "bg-amber-50 text-amber-700 border-amber-200",
+    Critical: "bg-red-50 text-red-700 border-red-200",
   };
   return (
-    <span className={`px-3 py-1 rounded-full text-xs font-medium ${map[status]}`}>
+    <span className={`px-3 py-1 rounded-full text-xs font-medium border ${map[status]}`}>
       {status}
     </span>
   );
 };
 
-const Input = ({ label, value, onChange, type = "text" }) => (
-  <div className="mb-3">
-    <label className="text-xs text-neutral-400">{label}</label>
+const Input = ({ label, value, onChange, type = "text", placeholder = "" }) => (
+  <div>
+    <label className="block text-sm font-semibold text-gray-900 mb-2">
+      {label}
+    </label>
     <input
       type={type}
       value={value}
       onChange={(e) => onChange(e.target.value)}
-      className="w-full mt-1 p-2 bg-neutral-800 rounded outline-none"
+      placeholder={placeholder}
+      className="w-full p-3 bg-white border border-gray-200 rounded-xl outline-none text-gray-900 placeholder-gray-400 focus:border-[#c62d23] focus:ring-2 focus:ring-[#c62d23]/20 transition-all"
     />
   </div>
 );

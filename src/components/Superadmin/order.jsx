@@ -18,6 +18,7 @@ import { useRouter } from "next/navigation";
 
 export default function Orders() {
   const [salesUsers, setSalesUsers] = useState([]);
+  const [spareParts, setSpareParts] = useState([]);
 
   const [vendors, setVendors] = useState([]);
   const [vendorSearch, setVendorSearch] = useState("");
@@ -44,11 +45,13 @@ export default function Orders() {
   const initialFormData = {
     dispatchedTo: "",
     chairModel: "",
+    orderType: "FULL",
     orderDate: "",
     deliveryDate: "",
     quantity: "",
     salesPerson: "",
   };
+
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   const filteredOrders = useMemo(() => {
@@ -177,6 +180,7 @@ export default function Orders() {
     setFormData({
       dispatchedTo: order.dispatchedTo?._id || order.dispatchedTo,
       chairModel: order.chairModel,
+      orderType: order.orderType || "FULL",
       orderDate: order.orderDate?.split("T")[0],
       deliveryDate: order.deliveryDate?.split("T")[0] || "",
       quantity: order.quantity,
@@ -194,16 +198,27 @@ export default function Orders() {
 
   /* ================= CREATE / UPDATE ================= */
   const handleCreateOrder = async (e) => {
+    if (!formData.dispatchedTo) {
+      alert("Please select or create a vendor");
+      return;
+    }
+
+    if (user?.role === "admin" && !formData.salesPerson) {
+      alert("Please assign a sales person");
+      return;
+    }
+
     e.preventDefault();
 
     try {
       const payload = {
         dispatchedTo: formData.dispatchedTo,
         chairModel: formData.chairModel,
+        orderType: formData.orderType,
         orderDate: formData.orderDate || new Date().toISOString().split("T")[0],
         deliveryDate: formData.deliveryDate,
         quantity: Number(formData.quantity),
-        salesPerson: formData.salesPerson, // 👈 REQUIRED FOR ADMIN
+        salesPerson: formData.salesPerson,
         progress: "ORDER_PLACED",
       };
 
@@ -218,7 +233,9 @@ export default function Orders() {
       setShowForm(false);
       setEditingOrderId(null);
       setFormData(initialFormData);
-      fetchOrders();
+
+      await fetchOrders(); // refresh orders
+      await fetchVendors(); // 🔥 refresh vendors automatically
     } catch (err) {
       console.error("Save failed", err?.response?.data || err);
       alert(err?.response?.data?.message || "Failed to save order");
@@ -245,7 +262,7 @@ export default function Orders() {
       await axios.patch(
         `${API}/orders/${orderId}/progress`,
         { progress: "DISPATCHED" },
-        { headers }
+        { headers },
       );
       fetchOrders();
     } catch (err) {
@@ -259,15 +276,15 @@ export default function Orders() {
   const delayed = filteredOrders.filter(isDelayed).length;
 
   const readyToDispatch = filteredOrders.filter(
-    (o) => o.progress === "READY_FOR_DISPATCH"
+    (o) => o.progress === "READY_FOR_DISPATCH",
   ).length;
 
   const completed = filteredOrders.filter(
-    (o) => o.progress === "DISPATCHED"
+    (o) => o.progress === "DISPATCHED",
   ).length;
 
   const inProgress = filteredOrders.filter(
-    (o) => !["DISPATCHED", "PARTIAL"].includes(o.progress) && !isDelayed(o)
+    (o) => !["DISPATCHED", "PARTIAL"].includes(o.progress) && !isDelayed(o),
   ).length;
 
   /* ================= ORDER STEPS ================= */
@@ -565,7 +582,7 @@ export default function Orders() {
                             <td colSpan={9} className="p-6">
                               {(() => {
                                 const currentIndex = ORDER_STEPS.findIndex(
-                                  (s) => s.key === o.progress
+                                  (s) => s.key === o.progress,
                                 );
 
                                 const safeIndex =
@@ -637,7 +654,7 @@ export default function Orders() {
                                       <span className="text-amber-400 font-medium">
                                         {
                                           ORDER_STEPS.find(
-                                            (s) => s.key === o.progress
+                                            (s) => s.key === o.progress,
                                           )?.label
                                         }
                                       </span>
@@ -660,12 +677,14 @@ export default function Orders() {
       {/* MODAL */}
       {showForm && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-neutral-900 p-8 rounded-2xl w-full max-w-[520px] border-2 border-amber-600 shadow-2xl">
-            <h2 className="text-2xl font-bold mb-6 text-amber-400">
+          <div
+            className="bg-neutral-900 rounded-2xl w-full max-w-[520px] border-2 border-amber-600 shadow-2xl
+                max-h-[85vh] flex flex-col"
+          >
+            <h2 className="text-2xl font-bold m-5 ml-7 mt-6 text-amber-400">
               {editingOrderId ? "Update Order" : "Create Order"}
             </h2>
-
-            <div className="space-y-4">
+            <div className="space-y-4 overflow-y-auto px-8 py-6 flex-1">
               <div>
                 <label className="text-base text-neutral-300 font-semibold block mb-2">
                   Dispatched To
@@ -680,7 +699,7 @@ export default function Orders() {
                   }
                   onChange={(e) => {
                     setVendorSearch(e.target.value);
-                    setFormData({ ...formData, dispatchedTo: e.target.value });
+                    // ❌ DO NOT touch dispatchedTo here
                   }}
                   className="w-full px-4 py-3 bg-neutral-800 rounded-lg outline-none border-2 border-neutral-600 focus:border-amber-600"
                 />
@@ -691,7 +710,7 @@ export default function Orders() {
                       .filter((v) =>
                         v.name
                           .toLowerCase()
-                          .includes(vendorSearch.toLowerCase())
+                          .includes(vendorSearch.toLowerCase()),
                       )
                       .map((v) => (
                         <div
@@ -708,13 +727,17 @@ export default function Orders() {
                       ))}
 
                     {vendorSearch &&
-                      !vendors.some((v) => v.name === vendorSearch) && (
+                      !vendors.some(
+                        (v) =>
+                          v.name.toLowerCase() === vendorSearch.toLowerCase(),
+                      ) && (
                         <div
                           onClick={() => {
                             setFormData({
                               ...formData,
-                              dispatchedTo: vendorSearch,
+                              dispatchedTo: vendorSearch.trim(),
                             });
+                            setVendorSearch(vendorSearch.trim());
                             setShowVendorDropdown(false);
                           }}
                           className="px-4 py-2 bg-neutral-900 hover:bg-emerald-700 cursor-pointer text-emerald-400"
@@ -748,60 +771,76 @@ export default function Orders() {
                   </select>
                 </div>
               )}
-
               <div>
                 <label className="text-sm text-neutral-300 block mb-1">
-                  Chair Model
+                  Order Type
                 </label>
 
-                <input
-                  placeholder="Search or type chair model"
-                  value={chairSearch}
-                  onFocus={() => setShowChairDropdown(true)}
-                  onBlur={() =>
-                    setTimeout(() => setShowChairDropdown(false), 200)
+                <select
+                  value={formData.orderType}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      orderType: e.target.value,
+                      chairModel: "",
+                    })
                   }
-                  onChange={(e) => {
-                    setChairSearch(e.target.value);
-                    setFormData({ ...formData, chairModel: e.target.value });
-                  }}
                   className="w-full px-4 py-2 bg-neutral-800 border border-neutral-700 rounded-lg"
-                />
-
-                {showChairDropdown && (
-                  <div className="bg-neutral-800 border border-neutral-700 mt-1 rounded-lg max-h-48 overflow-auto">
-                    {chairModels
-                      .filter((m) =>
-                        m.toLowerCase().includes(chairSearch.toLowerCase())
-                      )
-                      .map((m) => (
-                        <div
-                          key={m}
-                          onClick={() => {
-                            setFormData({ ...formData, chairModel: m });
-                            setChairSearch(m);
-                            setShowChairDropdown(false);
-                          }}
-                          className="px-4 py-2 hover:bg-amber-600 cursor-pointer"
-                        >
-                          {m}
-                        </div>
-                      ))}
-
-                    {chairSearch && !chairModels.includes(chairSearch) && (
-                      <div
-                        onClick={() => {
-                          setFormData({ ...formData, chairModel: chairSearch });
-                          setShowChairDropdown(false);
-                        }}
-                        className="px-4 py-2 bg-neutral-900 hover:bg-emerald-700 cursor-pointer text-emerald-400"
-                      >
-                        ➕ Add "{chairSearch}" as new chair model
-                      </div>
-                    )}
-                  </div>
-                )}
+                >
+                  <option value="FULL">Full Chair</option>
+                  <option value="SPARE">Spare Part</option>
+                </select>
               </div>
+
+              {/* FULL CHAIR */}
+              {formData.orderType === "FULL" && (
+                <div>
+                  <label className="text-sm text-neutral-300 block mb-1">
+                    Chair Model
+                  </label>
+
+                  <select
+                    value={formData.chairModel}
+                    onChange={(e) =>
+                      setFormData({ ...formData, chairModel: e.target.value })
+                    }
+                    className="w-full px-4 py-2 bg-neutral-800 border border-neutral-700 rounded-lg"
+                    required
+                  >
+                    <option value="">Select Chair Model</option>
+                    {chairModels.map((m) => (
+                      <option key={m} value={m}>
+                        {m}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {/* SPARE PART */}
+              {formData.orderType === "SPARE" && (
+                <div>
+                  <label className="text-sm text-neutral-300 block mb-1">
+                    Spare Part
+                  </label>
+
+                  <select
+                    value={formData.chairModel}
+                    onChange={(e) =>
+                      setFormData({ ...formData, chairModel: e.target.value })
+                    }
+                    className="w-full px-4 py-2 bg-neutral-800 border border-neutral-700 rounded-lg"
+                    required
+                  >
+                    <option value="">Select Spare Part</option>
+                    {spareParts.map((p) => (
+                      <option key={p} value={p}>
+                        {p}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
 
               <div>
                 <label className="text-base text-neutral-300 font-semibold block mb-2">
@@ -832,8 +871,7 @@ export default function Orders() {
                 onChange={handleFormChange}
               />
             </div>
-
-            <div className="flex justify-end gap-3 mt-8">
+            <div className="flex justify-end gap-3 px-8 py-4 border-t border-neutral-700 bg-neutral-900">
               <button
                 type="button"
                 onClick={() => {

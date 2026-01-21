@@ -9,6 +9,8 @@ import {
   MapPin,
   ArrowRightLeft,
   TrendingUp,
+  X,
+  AlertCircle,
 } from "lucide-react";
 import InventorySidebar from "./sidebar";
 
@@ -20,6 +22,7 @@ export default function StockMovementsPage() {
   const [search, setSearch] = useState("");
   const [fromFilter, setFromFilter] = useState("All");
   const [toFilter, setToFilter] = useState("All");
+  const [activeStatFilter, setActiveStatFilter] = useState("ALL");
 
   const API = process.env.NEXT_PUBLIC_API_URL;
   const token =
@@ -67,27 +70,38 @@ export default function StockMovementsPage() {
 
   /* ================= FILTER ================= */
   const filtered = useMemo(() => {
-    return normalized.filter((m) => {
-      const q = search.toLowerCase();
+    const q = search.toLowerCase();
 
+    let data = normalized.filter((m) => {
       const matchSearch =
-        m.part.toLowerCase().includes(q) ||
-        m.from.toLowerCase().includes(q) ||
-        m.to.toLowerCase().includes(q) ||
-        m.user.toLowerCase().includes(q);
+        (m.part ?? "").toLowerCase().includes(q) ||
+        (m.from ?? "").toLowerCase().includes(q) ||
+        (m.to ?? "").toLowerCase().includes(q) ||
+        (m.user ?? "").toLowerCase().includes(q);
 
       const matchFrom = fromFilter === "All" || m.from === fromFilter;
       const matchTo = toFilter === "All" || m.to === toFilter;
 
       return matchSearch && matchFrom && matchTo;
     });
-  }, [normalized, search, fromFilter, toFilter]);
+
+    // Apply stat filter
+    if (activeStatFilter === "TODAY") {
+      data = data.filter((m) => {
+        const d = new Date(m.time);
+        const today = new Date();
+        return d.toDateString() === today.toDateString();
+      });
+    }
+
+    return data;
+  }, [normalized, search, fromFilter, toFilter, activeStatFilter]);
 
   /* ================= STATS ================= */
-  const totalMovements = filtered.length;
-  const totalQty = filtered.reduce((s, m) => s + m.qty, 0);
+  const totalMovements = normalized.length;
+  const totalQty = normalized.reduce((s, m) => s + m.qty, 0);
 
-  const todayCount = filtered.filter((m) => {
+  const todayCount = normalized.filter((m) => {
     const d = new Date(m.time);
     const today = new Date();
     return d.toDateString() === today.toDateString();
@@ -95,39 +109,83 @@ export default function StockMovementsPage() {
 
   /* ================= UI ================= */
   return (
-    <div className="flex h-screen bg-gradient-to-b from-amber-900 via-black to-neutral-900 text-neutral-100">
+    <div className="flex min-h-screen bg-gray-50 text-gray-900">
       <InventorySidebar />
 
       <div className="flex-1 overflow-auto">
         {/* HEADER */}
-        <div className="bg-neutral-800 border-b border-neutral-700 p-4">
-          <h1 className="text-2xl font-bold">Stock Movement History</h1>
-          <p className="text-sm text-neutral-400">
-            Track all inventory transfers between locations
-          </p>
+        <div className="sticky top-0 z-10 bg-white/80 backdrop-blur border-b border-gray-200 p-6 shadow-sm">
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-2">
+                <ArrowRightLeft size={32} className="text-[#c62d23]" />
+                <span>Stock Movement History</span>
+              </h1>
+              <p className="text-sm text-gray-600 mt-1">
+                Track all inventory transfers between locations
+              </p>
+            </div>
+          </div>
         </div>
 
-        <div className="p-6 space-y-6">
+        <div className="p-8 space-y-8">
           {/* STATS */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <StatCard title="Total Movements" value={totalMovements} icon={<ArrowRightLeft />} />
-            <StatCard title="Total Qty Moved" value={totalQty} icon={<TrendingUp />} />
-            <StatCard title="Today" value={todayCount} icon={<Clock />} />
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <StatCard 
+              title="Total Movements" 
+              value={totalMovements} 
+              icon={<ArrowRightLeft className="text-[#c62d23]" />}
+              clickable={true}
+              active={activeStatFilter === "ALL"}
+              onClick={() => setActiveStatFilter("ALL")}
+            />
+            <StatCard 
+              title="Total Qty Moved" 
+              value={totalQty} 
+              icon={<TrendingUp className="text-[#c62d23]" />}
+              clickable={false}
+            />
+            <StatCard 
+              title="Today" 
+              value={todayCount} 
+              icon={<Clock className="text-[#c62d23]" />}
+              clickable={true}
+              active={activeStatFilter === "TODAY"}
+              onClick={() => setActiveStatFilter("TODAY")}
+            />
           </div>
 
+          {/* FILTER BADGE */}
+          {activeStatFilter !== "ALL" && (
+            <div className="flex items-center gap-3">
+              <div className="bg-amber-100 border border-amber-300 px-4 py-2 rounded-xl flex items-center gap-2">
+                <AlertCircle className="text-amber-700" size={18} />
+                <span className="text-sm font-medium text-amber-800">
+                  Showing only today's movements
+                </span>
+              </div>
+              <button
+                onClick={() => setActiveStatFilter("ALL")}
+                className="text-sm text-gray-600 hover:text-[#c62d23] font-medium"
+              >
+                Clear filter
+              </button>
+            </div>
+          )}
+
           {/* FILTERS */}
-          <div className="bg-neutral-800 p-4 rounded-xl border border-neutral-700 grid grid-cols-1 md:grid-cols-4 gap-3">
+          <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm grid grid-cols-1 md:grid-cols-4 gap-3">
             <input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search part, location or user..."
-              className="bg-neutral-900 border border-neutral-700 px-3 py-2 rounded outline-none"
+              className="bg-white border border-gray-200 px-4 py-3 rounded-xl outline-none text-gray-900 placeholder-gray-400 focus:border-[#c62d23] focus:ring-2 focus:ring-[#c62d23]/20 transition-all"
             />
 
             <select
               value={fromFilter}
               onChange={(e) => setFromFilter(e.target.value)}
-              className="bg-neutral-900 border border-neutral-700 px-3 py-2 rounded outline-none"
+              className="bg-white border border-gray-200 px-4 py-3 rounded-xl outline-none text-gray-900 focus:border-[#c62d23] focus:ring-2 focus:ring-[#c62d23]/20 transition-all"
             >
               <option value="All">From (All)</option>
               {locations.map((l) => (
@@ -140,7 +198,7 @@ export default function StockMovementsPage() {
             <select
               value={toFilter}
               onChange={(e) => setToFilter(e.target.value)}
-              className="bg-neutral-900 border border-neutral-700 px-3 py-2 rounded outline-none"
+              className="bg-white border border-gray-200 px-4 py-3 rounded-xl outline-none text-gray-900 focus:border-[#c62d23] focus:ring-2 focus:ring-[#c62d23]/20 transition-all"
             >
               <option value="All">To (All)</option>
               {locations.map((l) => (
@@ -155,82 +213,91 @@ export default function StockMovementsPage() {
                 setSearch("");
                 setFromFilter("All");
                 setToFilter("All");
+                setActiveStatFilter("ALL");
               }}
-              className="bg-neutral-700 hover:bg-neutral-600 rounded px-3 py-2"
+              className="bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl px-4 py-3 font-medium transition-all"
             >
-              Reset
+              Reset All Filters
             </button>
           </div>
 
           {/* TABLE */}
-          <div className="bg-neutral-800 rounded-xl overflow-hidden border border-neutral-700">
+          <div className="bg-white rounded-2xl overflow-hidden border border-gray-200 shadow-sm">
             {loading ? (
-              <div className="p-6 text-center">Loading...</div>
+              <div className="p-8 text-center">
+                <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-[#c62d23]"></div>
+                <p className="mt-2 text-gray-500">Loading...</p>
+              </div>
             ) : filtered.length === 0 ? (
-              <div className="p-6 text-center text-neutral-400">
-                No stock movements found
+              <div className="text-center text-gray-500 py-16">
+                <Package size={48} className="mx-auto mb-4 text-gray-300" />
+                <p className="text-lg font-medium">No stock movements found</p>
               </div>
             ) : (
-              <table className="w-full table-fixed">
-                <thead className="bg-neutral-850 border-b border-neutral-700">
-                  <tr>
-                    <th className="p-4 text-left text-xs text-neutral-400 uppercase w-[20%]">Part</th>
-                    <th className="p-4 text-left text-xs text-neutral-400 uppercase w-[15%]">From</th>
-                    <th className="p-4 text-left text-xs text-neutral-400 uppercase w-[15%]">To</th>
-                    <th className="p-4 text-center text-xs text-neutral-400 uppercase w-[10%]">Qty</th>
-                    <th className="p-4 text-left text-xs text-neutral-400 uppercase w-[20%]">Moved By</th>
-                    <th className="p-4 text-left text-xs text-neutral-400 uppercase w-[20%]">Time</th>
-                  </tr>
-                </thead>
-
-                <tbody>
-                  {filtered.map((m) => (
-                    <tr
-                      key={m.id}
-                      className="border-b border-neutral-700 hover:bg-neutral-850 transition"
-                    >
-                      <td className="p-4 whitespace-nowrap">
-                        <div className="flex items-center gap-2">
-                          <Package size={14} className="text-neutral-400" />
-                          {m.part}
-                        </div>
-                      </td>
-
-                      <td className="p-4 whitespace-nowrap">
-                        <div className="flex items-center gap-1">
-                          <MapPin size={14} className="text-neutral-400" />
-                          {m.from}
-                        </div>
-                      </td>
-
-                      <td className="p-4 whitespace-nowrap">
-                        <div className="flex items-center gap-1">
-                          <MapPin size={14} className="text-neutral-400" />
-                          {m.to}
-                        </div>
-                      </td>
-
-                      <td className="p-4 text-center font-semibold text-amber-400 whitespace-nowrap">
-                        {m.qty}
-                      </td>
-
-                      <td className="p-4 whitespace-nowrap">
-                        <div className="flex items-center gap-2 text-sm">
-                          <User size={14} className="text-neutral-400" />
-                          {m.user}
-                        </div>
-                      </td>
-
-                      <td className="p-4 whitespace-nowrap text-sm text-neutral-400">
-                        <div className="flex items-center gap-2">
-                          <Clock size={14} />
-                          {new Date(m.time).toLocaleString()}
-                        </div>
-                      </td>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="bg-gray-50 border-b border-gray-200">
+                      <th className="p-4 text-left font-semibold text-gray-700">Part</th>
+                      <th className="p-4 text-left font-semibold text-gray-700">From</th>
+                      <th className="p-4 text-left font-semibold text-gray-700">To</th>
+                      <th className="p-4 text-center font-semibold text-gray-700">Qty</th>
+                      <th className="p-4 text-left font-semibold text-gray-700">Moved By</th>
+                      <th className="p-4 text-left font-semibold text-gray-700">Time</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+
+                  <tbody>
+                    {filtered.map((m, index) => (
+                      <tr
+                        key={m.id}
+                        className={`border-b border-gray-100 hover:bg-gray-50 transition-colors ${
+                          index % 2 === 0 ? 'bg-white' : 'bg-gray-50'
+                        }`}
+                      >
+                        <td className="p-4">
+                          <div className="flex items-center gap-2">
+                            <Package size={16} className="text-gray-400" />
+                            <span className="font-medium text-gray-900">{m.part}</span>
+                          </div>
+                        </td>
+
+                        <td className="p-4">
+                          <div className="flex items-center gap-2 text-gray-700">
+                            <MapPin size={16} className="text-gray-400" />
+                            {m.from}
+                          </div>
+                        </td>
+
+                        <td className="p-4">
+                          <div className="flex items-center gap-2 text-gray-700">
+                            <MapPin size={16} className="text-gray-400" />
+                            {m.to}
+                          </div>
+                        </td>
+
+                        <td className="p-4 text-center">
+                          <span className="font-semibold text-[#c62d23]">{m.qty}</span>
+                        </td>
+
+                        <td className="p-4">
+                          <div className="flex items-center gap-2 text-gray-700">
+                            <User size={16} className="text-gray-400" />
+                            {m.user}
+                          </div>
+                        </td>
+
+                        <td className="p-4 text-gray-700">
+                          <div className="flex items-center gap-2">
+                            <Clock size={16} className="text-gray-400" />
+                            {new Date(m.time).toLocaleString()}
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             )}
           </div>
         </div>
@@ -241,12 +308,28 @@ export default function StockMovementsPage() {
 
 /* ================= SMALL COMPONENTS ================= */
 
-const StatCard = ({ title, value, icon }) => (
-  <div className="p-5 rounded-xl border bg-neutral-800 border-neutral-700">
-    <div className="flex items-center justify-between mb-2">
-      <p className="text-sm text-neutral-400">{title}</p>
-      <span className="text-neutral-400">{icon}</span>
+const StatCard = ({ title, value, icon, clickable, active, onClick }) => (
+  <div
+    onClick={clickable ? onClick : undefined}
+    className={`bg-white border rounded-2xl p-6 transition-all duration-200 shadow-sm hover:shadow-md flex flex-col justify-between h-full border-gray-200 ${
+      clickable ? 'cursor-pointer hover:bg-gray-50 hover:border-[#c62d23]' : ''
+    } ${
+      active ? 'ring-2 ring-[#c62d23]' : ''
+    }`}
+    style={{
+      borderLeft: '4px solid #c62d23'
+    }}
+  >
+    <div className="flex justify-between items-start mb-4">
+      <p className="text-sm text-gray-600 font-medium">{title}</p>
+      {React.cloneElement(icon, { size: 24 })}
     </div>
-    <p className="text-3xl font-bold">{value}</p>
+    <p className="text-3xl font-bold text-gray-900 mb-1">{value}</p>
+    {clickable && (
+      <div className="mt-2 text-xs text-gray-500 flex items-center gap-1">
+        <span>{active ? 'Click to show all' : 'Click to view details'}</span>
+        <span className="text-[#c62d23]">→</span>
+      </div>
+    )}
   </div>
 );
