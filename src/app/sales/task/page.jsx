@@ -1,10 +1,10 @@
-import SalesTasks from "@/components/Sales/task";
+import WarehouseTasks from "@/components/Sales/task";
 import React from "react";
 
 const Page = () => {
     return (
         <div>
-        <SalesTasks/>
+            <WarehouseTasks />
         </div>
     )
 }

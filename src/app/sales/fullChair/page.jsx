@@ -1,8 +1,8 @@
-import SalesInventory from "@/components/Sales/fullChair.jsx";
-import React from "react";
+  import SalesInventory from "@/components/Sales/fullChair.jsx";
+  import React from "react";
 
-export default function page() {
-  return (
-    <SalesInventory />
-  );
-}
+  export default function page() {
+    return (
+      <SalesInventory />
+    );
+  }

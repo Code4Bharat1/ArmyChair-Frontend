@@ -2,32 +2,31 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Package, Wrench } from "lucide-react";
+import { Package, Wrench, History, Users, CheckSquare } from "lucide-react";
 
 export default function SalesSidebar() {
   const pathname = usePathname();
 
   const itemClass = (path) =>
-    `flex items-center gap-3 px-6 py-3 text-sm font-medium transition-all duration-200
-     ${
-       pathname === path
-         ? "bg-amber-100 text-amber-800 border-l-4 border-amber-600 shadow-sm"
-         : "text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900"
-     }`;
+    `flex items-center gap-3 px-6 py-3 text-sm font-medium transition-all duration-200 rounded-lg mx-2
+     ${pathname === path
+      ? "bg-[#c62d23] text-white shadow-md"
+      : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
+    }`;
 
   return (
-    <div className="w-60 bg-white border-r border-neutral-200 h-screen flex flex-col">
+    <div className="w-60 bg-white border-r border-gray-200 h-screen flex flex-col shadow-sm">
       {/* HEADER */}
-      <div className="p-6 border-b border-neutral-100">
-        <h2 className="text-xl font-bold text-neutral-900">Sales</h2>
-        <p className="text-xs text-neutral-500 mt-1">Sales Management</p>
+      <div className="p-6 border-b border-gray-200">
+        <h2 className="text-xl font-bold text-gray-900">Sales</h2>
+        <p className="text-xs text-gray-500 mt-1">Sales Management</p>
       </div>
 
       {/* NAV */}
-      <nav className="flex-1 p-4 space-y-1">
+      <nav className="flex-1 p-4 space-y-2">
         <Link href="/sales/order" className={itemClass("/sales/order")}>
           <Package size={18} />
-          Order
+          Orders
         </Link>
 
         <Link href="/sales/fullChair" className={itemClass("/sales/fullChair")}>
@@ -44,12 +43,12 @@ export default function SalesSidebar() {
         </Link>
 
         <Link href="/sales/history" className={itemClass("/sales/history")}>
-          <Wrench size={18} />
+          <History size={18} />
           History
         </Link>
 
         <Link href="/sales/task" className={itemClass("/sales/task")}>
-          <Wrench size={18} />
+          <CheckSquare size={18} />
           My Tasks
         </Link>
 
@@ -57,13 +56,13 @@ export default function SalesSidebar() {
           href="/sales/Client-List"
           className={itemClass("/sales/Client-List")}
         >
-          <Wrench size={18} />
+          <Users size={18} />
           Client List
         </Link>
       </nav>
 
       {/* FOOTER */}
-      <div className="p-4 border-t border-neutral-200 text-xs text-neutral-500 text-center">
+      <div className="p-4 border-t border-gray-200 text-xs text-gray-500 text-center">
         Army Industry © 2026
       </div>
     </div>
