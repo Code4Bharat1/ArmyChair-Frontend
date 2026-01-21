@@ -219,19 +219,30 @@ const handleCreateOrder = async (e) => {
   }
 
   const payload = {
-    dispatchedTo: formData.dispatchedTo, // ObjectId ONLY
+    dispatchedTo: formData.dispatchedTo,
     chairModel: formData.chairModel,
     orderType: formData.orderType,
     orderDate: formData.orderDate || new Date().toISOString().split("T")[0],
     deliveryDate: formData.deliveryDate,
     quantity: Number(formData.quantity),
-    progress: "ORDER_PLACED",
   };
 
-  console.log("FINAL PAYLOAD:", payload);
-
   try {
-    await axios.post(`${API}/orders`, payload, { headers });
+    if (editingOrderId) {
+      // ✅ UPDATE
+      await axios.put(
+        `${API}/orders/${editingOrderId}`,
+        payload,
+        { headers }
+      );
+    } else {
+      // ✅ CREATE
+      await axios.post(
+        `${API}/orders`,
+        payload,
+        { headers }
+      );
+    }
 
     setShowForm(false);
     setEditingOrderId(null);
@@ -242,6 +253,7 @@ const handleCreateOrder = async (e) => {
     alert(err?.response?.data?.message || "Failed to save order");
   }
 };
+
 
 
 

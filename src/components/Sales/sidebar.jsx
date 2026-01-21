@@ -2,163 +2,70 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Package, Wrench, X, Menu, ShoppingCart, CheckCircle } from "lucide-react";
-import { useState } from "react";
+import { Package, Wrench } from "lucide-react";
 
 export default function SalesSidebar() {
-    const pathname = usePathname();
-    const [open, setOpen] = useState(false);
+  const pathname = usePathname();
 
-    const itemClass = (path) =>
-        `flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-all duration-200
-     active:scale-95 
-     ${pathname === path
-            ? "bg-amber-600 text-white shadow-lg shadow-amber-600/20"
-            : "text-neutral-400 hover:bg-neutral-800 hover:text-white active:bg-neutral-700"
-        }`;
+  const itemClass = (path) =>
+    `flex items-center gap-3 px-6 py-3 text-sm font-medium transition-all duration-200
+     ${
+       pathname === path
+         ? "bg-amber-100 text-amber-800 border-l-4 border-amber-600 shadow-sm"
+         : "text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900"
+     }`;
 
-    return (
-        <>
-            {/* ===== Mobile Toggle Button ===== */}
-            <button
-                onClick={() => setOpen(true)}
-                className="lg:hidden fixed top-4 left-4 z-50 bg-neutral-900 text-white p-3 rounded-lg border border-neutral-700 shadow-lg hover:bg-neutral-800 active:scale-95 transition-all duration-200"
-                aria-label="Open menu"
-            >
-                <Menu size={20} />
-            </button>
+  return (
+    <div className="w-60 bg-white border-r border-neutral-200 h-screen flex flex-col">
+      {/* HEADER */}
+      <div className="p-6 border-b border-neutral-100">
+        <h2 className="text-xl font-bold text-neutral-900">Sales</h2>
+        <p className="text-xs text-neutral-500 mt-1">Sales Management</p>
+      </div>
 
-            {/* ===== Overlay (mobile) ===== */}
-            {open && (
-                <div
-                    onClick={() => setOpen(false)}
-                    className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 lg:hidden animate-fadeIn"
-                />
-            )}
+      {/* NAV */}
+      <nav className="flex-1 p-4 space-y-1">
+        <Link href="/sales/order" className={itemClass("/sales/order")}>
+          <Package size={18} />
+          Order
+        </Link>
 
-            {/* ===== Sidebar ===== */}
-            <aside
-                className={`fixed lg:static top-0 left-0 z-50 h-screen w-64 sm:w-72 lg:w-60
-        bg-neutral-950 border-r border-neutral-800 flex flex-col
-        transition-transform duration-300 ease-in-out
-        ${open ? "translate-x-0 shadow-2xl" : "-translate-x-full"} lg:translate-x-0`}
-            >
-                {/* Scrollable Content */}
-                <div className="flex-1 overflow-y-auto p-4 space-y-6">
-                    {/* HEADER */}
-                    <div className="flex items-start justify-between">
-                        <div>
-                            <h2 className="text-lg sm:text-xl font-bold text-white">Sales</h2>
-                            <p className="text-xs text-neutral-500 mt-0.5">Sales Management</p>
-                        </div>
+        <Link href="/sales/fullChair" className={itemClass("/sales/fullChair")}>
+          <Package size={18} />
+          Full Chair
+        </Link>
 
-                        {/* Close button - mobile only */}
-                        <button
-                            onClick={() => setOpen(false)}
-                            className="lg:hidden text-neutral-400 hover:text-white hover:bg-neutral-800 p-1.5 rounded-md active:scale-95 transition-all duration-200"
-                            aria-label="Close menu"
-                        >
-                            <X size={20} />
-                        </button>
-                    </div>
+        <Link
+          href="/sales/spare-parts"
+          className={itemClass("/sales/spare-parts")}
+        >
+          <Wrench size={18} />
+          Spare Parts
+        </Link>
 
-                    {/* NAV */}
-                    <nav className="space-y-2">
-                        <Link
-                            href="/sales/order"
-                            onClick={() => setOpen(false)}
-                            className={itemClass("/sales/order")}
-                        >
-                            <Package size={18} className="flex-shrink-0" />
-                            <span className="truncate">Order</span>
-                        </Link>
+        <Link href="/sales/history" className={itemClass("/sales/history")}>
+          <Wrench size={18} />
+          History
+        </Link>
 
-                        <Link
-                            href="/sales/fullChair"
-                            onClick={() => setOpen(false)}
-                            className={itemClass("/sales/fullChair")}
-                        >
-                            <Package size={18} className="flex-shrink-0" />
-                            <span className="truncate">Full Chair</span>
-                        </Link>
+        <Link href="/sales/task" className={itemClass("/sales/task")}>
+          <Wrench size={18} />
+          My Tasks
+        </Link>
 
-                        <Link
-                            href="/sales/spare-parts"
-                            onClick={() => setOpen(false)}
-                            className={itemClass("/sales/spare-parts")}
-                        >
-                            <Wrench size={18} className="flex-shrink-0" />
-                            <span className="truncate">Spare Parts</span>
-                        </Link>
-                        <Link
-                            href="/sales/history"
-                            onClick={() => setOpen(false)}
-                            className={itemClass("/sales/history")}
-                        >
-                            <Wrench size={18} className="flex-shrink-0" />
-                            <span className="truncate">History</span>
-                        </Link>
-                        <Link
-                            href="/sales/task"
-                            onClick={() => setOpen(false)}
-                            className={itemClass("/sales/task")}
-                        >
-                            <Wrench size={18} className="flex-shrink-0" />
-                            <span className="truncate">My Tasks</span>
-                        </Link>
-                        <Link
-                            href="/sales/Client-List"
-                            onClick={() => setOpen(false)}
-                            className={itemClass("/sales/Client-List")}
-                        >
-                            <Wrench size={18} className="flex-shrink-0" />
-                            <span className="truncate">Client List</span>
-                        </Link>
+        <Link
+          href="/sales/Client-List"
+          className={itemClass("/sales/Client-List")}
+        >
+          <Wrench size={18} />
+          Client List
+        </Link>
+      </nav>
 
-
-                    </nav>
-                </div>
-
-                {/* FOOTER - Sticky at bottom */}
-                <div className="p-4 border-t border-neutral-800 bg-neutral-950">
-                    <p className="text-xs text-neutral-500 text-center">
-                        Army Industry © 2026
-                    </p>
-                </div>
-            </aside>
-
-            <style jsx global>{`
-        @keyframes fadeIn {
-          from {
-            opacity: 0;
-          }
-          to {
-            opacity: 1;
-          }
-        }
-
-        .animate-fadeIn {
-          animation: fadeIn 0.2s ease-out;
-        }
-
-        /* Custom scrollbar for sidebar */
-        aside::-webkit-scrollbar {
-          width: 6px;
-        }
-
-        aside::-webkit-scrollbar-track {
-          background: transparent;
-        }
-
-        aside::-webkit-scrollbar-thumb {
-          background: #404040;
-          border-radius: 3px;
-        }
-
-        aside::-webkit-scrollbar-thumb:hover {
-          background: #525252;
-        }
-      `}</style>
-        </>
-    );
+      {/* FOOTER */}
+      <div className="p-4 border-t border-neutral-200 text-xs text-neutral-500 text-center">
+        Army Industry © 2026
+      </div>
+    </div>
+  );
 }
