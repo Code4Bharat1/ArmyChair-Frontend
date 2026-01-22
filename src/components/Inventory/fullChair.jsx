@@ -22,7 +22,7 @@ import InventorySidebar from "./sidebar";
 export default function InventoryPage() {
   const [inventory, setInventory] = useState([]);
   const [loading, setLoading] = useState(true);
-
+  
   /* FILTERS */
   const [searchTerm, setSearchTerm] = useState("");
   const [filterVendor, setFilterVendor] = useState("All");
@@ -31,13 +31,14 @@ export default function InventoryPage() {
   /* MODAL STATE */
   const [showForm, setShowForm] = useState(false);
   const [editId, setEditId] = useState(null);
+  const [vendorsList, setVendorsList] = useState([]);
+
   const [form, setForm] = useState({
     chairType: "",
     vendor: "",
     quantity: "",
   });
 
-  const VENDORS = ["Ramesh", "Suresh", "Mahesh", "Akash", "Vikram", "Amit"];
   const router = useRouter();
 
   const API = process.env.NEXT_PUBLIC_API_URL;
@@ -72,6 +73,14 @@ export default function InventoryPage() {
   useEffect(() => {
     fetchInventory();
   }, []);
+useEffect(() => {
+  const fetchVendors = async () => {
+    const res = await axios.get(`${API}/vendors`, { headers });
+    setVendorsList(res.data);
+  };
+
+  fetchVendors();
+}, []);
 
   /* ================= CREATE / UPDATE ================= */
   const submitInventory = async () => {
@@ -81,14 +90,14 @@ export default function InventoryPage() {
       }
 
       const payload = {
-        chairType: form.chairType,
-        vendor: form.vendor,
-        quantity: Number(form.quantity),
-        color: "Default",
-        minQuantity: 50,
-        location: "WAREHOUSE",
-        type: "FULL",
-      };
+  type: "FULL",
+  chairType: form.chairType,
+  vendor: form.vendor, // ObjectId
+  quantity: Number(form.quantity),
+  minQuantity: 50,
+  maxQuantity: 500,
+  location: "WAREHOUSE",
+};
 
       if (editId) {
         await axios.patch(`${API}/inventory/update/${editId}`, payload, {
@@ -265,11 +274,14 @@ export default function InventoryPage() {
                   onChange={(e) => setFilterVendor(e.target.value)}
                   className="bg-transparent outline-none text-sm text-gray-900 font-medium cursor-pointer"
                 >
-                  {vendors.map((v) => (
-                    <option key={v} value={v} className="bg-white">
-                      {v}
-                    </option>
-                  ))}
+                  {vendorsList.map((v) => (
+  <option key={v._id} value={v.name}>
+  {v.name}
+</option>
+
+
+))}
+
                 </select>
               </div>
 
@@ -361,6 +373,7 @@ export default function InventoryPage() {
                                 setForm({
                                   chairType: i.name,
                                   vendor: i.vendor?.name,
+
                                   quantity: i.quantity,
                                 });
                                 setShowForm(true);
@@ -443,11 +456,12 @@ export default function InventoryPage() {
                     className="w-full p-3 bg-white border border-gray-200 rounded-xl outline-none text-gray-900 focus:border-[#c62d23] focus:ring-2 focus:ring-[#c62d23]/20 transition-all"
                   >
                     <option value="">Select Vendor</option>
-                    {VENDORS.map((v) => (
-                      <option key={v} value={v} className="bg-white">
-                        {v}
-                      </option>
-                    ))}
+                   {vendorsList.map((v) => (
+  <option key={v._id} value={v._id} className="bg-white">
+    {v.name}
+  </option>
+))}
+
                   </select>
                 </div>
 

@@ -511,12 +511,7 @@ Please reduce picks to exactly ${order.quantity}.`,
             Recheck Inventory
           </button>
 
-          <button
-            onClick={() => router.push(`/inventory/order/${o._id}`)}
-            className="bg-emerald-600 hover:bg-emerald-700 px-3 py-1.5 rounded-lg text-white text-sm font-medium transition-all shadow-sm hover:shadow-md"
-          >
-            Pick Parts
-          </button>
+          
         </div>
       );
     }
