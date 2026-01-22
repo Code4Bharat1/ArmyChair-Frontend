@@ -15,7 +15,7 @@ export default function SalesSidebar() {
     }`;
 
   return (
-    <div className="w-60 bg-white border-r border-gray-200 h-screen flex flex-col shadow-sm">
+    <div className="w-64 bg-white border-r border-gray-200 h-screen flex flex-col shadow-sm">
       {/* HEADER */}
       <div className="p-6 border-b border-gray-200">
         <h2 className="text-xl font-bold text-gray-900">Sales</h2>
@@ -35,8 +35,8 @@ export default function SalesSidebar() {
         </Link>
 
         <Link
-          href="/sales/spare-parts"
-          className={itemClass("/sales/spare-parts")}
+          href="/sales/Spare"
+          className={itemClass("/sales/Spare")}
         >
           <Wrench size={18} />
           Spare Parts

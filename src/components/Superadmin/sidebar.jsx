@@ -2,6 +2,7 @@
 import React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import NotificationBell from "@/components/notifications/NotificationBell";
 
 export default function Sidebar() {
   const pathname = usePathname();
@@ -15,7 +16,8 @@ export default function Sidebar() {
      }`;
 
   return (
-    <div className="w-64 bg-white border-r border-gray-200 shadow-sm relative h-screen">
+    <div className="w-64 bg-white border-r border-gray-200 shadow-sm relative h-screen overflow-visible">
+
       {/* Logo */}
       <div className="p-6 border-b border-gray-100">
         <h1 className="text-2xl font-bold flex items-center gap-2">
@@ -25,71 +27,27 @@ export default function Sidebar() {
       </div>
 
       {/* Navigation */}
-      <nav className="p-4 space-y-1">
-        {/* MAIN MENU */}
+      <nav className="p-4 space-y-1 overflow-y-auto pb-24">
         <div className="space-y-1">
-          <Link
-            href="/superadmin/dashboard"
-            className={menuItem("/superadmin/dashboard")}
-          >
-            Dashboard
-          </Link>
-
-          <Link
-            href="/superadmin/inventory"
-            className={menuItem("/superadmin/inventory")}
-          >
-            Chair Inventory
-          </Link>
-          <Link
-            href="/superadmin/spareparts"
-            className={menuItem("/superadmin/spareparts")}
-          >
-            Parts Inventory
-          </Link>
-
-          <Link
-            href="/superadmin/order"
-            className={menuItem("/superadmin/order")}
-          >
-            Orders
-          </Link>
-          <Link
-            href="/superadmin/return"
-            className={menuItem("/superadmin/return")}
-          >
-            Returns
-          </Link>
-          <Link
-            href="/superadmin/staff"
-            className={menuItem("/superadmin/staff")}
-          >
-            Staff
-          </Link>
-          <Link
-            href="/superadmin/task"
-            className={menuItem("/superadmin/task")}
-          >
-            Assign tasks
-          </Link>
-          <Link
-            href="/superadmin/activity"
-            className={menuItem("/superadmin/activity")}
-          >
-            Activity
-          </Link>
+          <Link href="/superadmin/dashboard" className={menuItem("/superadmin/dashboard")}>Dashboard</Link>
+          <Link href="/superadmin/inventory" className={menuItem("/superadmin/inventory")}>Chair Inventory</Link>
+          <Link href="/superadmin/spareparts" className={menuItem("/superadmin/spareparts")}>Parts Inventory</Link>
+          <Link href="/superadmin/order" className={menuItem("/superadmin/order")}>Orders</Link>
+          <Link href="/superadmin/return" className={menuItem("/superadmin/return")}>Returns</Link>
+          <Link href="/superadmin/staff" className={menuItem("/superadmin/staff")}>Staff</Link>
+          <Link href="/superadmin/task" className={menuItem("/superadmin/task")}>Assign tasks</Link>
+          <Link href="/superadmin/activity" className={menuItem("/superadmin/activity")}>Activity</Link>
         </div>
       </nav>
 
+      {/* 🔔 NOTIFICATION BELL (FLOATING IN SIDEBAR) */}
+      <div className="absolute top-4 right-3">
+        <NotificationBell />
+      </div>
+
       {/* Footer */}
       <div className="absolute bottom-0 w-full border-t border-gray-200 bg-gray-50">
-        <Link
-          href="/settings"
-          className="block px-6 py-3 text-sm text-gray-600 hover:bg-gray-100 hover:text-gray-900 transition-colors"
-        >
-          Settings
-        </Link>
-
+       
         <Link
           href="/logout"
           className="block px-6 py-3 text-sm text-gray-600 hover:bg-gray-100 hover:text-gray-900 transition-colors border-t border-gray-200"

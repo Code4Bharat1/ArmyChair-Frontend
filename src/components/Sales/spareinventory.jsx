@@ -14,7 +14,6 @@ import {
   ArrowLeftRight,
 } from "lucide-react";
 import axios from "axios";
-import InventorySidebar from "./sidebar";
 
 /* ================= PAGE ================= */
 export default function SparePartsInventory() {
@@ -203,8 +202,6 @@ const overStock = data.filter((i) => i.status === "Overstocked").length;
   /* ================= UI ================= */
   return (
     <div className="flex h-screen bg-gray-50 text-gray-900">
-      <InventorySidebar />
-
       {/* MAIN */}
       <div className="flex-1 overflow-y-auto overflow-x-hidden">
         {/* HEADER */}
@@ -218,12 +215,7 @@ const overStock = data.filter((i) => i.status === "Overstocked").length;
             </p>
           </div>
 
-          <button
-            onClick={() => setShowForm(true)}
-            className="bg-[#c62d23] hover:bg-[#a8241c] text-white px-5 py-3 rounded-xl font-medium flex items-center gap-2 transition-all duration-200 shadow-sm hover:shadow-md"
-          >
-            <Plus size={18} /> Add Inventory
-          </button>
+          
         </div>
 
         {/* CONTENT */}
@@ -301,9 +293,7 @@ const overStock = data.filter((i) => i.status === "Overstocked").length;
                     <th className="text-left p-4 font-semibold text-gray-700">
                       Status
                     </th>
-                    <th className="text-left p-4 font-semibold text-gray-700">
-                      Actions
-                    </th>
+                    
                   </tr>
                 </thead>
 
@@ -354,56 +344,7 @@ const overStock = data.filter((i) => i.status === "Overstocked").length;
                           <StatusBadge status={i.status} />
                         </td>
 
-                        <td className="p-4 flex gap-3">
-                          {/* EDIT */}
-                          <button
-                            onClick={() => {
-                              setEditId(i.id);
-                              setForm({
-                                partName: i.name,
-                                location: i.location,
-                                quantity: i.quantity,
-                                maxQuantity: i.maxQuantity ?? "",
-                              });
-
-                              setShowForm(true);
-                            }}
-                            className="p-2 rounded-lg hover:bg-gray-100 transition-colors"
-                            title="Edit"
-                          >
-                            <Pencil
-                              size={16}
-                              className="text-gray-600 hover:text-[#c62d23]"
-                            />
-                          </button>
-
-                          {/* TRANSFER */}
-                          <button
-                            onClick={() => {
-                              setTransferItem(i);
-                              setShowTransfer(true);
-                            }}
-                            className="p-2 rounded-lg hover:bg-gray-100 transition-colors"
-                            title="Transfer Location"
-                          >
-                            <ArrowLeftRight
-                              size={16}
-                              className="text-gray-600 hover:text-[#c62d23]"
-                            />
-                          </button>
-
-                          {/* DELETE */}
-                          <button
-                            onClick={() => deletePart(i.id)}
-                            className="p-2 rounded-lg hover:bg-gray-100 transition-colors"
-                            title="Delete"
-                          >
-                            <Trash2
-                              size={16}
-                              className="text-gray-600 hover:text-red-600"
-                            />
-                          </button>
-                        </td>
+                        
                       </tr>
                     ))
                   )}
@@ -414,66 +355,7 @@ const overStock = data.filter((i) => i.status === "Overstocked").length;
         </div>
       </div>
 
-      {/* ADD / EDIT MODAL */}
-      {showForm && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
-          <div className="bg-white p-6 rounded-2xl w-full max-w-md border border-gray-200 shadow-lg">
-            <h2 className="font-bold text-xl text-gray-900 mb-6">
-              {editId ? "Update Spare Part" : "Add Spare Part"}
-            </h2>
-
-            <Input
-              label="Spare Part Name"
-              value={form.partName}
-              onChange={(v) => setForm({ ...form, partName: v })}
-              placeholder="Enter part name"
-            />
-
-            <Input
-              label="Location"
-              value={form.location}
-              onChange={(v) => setForm({ ...form, location: v })}
-              placeholder="Enter location"
-            />
-
-            <Input
-              label="Quantity"
-              type="number"
-              value={form.quantity}
-              onChange={(v) => setForm({ ...form, quantity: v })}
-              placeholder="Enter quantity"
-            />
-            {role === "admin" && (
-              <Input
-                label="Max Quantity"
-                type="number"
-                value={form.maxQuantity}
-                onChange={(v) => setForm({ ...form, maxQuantity: v })}
-                placeholder="Enter max stock level"
-              />
-            )}
-
-            <div className="flex justify-end gap-3 mt-8 pt-6 border-t border-gray-200">
-              <button
-                onClick={() => {
-                  setShowForm(false);
-                  setEditId(null);
-                  setForm({ partName: "", location: "", quantity: "" });
-                }}
-                className="px-5 py-2.5 text-gray-700 font-medium rounded-xl border border-gray-300 hover:bg-gray-50 transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={submitPart}
-                className="bg-[#c62d23] hover:bg-[#a8241c] text-white px-5 py-2.5 font-medium rounded-xl transition-all duration-200 shadow-sm hover:shadow-md"
-              >
-                {editId ? "Update" : "Save"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+     
 
       {/* TRANSFER MODAL */}
       {showTransfer && transferItem && (

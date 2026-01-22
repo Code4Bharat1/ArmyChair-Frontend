@@ -1,4 +1,5 @@
 "use client";
+import { useRouter } from "next/navigation";
 import React, { useEffect, useMemo, useState } from "react";
 import {
   AlertCircle,
@@ -13,6 +14,7 @@ import {
   Filter,
   X,
   Package,
+  UserCircle,
 } from "lucide-react";
 import axios from "axios";
 import InventorySidebar from "./sidebar";
@@ -35,14 +37,8 @@ export default function InventoryPage() {
     quantity: "",
   });
 
-  const VENDORS = [
-    "Ramesh",
-    "Suresh",
-    "Mahesh",
-    "Akash",
-    "Vikram",
-    "Amit",
-  ];
+  const VENDORS = ["Ramesh", "Suresh", "Mahesh", "Akash", "Vikram", "Amit"];
+  const router = useRouter();
 
   const API = process.env.NEXT_PUBLIC_API_URL;
   const token =
@@ -57,13 +53,13 @@ export default function InventoryPage() {
 
       const data = res.data.inventory || [];
 
-      const safeData = data.map(i => ({
+      const safeData = data.map((i) => ({
         ...i,
         quantity: Number(i.quantity || 0),
       }));
 
       // ✅ ONLY FULL CHAIRS
-      const onlyFullChairs = safeData.filter(i => i.type === "FULL");
+      const onlyFullChairs = safeData.filter((i) => i.type === "FULL");
 
       setInventory(onlyFullChairs);
     } catch (err) {
@@ -143,9 +139,7 @@ export default function InventoryPage() {
 
   /* ===== FILTER OPTIONS ===== */
   const vendors = useMemo(() => {
-    const names = inventoryData
-      .map((i) => i.vendor?.name)
-      .filter(Boolean);
+    const names = inventoryData.map((i) => i.vendor?.name).filter(Boolean);
 
     return ["All", ...new Set(names)];
   }, [inventoryData]);
@@ -172,14 +166,14 @@ export default function InventoryPage() {
   /* ================= STATS ================= */
   const totalStock = useMemo(
     () => inventoryData.reduce((s, i) => s + Number(i.quantity || 0), 0),
-    [inventoryData]
+    [inventoryData],
   );
 
   const totalProducts = inventoryData.length;
 
   const lowStockCount = useMemo(
     () => inventoryData.filter((i) => i.status !== "Healthy").length,
-    [inventoryData]
+    [inventoryData],
   );
 
   const closeModal = () => {
@@ -190,13 +184,14 @@ export default function InventoryPage() {
 
   /* ================= UI ================= */
   return (
-    <div className="flex min-h-screen bg-gray-50 text-gray-900">
+    <div className="flex h-screen bg-gray-50 text-gray-900">
       <InventorySidebar />
 
-      <div className="flex-1 overflow-auto">
+      <div className="flex-1 overflow-y-auto overflow-x-hidden">
         {/* HEADER */}
         <div className="sticky top-0 z-10 bg-white/80 backdrop-blur border-b border-gray-200 p-6 shadow-sm">
           <div className="flex items-center justify-between">
+            {/* LEFT SIDE */}
             <div>
               <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-2">
                 <Package size={32} className="text-[#c62d23]" />
@@ -207,22 +202,33 @@ export default function InventoryPage() {
               </p>
             </div>
 
-            <button
-              onClick={() => setShowForm(true)}
-              className="bg-[#c62d23] hover:bg-[#a82419] text-white px-5 py-3 rounded-xl flex items-center gap-2 shadow-lg shadow-[#c62d23]/20 font-medium transition-all"
-            >
-              <Plus size={18} /> Add Inventory
-            </button>
+            {/* RIGHT SIDE */}
+            <div className="flex items-center gap-4">
+              <button
+                onClick={() => setShowForm(true)}
+                className="bg-[#c62d23] hover:bg-[#a82419] text-white px-5 py-3 rounded-xl flex items-center gap-2 shadow-lg shadow-[#c62d23]/20 font-medium transition-all"
+              >
+                <Plus size={18} /> Add Inventory
+              </button>
+
+              <button
+                onClick={() => router.push("/profile")}
+                title="My Profile"
+                className="text-gray-600 hover:text-[#c62d23] transition"
+              >
+                <UserCircle size={34} />
+              </button>
+            </div>
           </div>
         </div>
 
         <div className="p-8 space-y-8">
           {/* ===== TOP CARDS ===== */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <StatCard 
-              title="Total Stock" 
-              value={totalStock} 
-              icon={<Warehouse className="text-[#c62d23]" />} 
+            <StatCard
+              title="Total Stock"
+              value={totalStock}
+              icon={<Warehouse className="text-[#c62d23]" />}
             />
             <StatCard
               title="Total Products"
@@ -307,7 +313,13 @@ export default function InventoryPage() {
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="bg-gray-50 border-b border-gray-200">
-                      {["Product", "Vendor", "Quantity", "Status", "Actions"].map((h) => (
+                      {[
+                        "Product",
+                        "Vendor",
+                        "Quantity",
+                        "Status",
+                        "Actions",
+                      ].map((h) => (
                         <th
                           key={h}
                           className="p-4 text-left font-semibold text-gray-700"
@@ -323,17 +335,21 @@ export default function InventoryPage() {
                       <tr
                         key={i.id}
                         className={`border-b border-gray-100 hover:bg-gray-50 transition-colors ${
-                          index % 2 === 0 ? 'bg-white' : 'bg-gray-50'
+                          index % 2 === 0 ? "bg-white" : "bg-gray-50"
                         }`}
                       >
-                        <td className="p-4 font-medium text-gray-900">{i.name}</td>
+                        <td className="p-4 font-medium text-gray-900">
+                          {i.name}
+                        </td>
                         <td className="p-4">
                           <div className="flex items-center gap-2 text-gray-700">
                             <Building2 size={16} className="text-gray-400" />
                             {i.vendor?.name || "—"}
                           </div>
                         </td>
-                        <td className="p-4 font-semibold text-gray-900">{i.quantity}</td>
+                        <td className="p-4 font-semibold text-gray-900">
+                          {i.quantity}
+                        </td>
                         <td className="p-4">
                           <StatusBadge status={i.status} />
                         </td>
@@ -414,14 +430,16 @@ export default function InventoryPage() {
                   onChange={(v) => setForm({ ...form, chairType: v })}
                   placeholder="Enter chair type"
                 />
-                
+
                 <div>
                   <label className="block text-sm font-semibold text-gray-900 mb-2">
                     Vendor
                   </label>
                   <select
                     value={form.vendor}
-                    onChange={(e) => setForm({ ...form, vendor: e.target.value })}
+                    onChange={(e) =>
+                      setForm({ ...form, vendor: e.target.value })
+                    }
                     className="w-full p-3 bg-white border border-gray-200 rounded-xl outline-none text-gray-900 focus:border-[#c62d23] focus:ring-2 focus:ring-[#c62d23]/20 transition-all"
                   >
                     <option value="">Select Vendor</option>
@@ -474,10 +492,10 @@ const StatCard = ({ title, value, icon, danger }) => {
   return (
     <div
       className={`bg-white border rounded-2xl p-6 transition-all duration-200 shadow-sm hover:shadow-md flex flex-col justify-between h-full ${
-        danger ? 'border-amber-300 bg-amber-50' : 'border-gray-200'
+        danger ? "border-amber-300 bg-amber-50" : "border-gray-200"
       }`}
       style={{
-        borderLeft: '4px solid #c62d23'
+        borderLeft: "4px solid #c62d23",
       }}
     >
       <div className="flex justify-between items-start mb-4">
@@ -496,7 +514,9 @@ const StatusBadge = ({ status }) => {
     Critical: "bg-red-50 text-red-700 border-red-200",
   };
   return (
-    <span className={`px-3 py-1 rounded-full text-xs font-medium border ${map[status]}`}>
+    <span
+      className={`px-3 py-1 rounded-full text-xs font-medium border ${map[status]}`}
+    >
       {status}
     </span>
   );

@@ -10,6 +10,7 @@ import {
   ChevronDown,
   ChevronUp,
   AlertCircle,
+  UserCircle,
   Plus,
   Trash2,
   Pencil,
@@ -279,12 +280,18 @@ export default function WarehouseOrders() {
         label: "Ready for Dispatch",
         color: "bg-green-50 text-green-700 border-green-200",
       },
-      DISPATCHED: { label: "Dispatched", color: "bg-green-50 text-green-700 border-green-200" },
+      DISPATCHED: {
+        label: "Dispatched",
+        color: "bg-green-50 text-green-700 border-green-200",
+      },
       PARTIAL: {
         label: "Partial / Issue",
         color: "bg-amber-50 text-amber-700 border-amber-200",
       },
-      COMPLETED: { label: "Completed", color: "bg-green-50 text-green-700 border-green-200" },
+      COMPLETED: {
+        label: "Completed",
+        color: "bg-green-50 text-green-700 border-green-200",
+      },
     };
 
     const status = statusMap[progress] || {
@@ -447,7 +454,11 @@ Please reduce picks to exactly ${order.quantity}.`,
     }
 
     if (o.progress === "WAREHOUSE_COLLECTED") {
-      return <span className="text-blue-600 text-sm font-medium">Sent to Fitting</span>;
+      return (
+        <span className="text-blue-600 text-sm font-medium">
+          Sent to Fitting
+        </span>
+      );
     }
 
     if (o.progress === "FITTING_COMPLETED") {
@@ -510,17 +521,19 @@ Please reduce picks to exactly ${order.quantity}.`,
       );
     }
 
-    return <span className="text-gray-500 text-sm font-medium">In Progress</span>;
+    return (
+      <span className="text-gray-500 text-sm font-medium">In Progress</span>
+    );
   };
 
   /* ================= UI ================= */
   return (
-    <div className="flex min-h-screen bg-gray-50 text-gray-900">
+    <div className="flex h-screen bg-gray-50 text-gray-900">
       <InventorySidebar />
 
-      <div className="flex-1 overflow-auto">
+      <div className="flex-1 overflow-y-auto overflow-x-hidden">
         <div className="sticky top-0 z-10 bg-white/80 backdrop-blur border-b border-gray-200 p-6 shadow-sm">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between pr-5">
             <div>
               <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-2">
                 <Truck size={32} className="text-[#c62d23]" />
@@ -530,6 +543,14 @@ Please reduce picks to exactly ${order.quantity}.`,
                 Manual picking & fitting workflow
               </p>
             </div>
+            {/* PROFILE */}
+            <button
+              onClick={() => router.push("/profile")}
+              title="My Profile"
+              className="text-gray-600 hover:text-[#c62d23] transition"
+            >
+              <UserCircle size={34} />
+            </button>
           </div>
         </div>
 
@@ -567,10 +588,23 @@ Please reduce picks to exactly ${order.quantity}.`,
           {/* FILTER BADGE */}
           {activeFilter !== "ALL" && (
             <div className="flex items-center gap-3">
-              <div className={`${activeFilter === "DELAYED" ? "bg-amber-100 border-amber-300" : "bg-green-100 border-green-300"} px-4 py-2 rounded-xl flex items-center gap-2 border`}>
-                <AlertCircle className={activeFilter === "DELAYED" ? "text-amber-700" : "text-green-700"} size={18} />
-                <span className={`text-sm font-medium ${activeFilter === "DELAYED" ? "text-amber-800" : "text-green-800"}`}>
-                  {activeFilter === "DELAYED" ? "Showing only delayed orders" : "Showing only ready for dispatch"}
+              <div
+                className={`${activeFilter === "DELAYED" ? "bg-amber-100 border-amber-300" : "bg-green-100 border-green-300"} px-4 py-2 rounded-xl flex items-center gap-2 border`}
+              >
+                <AlertCircle
+                  className={
+                    activeFilter === "DELAYED"
+                      ? "text-amber-700"
+                      : "text-green-700"
+                  }
+                  size={18}
+                />
+                <span
+                  className={`text-sm font-medium ${activeFilter === "DELAYED" ? "text-amber-800" : "text-green-800"}`}
+                >
+                  {activeFilter === "DELAYED"
+                    ? "Showing only delayed orders"
+                    : "Showing only ready for dispatch"}
                 </span>
               </div>
               <button
@@ -692,7 +726,6 @@ const OrdersTable = ({
   loading,
   orders_data,
 }) => {
-
   if (loading) {
     return (
       <div className="bg-white rounded-2xl overflow-hidden border border-gray-200 shadow-sm p-8 text-center">
@@ -740,12 +773,18 @@ const OrdersTable = ({
           <tbody>
             {orders.map((o, index) => (
               <React.Fragment key={`order-row-${o._id}`}>
-                <tr className={`border-b border-gray-100 hover:bg-gray-50 transition-colors ${
-                  index % 2 === 0 ? 'bg-white' : 'bg-gray-50'
-                }`}>
-                  <td className="p-4 font-semibold text-gray-900">{o.orderId}</td>
+                <tr
+                  className={`border-b border-gray-100 hover:bg-gray-50 transition-colors ${
+                    index % 2 === 0 ? "bg-white" : "bg-gray-50"
+                  }`}
+                >
+                  <td className="p-4 font-semibold text-gray-900">
+                    {o.orderId}
+                  </td>
                   <td className="p-4 text-gray-700">{o.dispatchedTo?.name}</td>
-                  <td className="p-4 font-medium text-gray-900">{o.chairModel || "Spare Parts"}</td>
+                  <td className="p-4 font-medium text-gray-900">
+                    {o.chairModel || "Spare Parts"}
+                  </td>
                   <td className="p-4 text-gray-700">
                     {new Date(o.orderDate).toLocaleDateString()}
                   </td>
@@ -754,7 +793,9 @@ const OrdersTable = ({
                       ? new Date(o.deliveryDate).toLocaleDateString()
                       : "-"}
                   </td>
-                  <td className="p-4 font-semibold text-gray-900">{o.quantity}</td>
+                  <td className="p-4 font-semibold text-gray-900">
+                    {o.quantity}
+                  </td>
                   <td className="p-4">{getStatusBadge(o.progress)}</td>
                   <td className="p-4">{renderAction(o)}</td>
                 </tr>
@@ -764,10 +805,10 @@ const OrdersTable = ({
                   ["ORDER_PLACED", "PARTIAL"].includes(o.progress) && (
                     <tr>
                       <td colSpan={8} className="p-0">
-                        <div 
+                        <div
                           className="bg-gradient-to-br from-gray-50 to-white border-t border-gray-200 overflow-hidden"
                           style={{
-                            animation: 'slideDown 0.3s ease-out'
+                            animation: "slideDown 0.3s ease-out",
                           }}
                         >
                           <style>
@@ -788,12 +829,12 @@ const OrdersTable = ({
                               }
                             `}
                           </style>
-                          
+
                           <div className="p-8">
                             {/* Header Section */}
-                            <div 
+                            <div
                               className="mb-6 pb-6 border-b border-gray-200"
-                              style={{ animation: 'fadeIn 0.4s ease-out' }}
+                              style={{ animation: "fadeIn 0.4s ease-out" }}
                             >
                               <div className="flex items-start justify-between">
                                 <div>
@@ -802,29 +843,42 @@ const OrdersTable = ({
                                   </h3>
                                   <div className="flex flex-wrap gap-4 text-sm">
                                     <div className="flex items-center gap-2">
-                                      <span className="text-gray-500 font-medium">Chair Model:</span>
-                                      <span className="font-semibold text-gray-900">{o.chairModel}</span>
+                                      <span className="text-gray-500 font-medium">
+                                        Chair Model:
+                                      </span>
+                                      <span className="font-semibold text-gray-900">
+                                        {o.chairModel}
+                                      </span>
                                     </div>
                                     <div className="flex items-center gap-2">
-                                      <span className="text-gray-500 font-medium">Required Quantity:</span>
-                                      <span className="font-semibold text-[#c62d23] text-lg">{o.quantity}</span>
+                                      <span className="text-gray-500 font-medium">
+                                        Required Quantity:
+                                      </span>
+                                      <span className="font-semibold text-[#c62d23] text-lg">
+                                        {o.quantity}
+                                      </span>
                                     </div>
                                   </div>
                                 </div>
-                                
+
                                 {o.progress === "PARTIAL" && (
                                   <div className="flex items-center gap-2 bg-amber-50 border border-amber-200 px-4 py-2 rounded-lg">
-                                    <AlertCircle size={18} className="text-amber-600" />
-                                    <span className="text-sm font-semibold text-amber-800">Partial Order</span>
+                                    <AlertCircle
+                                      size={18}
+                                      className="text-amber-600"
+                                    />
+                                    <span className="text-sm font-semibold text-amber-800">
+                                      Partial Order
+                                    </span>
                                   </div>
                                 )}
                               </div>
                             </div>
 
                             {/* Inventory Grid */}
-                            <div 
+                            <div
                               className="mb-6"
-                              style={{ animation: 'fadeIn 0.5s ease-out' }}
+                              style={{ animation: "fadeIn 0.5s ease-out" }}
                             >
                               <h4 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
                                 <Package size={20} className="text-[#c62d23]" />
@@ -837,8 +891,13 @@ const OrdersTable = ({
                                 </div>
                               ) : inventoryPreview[o._id].length === 0 ? (
                                 <div className="text-center py-12 bg-gray-50 rounded-xl border border-gray-200">
-                                  <Package size={48} className="mx-auto mb-4 text-gray-300" />
-                                  <p className="text-gray-600 font-medium">No spare parts available</p>
+                                  <Package
+                                    size={48}
+                                    className="mx-auto mb-4 text-gray-300"
+                                  />
+                                  <p className="text-gray-600 font-medium">
+                                    No spare parts available
+                                  </p>
                                 </div>
                               ) : (
                                 <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
@@ -846,8 +905,8 @@ const OrdersTable = ({
                                     <div
                                       key={`${o._id}-${part.partName}`}
                                       className="bg-white border-2 border-gray-200 rounded-xl p-5 hover:border-[#c62d23] transition-all hover:shadow-md"
-                                      style={{ 
-                                        animation: `fadeIn ${0.6 + idx * 0.1}s ease-out` 
+                                      style={{
+                                        animation: `fadeIn ${0.6 + idx * 0.1}s ease-out`,
                                       }}
                                     >
                                       <div className="flex items-center justify-between mb-4 pb-3 border-b border-gray-200">
@@ -855,7 +914,11 @@ const OrdersTable = ({
                                           {part.partName}
                                         </h5>
                                         <div className="bg-[#c62d23] text-white text-xs font-bold px-2.5 py-1 rounded-full">
-                                          {part.locations.reduce((sum, l) => sum + (l.picked || 0), 0)} picked
+                                          {part.locations.reduce(
+                                            (sum, l) => sum + (l.picked || 0),
+                                            0,
+                                          )}{" "}
+                                          picked
                                         </div>
                                       </div>
 
@@ -871,7 +934,10 @@ const OrdersTable = ({
                                                   {loc.location}
                                                 </p>
                                                 <p className="text-xs text-gray-600 mt-0.5">
-                                                  Available: <span className="font-semibold text-gray-900">{loc.available}</span>
+                                                  Available:{" "}
+                                                  <span className="font-semibold text-gray-900">
+                                                    {loc.available}
+                                                  </span>
                                                 </p>
                                               </div>
 
@@ -883,32 +949,67 @@ const OrdersTable = ({
                                                 placeholder="0"
                                                 className="w-20 bg-white border-2 border-gray-300 px-3 py-2 rounded-lg text-center font-bold focus:border-[#c62d23] focus:ring-2 focus:ring-[#c62d23]/20 transition-all outline-none"
                                                 onChange={(e) => {
-                                                  let qty = Number(e.target.value);
+                                                  let qty = Number(
+                                                    e.target.value,
+                                                  );
                                                   if (qty < 0) qty = 0;
-                                                  if (qty > loc.available) qty = loc.available;
+                                                  if (qty > loc.available)
+                                                    qty = loc.available;
 
-                                                  setInventoryPreview(prev => {
-                                                    const parts = prev[o._id].map(p => {
-                                                      if (p.partName !== part.partName) return p;
+                                                  setInventoryPreview(
+                                                    (prev) => {
+                                                      const parts = prev[
+                                                        o._id
+                                                      ].map((p) => {
+                                                        if (
+                                                          p.partName !==
+                                                          part.partName
+                                                        )
+                                                          return p;
 
-                                                      let remaining = o.quantity;
+                                                        let remaining =
+                                                          o.quantity;
 
-                                                      const locations = p.locations.map(l => {
-                                                        if (l.inventoryId === loc.inventoryId) {
-                                                          remaining -= qty;
-                                                          return { ...l, picked: qty };
-                                                        }
+                                                        const locations =
+                                                          p.locations.map(
+                                                            (l) => {
+                                                              if (
+                                                                l.inventoryId ===
+                                                                loc.inventoryId
+                                                              ) {
+                                                                remaining -=
+                                                                  qty;
+                                                                return {
+                                                                  ...l,
+                                                                  picked: qty,
+                                                                };
+                                                              }
 
-                                                        const safe = Math.min(l.picked || 0, remaining);
-                                                        remaining -= safe;
-                                                        return { ...l, picked: safe };
+                                                              const safe =
+                                                                Math.min(
+                                                                  l.picked || 0,
+                                                                  remaining,
+                                                                );
+                                                              remaining -= safe;
+                                                              return {
+                                                                ...l,
+                                                                picked: safe,
+                                                              };
+                                                            },
+                                                          );
+
+                                                        return {
+                                                          ...p,
+                                                          locations,
+                                                        };
                                                       });
 
-                                                      return { ...p, locations };
-                                                    });
-
-                                                    return { ...prev, [o._id]: parts };
-                                                  });
+                                                      return {
+                                                        ...prev,
+                                                        [o._id]: parts,
+                                                      };
+                                                    },
+                                                  );
                                                 }}
                                               />
                                             </div>
@@ -922,9 +1023,9 @@ const OrdersTable = ({
                             </div>
 
                             {/* Action Buttons */}
-                            <div 
+                            <div
                               className="flex gap-3 pt-6 border-t border-gray-200"
-                              style={{ animation: 'fadeIn 0.7s ease-out' }}
+                              style={{ animation: "fadeIn 0.7s ease-out" }}
                             >
                               <button
                                 onClick={() => handlePartialAccepted(o._id)}
@@ -959,16 +1060,24 @@ const OrdersTable = ({
 };
 
 /* ================= STAT CARD COMPONENT ================= */
-const StatCard = ({ title, value, icon, danger, clickable, onClick, active }) => (
+const StatCard = ({
+  title,
+  value,
+  icon,
+  danger,
+  clickable,
+  onClick,
+  active,
+}) => (
   <div
     onClick={clickable ? onClick : undefined}
     className={`bg-white border rounded-2xl p-6 transition-all duration-200 shadow-sm hover:shadow-md flex flex-col justify-between h-full ${
-      danger ? 'border-amber-300 bg-amber-50' : 'border-gray-200'
-    } ${clickable ? 'cursor-pointer hover:bg-gray-50 hover:border-[#c62d23]' : ''} ${
-      active ? 'ring-2 ring-[#c62d23]' : ''
+      danger ? "border-amber-300 bg-amber-50" : "border-gray-200"
+    } ${clickable ? "cursor-pointer hover:bg-gray-50 hover:border-[#c62d23]" : ""} ${
+      active ? "ring-2 ring-[#c62d23]" : ""
     }`}
     style={{
-      borderLeft: '4px solid #c62d23'
+      borderLeft: "4px solid #c62d23",
     }}
   >
     <div className="flex justify-between items-start mb-4">
@@ -978,7 +1087,7 @@ const StatCard = ({ title, value, icon, danger, clickable, onClick, active }) =>
     <p className="text-3xl font-bold text-gray-900 mb-1">{value}</p>
     {clickable && (
       <div className="mt-2 text-xs text-gray-500 flex items-center gap-1">
-        <span>{active ? 'Click to show all' : 'Click to view details'}</span>
+        <span>{active ? "Click to show all" : "Click to view details"}</span>
         <span className="text-[#c62d23]">→</span>
       </div>
     )}

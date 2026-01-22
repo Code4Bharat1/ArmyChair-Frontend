@@ -1,5 +1,5 @@
 "use client";
-
+import { formatDate } from "@/utils/formatDate";
 import React, { useEffect, useMemo, useState } from "react";
 import axios from "axios";
 import {
@@ -46,17 +46,25 @@ export default function StockMovementsPage() {
   }, []);
 
   /* ================= NORMALIZE ================= */
-  const normalized = useMemo(() => {
-    return movements.map((m) => ({
+const normalized = useMemo(() => {
+  return movements.map((m) => {
+    // Extract quantity safely from description
+    const qtyMatch = m.description.match(/Transferred\s(\d+)/i);
+    const qty = qtyMatch ? Number(qtyMatch[1]) : 0;
+
+    return {
       id: m._id,
-      part: m.chairType,
-      from: m.fromLocation,
-      to: m.toLocation,
-      qty: m.quantity,
-      user: m.movedBy?.name || "System",
+      part: m.description,
+      from: m.sourceLocation,
+      to: m.destination,
+      qty,
+      user: m.userName,
       time: m.createdAt,
-    }));
-  }, [movements]);
+    };
+  });
+}, [movements]);
+
+
 
   /* ================= LOCATIONS ================= */
   const locations = useMemo(() => {
@@ -109,10 +117,10 @@ export default function StockMovementsPage() {
 
   /* ================= UI ================= */
   return (
-    <div className="flex min-h-screen bg-gray-50 text-gray-900">
+    <div className="flex h-screen bg-gray-50 text-gray-900">
       <InventorySidebar />
 
-      <div className="flex-1 overflow-auto">
+      <div className="flex-1 overflow-y-auto overflow-x-hidden">
         {/* HEADER */}
         <div className="sticky top-0 z-10 bg-white/80 backdrop-blur border-b border-gray-200 p-6 shadow-sm">
           <div className="flex items-center justify-between">
@@ -290,7 +298,7 @@ export default function StockMovementsPage() {
                         <td className="p-4 text-gray-700">
                           <div className="flex items-center gap-2">
                             <Clock size={16} className="text-gray-400" />
-                            {new Date(m.time).toLocaleString()}
+                            {formatDate(m.time)}
                           </div>
                         </td>
                       </tr>

@@ -13,7 +13,6 @@ import {
   AlertCircle,
 } from "lucide-react";
 import axios from "axios";
-import SalesSidebar from "./sidebar";
 
 import { UserCircle } from "lucide-react";
 import { useRouter } from "next/navigation";
@@ -56,15 +55,14 @@ export default function Orders() {
     return orders.filter((o) => {
       // 🔍 Search filter
       const vendorName =
-  typeof o.dispatchedTo === "string"
-    ? o.dispatchedTo
-    : o.dispatchedTo?.name || "";
+        typeof o.dispatchedTo === "string"
+          ? o.dispatchedTo
+          : o.dispatchedTo?.name || "";
 
-const matchesSearch =
-  o.orderId?.toLowerCase().includes(q) ||
-  vendorName.toLowerCase().includes(q) ||
-  o.chairModel?.toLowerCase().includes(q);
-
+      const matchesSearch =
+        o.orderId?.toLowerCase().includes(q) ||
+        vendorName.toLowerCase().includes(q) ||
+        o.chairModel?.toLowerCase().includes(q);
 
       if (!matchesSearch) return false;
 
@@ -205,57 +203,48 @@ const matchesSearch =
   };
 
   /* ================= CREATE / UPDATE ================= */
-const handleCreateOrder = async (e) => {
-  e.preventDefault();
+  const handleCreateOrder = async (e) => {
+    e.preventDefault();
 
-  if (!formData.dispatchedTo) {
-    alert("Please select vendor from dropdown");
-    return;
-  }
-
-  if (!formData.quantity || Number(formData.quantity) <= 0) {
-    alert("Please enter valid quantity");
-    return;
-  }
-
-  const payload = {
-    dispatchedTo: formData.dispatchedTo,
-    chairModel: formData.chairModel,
-    orderType: formData.orderType,
-    orderDate: formData.orderDate || new Date().toISOString().split("T")[0],
-    deliveryDate: formData.deliveryDate,
-    quantity: Number(formData.quantity),
-  };
-
-  try {
-    if (editingOrderId) {
-      // ✅ UPDATE
-      await axios.put(
-        `${API}/orders/${editingOrderId}`,
-        payload,
-        { headers }
-      );
-    } else {
-      // ✅ CREATE
-      await axios.post(
-        `${API}/orders`,
-        payload,
-        { headers }
-      );
+    if (!formData.dispatchedTo) {
+      alert("Please select vendor from dropdown");
+      return;
     }
 
-    setShowForm(false);
-    setEditingOrderId(null);
-    setFormData(initialFormData);
-    fetchOrders();
-  } catch (err) {
-    console.error("Save failed", err?.response?.data || err);
-    alert(err?.response?.data?.message || "Failed to save order");
-  }
-};
+    if (!formData.quantity || Number(formData.quantity) <= 0) {
+      alert("Please enter valid quantity");
+      return;
+    }
 
+    const payload = {
+      dispatchedTo: formData.dispatchedTo,
+      chairModel: formData.chairModel,
+      orderType: formData.orderType,
+      orderDate: formData.orderDate || new Date().toISOString().split("T")[0],
+      deliveryDate: formData.deliveryDate,
+      quantity: Number(formData.quantity),
+    };
 
+    try {
+      if (editingOrderId) {
+        // ✅ UPDATE
+        await axios.put(`${API}/orders/${editingOrderId}`, payload, {
+          headers,
+        });
+      } else {
+        // ✅ CREATE
+        await axios.post(`${API}/orders`, payload, { headers });
+      }
 
+      setShowForm(false);
+      setEditingOrderId(null);
+      setFormData(initialFormData);
+      fetchOrders();
+    } catch (err) {
+      console.error("Save failed", err?.response?.data || err);
+      alert(err?.response?.data?.message || "Failed to save order");
+    }
+  };
 
   /* ================= DELETE ================= */
   const handleDeleteOrder = async (orderId) => {
@@ -385,38 +374,61 @@ const handleCreateOrder = async (e) => {
   };
 
   /* ================= EXPORT CSV ================= */
-  const handleExportCSV = async () => {
-    try {
-      const res = await axios.get(`${API}/orders/export`, {
-        headers,
-        responseType: "blob",
-      });
-
-      const blob = new Blob([res.data], { type: "text/csv" });
-      const url = window.URL.createObjectURL(blob);
-
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = `orders_${new Date().toISOString().slice(0, 10)}.csv`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-    } catch (err) {
-      alert("Export failed");
+  const handleExportCSV = () => {
+    if (!orders.length) {
+      alert("No orders to export");
+      return;
     }
+
+    const headers = [
+      "Order ID",
+      "Vendor",
+      "Product",
+      "Order Type",
+      "Quantity",
+      "Order Date",
+      "Delivery Date",
+      "Status",
+    ];
+
+    const rows = orders.map((o) => [
+      o.orderId,
+      typeof o.dispatchedTo === "string"
+        ? o.dispatchedTo
+        : o.dispatchedTo?.name || "",
+      o.chairModel,
+      o.orderType,
+      o.quantity,
+      o.orderDate ? new Date(o.orderDate).toLocaleDateString() : "",
+      o.deliveryDate ? new Date(o.deliveryDate).toLocaleDateString() : "",
+      o.progress,
+    ]);
+
+    let csvContent =
+      headers.join(",") +
+      "\n" +
+      rows.map((row) => row.map((v) => `"${v}"`).join(",")).join("\n");
+
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `orders_${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
   };
 
   return (
     <div className="flex min-h-screen bg-gray-50 text-gray-900">
-      <SalesSidebar />
       <div className="flex-1 overflow-auto">
         {/* ================= HIDDEN UPLOAD INPUT ================= */}
         <input
           type="file"
           id="orderUploadInput"
-          webkitdirectory="true"
-          directory=""
-          multiple
+          accept=".csv,.xlsx"
           hidden
           onChange={(e) => handleUploadOrders(e.target.files)}
         />
@@ -471,7 +483,7 @@ const handleCreateOrder = async (e) => {
 
               {/* PROFILE */}
               <button
-                onClick={() => router.push("/sales/profile")}
+                onClick={() => router.push("/profile")}
                 title="My Profile"
                 className="text-gray-600 hover:text-[#c62d23] transition"
               >
@@ -831,7 +843,6 @@ const handleCreateOrder = async (e) => {
   max-h-[90vh] flex flex-col border border-gray-200 shadow-2xl"
           >
             <div className="flex items-center justify-between px-8 pt-8 pb-4 border-b border-gray-200">
-
               <h2 className="text-2xl font-bold text-gray-900">
                 {editingOrderId ? "Update Order" : "Create Order"}
               </h2>
@@ -861,10 +872,9 @@ const handleCreateOrder = async (e) => {
                     setTimeout(() => setShowVendorDropdown(false), 200)
                   }
                   onChange={(e) => {
-  setVendorSearch(e.target.value);
-  // ✅ DO NOT update dispatchedTo here
-}}
-
+                    setVendorSearch(e.target.value);
+                    // ✅ DO NOT update dispatchedTo here
+                  }}
                   className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl outline-none
       focus:border-[#c62d23] focus:ring-2 focus:ring-[#c62d23]/20 transition-all"
                 />
@@ -896,7 +906,6 @@ const handleCreateOrder = async (e) => {
                       ))}
 
                     {/* ADD NEW VENDOR */}
-                    
                   </div>
                 )}
               </div>
@@ -993,7 +1002,6 @@ const handleCreateOrder = async (e) => {
             </div>
 
             <div className="flex justify-end gap-3 px-8 py-4 border-t border-gray-200 bg-white">
-
               <button
                 type="button"
                 onClick={() => {

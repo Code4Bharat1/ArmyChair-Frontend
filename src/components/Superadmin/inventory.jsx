@@ -85,14 +85,15 @@ export default function InventoryPage() {
       }
 
       const payload = {
-  chairType: form.chairType,
-  vendor: form.vendor,
-  quantity: Number(form.quantity),
-  color: "Default",
-  minQuantity: 50,
-  location: "WAREHOUSE", // 🔥 REQUIRED
   type: "FULL",
+  chairType: form.chairType,
+  vendor: form.vendor, // ObjectId
+  quantity: Number(form.quantity),
+  minQuantity: 50,
+  maxQuantity: 500,
+  location: "WAREHOUSE",
 };
+
 
 
 
@@ -191,7 +192,7 @@ export default function InventoryPage() {
     <div className="flex h-screen bg-gray-50 text-gray-900">
       <InventorySidebar />
 
-      <div className="flex-1 overflow-auto">
+      <div className="flex-1 overflow-y-auto overflow-x-hidden">
         {/* HEADER */}
         <div className="bg-white border-b border-gray-200 p-4 flex items-center justify-between shadow-sm">
           <div>

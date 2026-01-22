@@ -3,7 +3,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import axios from "axios";
 import { Users, Package, Search, Filter } from "lucide-react";
-import SalesSidebar from "@/components/Sales/sidebar"; // sales sidebar
 
 export default function ClientsPage() {
   const [orders, setOrders] = useState([]);
@@ -102,8 +101,6 @@ export default function ClientsPage() {
 
   return (
     <div className="flex min-h-screen bg-gray-50 text-gray-900">
-      <SalesSidebar />
-
       <div className="flex-1 overflow-auto">
         {/* HEADER */}
         <div className="sticky top-0 z-10 bg-white/80 backdrop-blur border-b border-gray-200 p-6 shadow-sm">

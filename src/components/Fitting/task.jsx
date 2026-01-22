@@ -62,10 +62,10 @@ export default function FittingTasks() {
   }
 
   return (
-    <div className="flex min-h-screen bg-gray-50 text-gray-900">
+    <div className="flex h-screen bg-gray-50 text-gray-900">
       <FittingSidebar />
 
-      <div className="flex-1 overflow-auto">
+      <div className="flex-1 overflow-y-auto overflow-x-hidden">
         {/* Header */}
         <div className="sticky top-0 z-10 bg-white/80 backdrop-blur border-b border-gray-200 p-6 shadow-sm">
           <div>
@@ -82,7 +82,7 @@ export default function FittingTasks() {
         <div className="p-8 space-y-8">
           {/* CURRENT TASK */}
           {task ? (
-            <div className="max-w-4xl bg-white border border-gray-200 rounded-2xl p-8 shadow-sm">
+            <div className="max-w-8xl bg-white border border-gray-200 rounded-2xl p-8 shadow-sm">
               <div className="flex items-center justify-between mb-6">
                 <h2 className="text-xl font-semibold flex items-center gap-3 text-gray-900">
                   <ClipboardList className="text-[#c62d23]" size={24} />

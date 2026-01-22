@@ -28,6 +28,7 @@ export default function Staff() {
   const [showForm, setShowForm] = useState(false);
   const [selectedStaff, setSelectedStaff] = useState(null);
   const [search, setSearch] = useState("");
+  const [roleFilter, setRoleFilter] = useState("All");
   const API = process.env.NEXT_PUBLIC_API_URL;
 
   const fetchStaffs = async () => {
@@ -65,12 +66,16 @@ export default function Staff() {
   /* ==========================
      FILTER
   ========================== */
-  const filteredStaff = staffs.filter(
-    (s) =>
-      s.name.toLowerCase().includes(search.toLowerCase()) ||
-      s.email.toLowerCase().includes(search.toLowerCase()) ||
-      s.role.toLowerCase().includes(search.toLowerCase())
-  );
+  const filteredStaff = staffs.filter((s) => {
+  const matchesSearch = 
+    s.name.toLowerCase().includes(search.toLowerCase()) ||
+    s.email.toLowerCase().includes(search.toLowerCase()) ||
+    s.role.toLowerCase().includes(search.toLowerCase());
+  
+  const matchesRole = roleFilter === "All" || s.role === roleFilter;
+  
+  return matchesSearch && matchesRole;
+});
 
   /* ==========================
      STATS
@@ -79,6 +84,7 @@ export default function Staff() {
   const salesCount = staffs.filter((s) => s.role === "sales").length;
   const warehouseCount = staffs.filter((s) => s.role === "warehouse").length;
   const fittingCount = staffs.filter((s) => s.role === "fitting").length;
+  const productionCount = staffs.filter((s) => s.role === "production").length;
 
   /* ==========================
      FORM STATE
@@ -225,10 +231,10 @@ export default function Staff() {
   };
 
   return (
-    <div className="flex min-h-screen bg-gray-50 text-gray-900">
+    <div className="flex h-screen bg-gray-50 text-gray-900">
       <Sidebar />
 
-      <div className="flex-1 overflow-auto">
+      <div className="flex-1 overflow-y-auto overflow-x-hidden">
         {/* HEADER */}
         <div className="sticky top-0 z-10 bg-white/80 backdrop-blur border-b border-gray-200 p-6 shadow-sm flex justify-between items-center">
           <div>
@@ -251,28 +257,43 @@ export default function Staff() {
 
         <div className="p-8 space-y-8">
           {/* STATS */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-            <KpiCard
-              title="Total Staff"
-              value={totalStaff}
-              icon={<Users className="text-[#c62d23]" />}
-            />
-            <KpiCard
-              title="Sales Team"
-              value={salesCount}
-              icon={<UserCheck className="text-[#c62d23]" />}
-            />
-            <KpiCard
-              title="Warehouse Team"
-              value={warehouseCount}
-              icon={<UserCog className="text-[#c62d23]" />}
-            />
-            <KpiCard
-              title="Fitting Team"
-              value={fittingCount}
-              icon={<UserCheck className="text-[#c62d23]" />}
-            />
-          </div>
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
+  <KpiCard
+    title="Total Staff"
+    value={totalStaff}
+    icon={<Users className="text-[#c62d23]" />}
+    onClick={() => setRoleFilter("All")}
+    isClickable={true}
+  />
+  <KpiCard
+    title="Sales Team"
+    value={salesCount}
+    icon={<UserCheck className="text-[#c62d23]" />}
+    onClick={() => setRoleFilter("sales")}
+    isClickable={true}
+  />
+  <KpiCard
+    title="Warehouse Team"
+    value={warehouseCount}
+    icon={<UserCog className="text-[#c62d23]" />}
+    onClick={() => setRoleFilter("warehouse")}
+    isClickable={true}
+  />
+  <KpiCard
+    title="Fitting Team"
+    value={fittingCount}
+    icon={<UserCheck className="text-[#c62d23]" />}
+    onClick={() => setRoleFilter("fitting")}
+    isClickable={true}
+  />
+  <KpiCard
+    title="Production Team"
+    value={productionCount}
+    icon={<UserCheck className="text-[#c62d23]" />}
+    onClick={() => setRoleFilter("production")}
+    isClickable={true}
+  />
+</div>
 
           {/* SEARCH & TABLE */}
           <div className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm hover:shadow-md transition-shadow">
@@ -647,6 +668,7 @@ export default function Staff() {
                     <option value="sales">Sales</option>
                     <option value="warehouse">Warehouse</option>
                     <option value="fitting">Fitting</option>
+                    <option value="production">Production</option>
                   </select>
                 </div>
 
@@ -758,13 +780,19 @@ export default function Staff() {
 }
 
 /* ================= KPI CARD ================= */
-const KpiCard = ({ title, value, icon }) => (
-  <div className="bg-white border border-gray-200 rounded-2xl p-6 transition-all duration-200 shadow-sm hover:shadow-md flex flex-col justify-between h-full"
-    style={{ borderLeft: '4px solid #c62d23' }}>
+const KpiCard = ({ title, value, icon, onClick, isClickable }) => (
+  <button
+    onClick={onClick}
+    disabled={!isClickable}
+    className={`bg-white border border-gray-200 rounded-2xl p-6 transition-all duration-200 shadow-sm hover:shadow-md flex flex-col justify-between h-full text-left ${
+      isClickable ? 'cursor-pointer hover:border-[#c62d23]' : ''
+    }`}
+    style={{ borderLeft: '4px solid #c62d23' }}
+  >
     <div className="flex justify-between items-start mb-4">
       <p className="text-sm text-gray-600 font-medium">{title}</p>
       {React.cloneElement(icon, { size: 24 })}
     </div>
     <p className="text-3xl font-bold text-gray-900">{value}</p>
-  </div>
+  </button>
 );

@@ -94,11 +94,11 @@ export default function CompletedOrders() {
 
   /* ================= UI ================= */
   return (
-    <div className="flex min-h-screen bg-gray-50 text-gray-900">
+    <div className="flex h-screen bg-gray-50 text-gray-900">
       {/* SIDEBAR PLACEHOLDER */}
       <InventorySidebar />
       {/* MAIN */}
-      <div className="flex-1 overflow-auto">
+      <div className="flex-1 overflow-y-auto overflow-x-hidden">
         {/* HEADER */}
         <div className="sticky top-0 z-10 bg-white/80 backdrop-blur border-b border-gray-200 p-6 shadow-sm">
           <div className="flex items-center justify-between">
@@ -114,7 +114,7 @@ export default function CompletedOrders() {
 
             <button
               onClick={exportCSV}
-              className="bg-[#c62d23] hover:bg-[#a82419] text-white px-5 py-3 rounded-xl flex items-center gap-2 shadow-lg shadow-green-600/20 font-medium transition-all"
+              className="bg-[#c62d23] hover:bg-[#a82419] text-white px-5 py-3 rounded-xl flex items-center gap-2 shadow-lg shadow-red-600/20 font-medium transition-all"
             >
               <Download size={18} />
               Export CSV

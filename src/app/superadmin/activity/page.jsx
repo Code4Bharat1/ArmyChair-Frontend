@@ -9,7 +9,9 @@ import { Download, RefreshCw, Calendar, ChevronDown } from "lucide-react";
 export default function ActivityLogPage() {
   const [logs, setLogs] = useState([]);
   const [files, setFiles] = useState([]);
-  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split("T")[0]);
+  const [selectedDate, setSelectedDate] = useState(
+    new Date().toISOString().split("T")[0],
+  );
   const [showCalendar, setShowCalendar] = useState(false);
   const calendarRef = useRef(null);
   const [token, setToken] = useState(null);
@@ -49,9 +51,9 @@ export default function ActivityLogPage() {
       }
     };
 
-    document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener("mousedown", handleClickOutside);
     return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener("mousedown", handleClickOutside);
     };
   }, []);
 
@@ -130,12 +132,12 @@ export default function ActivityLogPage() {
 
   return (
     <ProtectedRoute allowedRoles={["admin"]}>
-      <div className="flex min-h-screen bg-gray-50 text-gray-900">
+      <div className="flex h-screen bg-gray-50 text-gray-900">
         {/* SIDEBAR */}
         <Sidebar />
 
         {/* MAIN CONTENT */}
-        <div className="flex-1 overflow-auto">
+        <div className="flex-1 overflow-y-auto overflow-x-hidden">
           {/* HEADER */}
           <div className="sticky top-0 z-10 bg-white/80 backdrop-blur border-b border-gray-200 p-6 shadow-sm">
             <div>
@@ -156,7 +158,10 @@ export default function ActivityLogPage() {
                   onClick={exportCSV}
                   className="bg-white px-5 py-3 rounded-xl border-2 border-gray-200 shadow-sm hover:border-[#c62d23] hover:shadow-md transition-all duration-200 cursor-pointer group flex items-center gap-2 font-medium"
                 >
-                  <Download size={18} className="text-[#c62d23] group-hover:scale-110 transition-transform" />
+                  <Download
+                    size={18}
+                    className="text-[#c62d23] group-hover:scale-110 transition-transform"
+                  />
                   Export CSV (Current View)
                 </button>
 
@@ -166,15 +171,21 @@ export default function ActivityLogPage() {
                     onClick={() => setShowCalendar(!showCalendar)}
                     className="flex items-center gap-3 bg-white px-5 py-3 rounded-xl border-2 border-gray-200 shadow-sm hover:border-[#c62d23] hover:shadow-md transition-all duration-200 cursor-pointer group"
                   >
-                    <Calendar size={18} className="text-[#c62d23] group-hover:scale-110 transition-transform" />
+                    <Calendar
+                      size={18}
+                      className="text-[#c62d23] group-hover:scale-110 transition-transform"
+                    />
                     <span className="text-sm font-medium text-gray-900 min-w-[120px]">
-                      {new Date(selectedDate).toLocaleDateString('en-US', {
-                        year: 'numeric',
-                        month: 'short',
-                        day: 'numeric'
+                      {new Date(selectedDate).toLocaleDateString("en-US", {
+                        year: "numeric",
+                        month: "short",
+                        day: "numeric",
                       })}
                     </span>
-                    <ChevronDown size={16} className={`text-gray-500 transition-transform ${showCalendar ? 'rotate-180' : ''}`} />
+                    <ChevronDown
+                      size={16}
+                      className={`text-gray-500 transition-transform ${showCalendar ? "rotate-180" : ""}`}
+                    />
                   </div>
 
                   {showCalendar && (
@@ -210,7 +221,10 @@ export default function ActivityLogPage() {
                   }}
                   className="bg-white px-5 py-3 rounded-xl border-2 border-gray-200 shadow-sm hover:border-[#c62d23] hover:shadow-md transition-all duration-200 cursor-pointer group flex items-center gap-2 font-medium"
                 >
-                  <RefreshCw size={18} className="text-[#c62d23] group-hover:scale-110 transition-transform" />
+                  <RefreshCw
+                    size={18}
+                    className="text-[#c62d23] group-hover:scale-110 transition-transform"
+                  />
                   Refresh Logs
                 </button>
               </div>
@@ -218,31 +232,48 @@ export default function ActivityLogPage() {
 
             {/* TABLE */}
             <div className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm hover:shadow-md transition-shadow">
-              <h2 className="text-xl font-bold text-gray-900 mb-6">Activity Logs</h2>
+              <h2 className="text-xl font-bold text-gray-900 mb-6">
+                Activity Logs
+              </h2>
               <div className="overflow-auto rounded-lg border border-gray-200">
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="bg-gray-50">
-                      {["Time", "User", "Role", "Action", "Module", "Description"].map(
-                        (h) => (
-                          <th key={h} className="text-left p-4 font-semibold text-gray-700">
-                            {h}
-                          </th>
-                        )
-                      )}
+                      {[
+                        "Time",
+                        "User",
+                        "Role",
+                        "Action",
+                        "Module",
+                        "Description",
+                      ].map((h) => (
+                        <th
+                          key={h}
+                          className="text-left p-4 font-semibold text-gray-700"
+                        >
+                          {h}
+                        </th>
+                      ))}
                     </tr>
                   </thead>
                   <tbody>
                     {logs.map((l, index) => (
-                      <tr 
-                        key={l._id} 
+                      <tr
+                        key={l._id}
                         className={`border-b border-gray-100 hover:bg-gray-50 transition-colors ${
                           index % 2 === 0 ? "bg-white" : "bg-gray-50"
                         }`}
                       >
-                        <td className="p-4 text-gray-700">
-                          {new Date(l.createdAt).toLocaleString()}
+                        <td className="p-4 font-semibold text-[15px] text-gray-700">
+                          {new Date(l.createdAt).toLocaleString([], {
+                            year: "numeric",
+                            month: "short",
+                            day: "2-digit",
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          })}
                         </td>
+
                         <td className="p-4 text-gray-700">{l.user?.name}</td>
                         <td className="p-4 text-gray-700">{l.user?.role}</td>
                         <td className="p-4 text-gray-700">{l.action}</td>
@@ -262,7 +293,9 @@ export default function ActivityLogPage() {
 
             {/* DAILY ARCHIVES */}
             <div className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm hover:shadow-md transition-shadow">
-              <h2 className="text-xl font-bold text-gray-900 mb-6">Daily Archives</h2>
+              <h2 className="text-xl font-bold text-gray-900 mb-6">
+                Daily Archives
+              </h2>
               <div className="flex flex-wrap gap-3">
                 {files.map((f) => (
                   <button
@@ -270,12 +303,17 @@ export default function ActivityLogPage() {
                     onClick={() => downloadFile(f)}
                     className="bg-white px-5 py-3 rounded-xl border-2 border-gray-200 shadow-sm hover:border-[#c62d23] hover:shadow-md transition-all duration-200 cursor-pointer group flex items-center gap-2 font-medium"
                   >
-                    <Download size={16} className="text-[#c62d23] group-hover:scale-110 transition-transform" />
+                    <Download
+                      size={16}
+                      className="text-[#c62d23] group-hover:scale-110 transition-transform"
+                    />
                     {f}
                   </button>
                 ))}
                 {files.length === 0 && (
-                  <div className="text-gray-500">No archived files available</div>
+                  <div className="text-gray-500">
+                    No archived files available
+                  </div>
                 )}
               </div>
             </div>
@@ -297,8 +335,18 @@ const CalendarComponent = ({ selectedDate, onDateSelect, maxDate }) => {
   const selectedDateObj = new Date(selectedDate);
 
   const monthNames = [
-    "January", "February", "March", "April", "May", "June",
-    "July", "August", "September", "October", "November", "December"
+    "January",
+    "February",
+    "March",
+    "April",
+    "May",
+    "June",
+    "July",
+    "August",
+    "September",
+    "October",
+    "November",
+    "December",
   ];
 
   const daysOfWeek = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -347,15 +395,15 @@ const CalendarComponent = ({ selectedDate, onDateSelect, maxDate }) => {
 
     // Format date as YYYY-MM-DD
     const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
     const formattedDate = `${year}-${month}-${day}`;
 
     onDateSelect(formattedDate);
   };
 
   const navigateMonth = (direction) => {
-    setCurrentMonth(prev => {
+    setCurrentMonth((prev) => {
       const newMonth = new Date(prev);
       newMonth.setMonth(prev.getMonth() + direction);
       return newMonth;
@@ -389,8 +437,11 @@ const CalendarComponent = ({ selectedDate, onDateSelect, maxDate }) => {
 
       {/* Days of week header */}
       <div className="grid grid-cols-7 gap-1 mb-2">
-        {daysOfWeek.map(day => (
-          <div key={day} className="text-center text-xs font-medium text-gray-500 p-2">
+        {daysOfWeek.map((day) => (
+          <div
+            key={day}
+            className="text-center text-xs font-medium text-gray-500 p-2"
+          >
             {day}
           </div>
         ))}
@@ -410,12 +461,13 @@ const CalendarComponent = ({ selectedDate, onDateSelect, maxDate }) => {
               disabled={isDisabled}
               className={`
                 aspect-square p-2 text-sm rounded-lg transition-all min-h-[36px] flex items-center justify-center
-                ${!date ? 'invisible' : ''}
-                ${isSelected
-                  ? 'bg-[#c62d23] text-white font-semibold shadow-md'
-                  : isDisabled
-                    ? 'text-gray-300 cursor-not-allowed'
-                    : 'hover:bg-gray-100 text-gray-700 cursor-pointer'
+                ${!date ? "invisible" : ""}
+                ${
+                  isSelected
+                    ? "bg-[#c62d23] text-white font-semibold shadow-md"
+                    : isDisabled
+                      ? "text-gray-300 cursor-not-allowed"
+                      : "hover:bg-gray-100 text-gray-700 cursor-pointer"
                 }
               `}
             >

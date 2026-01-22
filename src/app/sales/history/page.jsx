@@ -2,7 +2,8 @@
 import React, { useEffect, useState } from "react";
 import axios from "axios";
 import { CalendarDays, Download, History } from "lucide-react";
-import SalesSidebar from "@/components/Sales/sidebar";
+import * as XLSX from "xlsx";
+
 
 export default function OrderHistory() {
   const [orders, setOrders] = useState([]);
@@ -34,57 +35,38 @@ export default function OrderHistory() {
     fetchHistory(range);
   }, [range]);
 
-  const exportToCSV = () => {
-    if (!orders.length) return;
+ const exportToExcel = () => {
+  if (!orders.length) return;
 
-    const headers = [
-      "Order ID",
-      "Dispatched To",
-      "Chair Model",
-      "Order Date",
-      "Delivery Date",
-      "Quantity",
-      "Status",
-    ];
-
-    const rows = orders.map((o) => [
-      o.orderId,
-      typeof o.dispatchedTo === 'object' && o.dispatchedTo?.name
+  const data = orders.map((o) => ({
+    "Order ID": o.orderId,
+    "Dispatched To":
+      typeof o.dispatchedTo === "object" && o.dispatchedTo?.name
         ? o.dispatchedTo.name
         : o.dispatchedTo,
-      o.chairModel,
-      new Date(o.orderDate).toLocaleDateString(),
-      o.deliveryDate ? new Date(o.deliveryDate).toLocaleDateString() : "",
-      o.quantity,
-      o.progress.replaceAll("_", " "),
-    ]);
+    Chair: o.chairModel,
+    "Order Date": new Date(o.orderDate).toLocaleDateString(),
+    "Delivery Date": o.deliveryDate
+      ? new Date(o.deliveryDate).toLocaleDateString()
+      : "",
+    Quantity: o.quantity,
+    Status: o.progress?.replaceAll("_", " "),
+  }));
 
-    const csvContent =
-      [headers, ...rows]
-        .map((row) =>
-          row
-            .map((cell) => `"${String(cell).replace(/"/g, '""')}"`)
-            .join(",")
-        )
-        .join("\n");
+  const worksheet = XLSX.utils.json_to_sheet(data);
+  const workbook = XLSX.utils.book_new();
 
-    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
+  XLSX.utils.book_append_sheet(workbook, worksheet, "Orders");
 
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = `orders_${range}_${new Date()
-      .toISOString()
-      .slice(0, 10)}.csv`;
-    link.click();
+  XLSX.writeFile(
+    workbook,
+    `orders_${range}_${new Date().toISOString().slice(0, 10)}.xlsx`
+  );
+};
 
-    URL.revokeObjectURL(url);
-  };
 
   return (
     <div className="flex min-h-screen bg-gray-50 text-gray-900">
-      <SalesSidebar />
-
       <div className="flex-1 overflow-auto">
         {/* HEADER */}
         <div className="sticky top-0 z-10 bg-white/80 backdrop-blur border-b border-gray-200 p-6 shadow-sm">
@@ -100,7 +82,8 @@ export default function OrderHistory() {
             </div>
 
             <button
-              onClick={exportToCSV}
+            onClick={exportToExcel}
+
               disabled={loading || orders.length === 0}
               className="bg-green-600 hover:bg-green-700 text-white px-4 py-2.5 rounded-xl flex items-center gap-2 shadow-sm font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed"
             >

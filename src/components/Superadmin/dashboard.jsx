@@ -1,5 +1,6 @@
 "use client";
-import React, { useEffect, useState, useRef } from "react";
+import { useRouter } from "next/navigation";
+import React, { useEffect, useState, useRef, useMemo } from "react";
 import axios from "axios";
 import CountUp from "react-countup";
 import {
@@ -10,6 +11,7 @@ import {
   Inbox,
   Send,
   X,
+  ArrowRight,
   ChevronDown,
 } from "lucide-react";
 import Sidebar from "./sidebar";
@@ -26,6 +28,19 @@ import {
   Legend,
 } from "recharts";
 
+const isDelayed = (order) => {
+  const created = new Date(order.createdAt);
+  const days = (Date.now() - created) / (1000 * 60 * 60 * 24);
+  return days > 4 && order.progress !== "DISPATCHED";
+};
+
+const getStatusClass = (status) => {
+  if (status === "DISPATCHED") return "bg-green-100 text-green-800";
+  if (status === "ORDER_PLACED") return "bg-yellow-100 text-yellow-800";
+  if (status.includes("WAREHOUSE")) return "bg-blue-100 text-blue-800";
+  return "bg-gray-100 text-gray-700";
+};
+
 const API = process.env.NEXT_PUBLIC_API_URL;
 const COLORS = [
   "#000000", // Black
@@ -39,9 +54,11 @@ const COLORS = [
 export default function Dashboard() {
   const [staff, setStaff] = useState([]);
   const [products, setProducts] = useState([]);
+  const [productType, setProductType] = useState("ALL"); // ALL | FULL | SPARE
+
   const [token, setToken] = useState(null);
   const [selectedDate, setSelectedDate] = useState(
-    new Date().toISOString().split("T")[0]
+    new Date().toISOString().split("T")[0],
   );
   const [showCalendar, setShowCalendar] = useState(false);
   const calendarRef = useRef(null);
@@ -53,6 +70,10 @@ export default function Dashboard() {
   const [outward, setOutward] = useState([]);
   const [view, setView] = useState(null); // inward | outward
   const [loading, setLoading] = useState(true);
+  const router = useRouter();
+  const [selectedStaff, setSelectedStaff] = useState(null);
+  const [staffOrders, setStaffOrders] = useState([]);
+  const [staffLoading, setStaffLoading] = useState(false);
 
   useEffect(() => {
     if (typeof window !== "undefined") setToken(localStorage.getItem("token"));
@@ -66,11 +87,35 @@ export default function Dashboard() {
       }
     };
 
-    document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener("mousedown", handleClickOutside);
     return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener("mousedown", handleClickOutside);
     };
   }, []);
+
+  const fullSet = useMemo(
+    () => new Set(inwardFull.map((i) => i.chairType)),
+    [inwardFull],
+  );
+
+  const spareSet = useMemo(
+    () => new Set(inwardSpare.map((i) => i.partName)),
+    [inwardSpare],
+  );
+
+  const filteredProducts = useMemo(() => {
+    if (productType === "ALL") return products;
+
+    if (productType === "FULL") {
+      return products.filter((p) => fullSet.has(p.name));
+    }
+
+    if (productType === "SPARE") {
+      return products.filter((p) => spareSet.has(p.name));
+    }
+
+    return products;
+  }, [products, productType, fullSet, spareSet]);
 
   const from = new Date(new Date(selectedDate).setDate(1)).toISOString();
   const to = new Date(selectedDate).toISOString();
@@ -118,16 +163,42 @@ export default function Dashboard() {
     fetchAll();
   }, [token, selectedDate]);
 
+  useEffect(() => {
+    const fetchStaffOrders = async () => {
+      if (!selectedStaff || !token) return;
+
+      try {
+        setStaffLoading(true);
+
+        const res = await axios.get(`${API}/orders`, {
+          headers: { Authorization: `Bearer ${token}` },
+          params: {
+            staffId: selectedStaff._id,
+            from,
+            to,
+          },
+        });
+
+        setStaffOrders(res.data.orders || []);
+      } catch (err) {
+        console.error("Staff order fetch failed", err);
+      } finally {
+        setStaffLoading(false);
+      }
+    };
+
+    fetchStaffOrders();
+  }, [selectedStaff, token, from, to]);
+
   const totalOrders = staff.reduce((a, b) => a + (b.orders || 0), 0);
   const topStaff = staff[0]?.name || "—";
   const topProduct = products[0]?.name || "—";
 
   return (
-
-    <div className="flex min-h-screen bg-gray-50 text-gray-900">
+    <div className="flex h-screen bg-gray-50 text-gray-900">
       <Sidebar />
 
-      <div className="flex-1 overflow-auto">
+      <div className="flex-1 overflow-y-auto overflow-x-hidden">
         {/* Header */}
         <div className="sticky top-0 z-10 bg-white/80 backdrop-blur border-b border-gray-200 p-6 flex justify-between shadow-sm">
           <div>
@@ -141,15 +212,21 @@ export default function Dashboard() {
               onClick={() => setShowCalendar(!showCalendar)}
               className="flex items-center gap-3 bg-white px-5 py-3 rounded-xl border-2 border-gray-200 shadow-sm hover:border-[#c62d23] hover:shadow-md transition-all duration-200 cursor-pointer group"
             >
-              <Calendar size={18} className="text-[#c62d23] group-hover:scale-110 transition-transform" />
+              <Calendar
+                size={18}
+                className="text-[#c62d23] group-hover:scale-110 transition-transform"
+              />
               <span className="text-sm font-medium text-gray-900 min-w-[140px]">
-                {new Date(selectedDate).toLocaleDateString('en-US', {
-                  year: 'numeric',
-                  month: 'long',
-                  day: 'numeric'
+                {new Date(selectedDate).toLocaleDateString("en-US", {
+                  year: "numeric",
+                  month: "long",
+                  day: "numeric",
                 })}
               </span>
-              <ChevronDown size={16} className={`text-gray-500 transition-transform ${showCalendar ? 'rotate-180' : ''}`} />
+              <ChevronDown
+                size={16}
+                className={`text-gray-500 transition-transform ${showCalendar ? "rotate-180" : ""}`}
+              />
               <div className="absolute inset-0 rounded-xl bg-gradient-to-r from-[#c62d23]/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
             </div>
 
@@ -175,9 +252,10 @@ export default function Dashboard() {
               title="Total Orders"
               value={totalOrders}
               icon={<TrendingUp className="text-[#c62d23]" />}
-              accentColor="red"
-              clickable={false}
+              clickable
+              onClick={() => router.push("/superadmin/order")}
             />
+
             <Kpi
               title="Top Staff"
               value={topStaff}
@@ -232,32 +310,90 @@ export default function Dashboard() {
           {!view && (
             <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
               <Card title="Most Purchased Products">
-                <ResponsiveContainer width="100%" height={320}>
-                  <BarChart data={products}>
-                    <XAxis dataKey="name" stroke="#000000" />
-                    <YAxis stroke="#000000" />
-                    <Tooltip contentStyle={{ backgroundColor: '#fff', border: '1px solid #e5e7eb', borderRadius: '8px' }} />
-                    <Bar dataKey="orders" radius={[8, 8, 0, 0]} fill="#c62d23" />
+                {/* TOGGLE */}
+                <div className="flex gap-2 mb-4">
+                  {["ALL", "FULL", "SPARE"].map((t) => (
+                    <button
+                      key={t}
+                      onClick={() => setProductType(t)}
+                      className={`px-4 py-2 text-sm rounded-lg font-medium transition
+          ${
+            productType === t
+              ? "bg-[#c62d23] text-white"
+              : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+          }`}
+                    >
+                      {t}
+                    </button>
+                  ))}
+                </div>
+
+                <ResponsiveContainer width="100%" height={400}>
+                  <BarChart
+                    data={filteredProducts}
+                    margin={{ top: 20, right: 30, left: 20, bottom: 100 }}
+                  >
+                    <XAxis
+                      dataKey="name"
+                      angle={-45}
+                      textAnchor="end"
+                      interval={0}
+                      height={100}
+                      tick={{ fontSize: 11, fill: "#374151" }}
+                      stroke="#E5E7EB"
+                    />
+                    <YAxis
+                      tick={{ fontSize: 12, fill: "#6B7280" }}
+                      stroke="#E5E7EB"
+                      axisLine={false}
+                    />
+                    <Tooltip
+                      contentStyle={{
+                        backgroundColor: "#fff",
+                        border: "1px solid #e5e7eb",
+                        borderRadius: "12px",
+                        boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1)",
+                        padding: "12px",
+                      }}
+                      cursor={{ fill: "rgba(198, 45, 35, 0.1)" }}
+                    />
+                    <Bar
+                      dataKey="orders"
+                      fill="#c62d23"
+                      radius={[8, 8, 0, 0]}
+                      maxBarSize={60}
+                    />
                   </BarChart>
                 </ResponsiveContainer>
               </Card>
 
               <Card title="Staff Performance">
-                <ResponsiveContainer width="100%" height={320}>
+                <ResponsiveContainer width="100%" height={350}>
                   <PieChart>
                     <Pie
                       data={staff}
                       dataKey="orders"
                       nameKey="name"
                       outerRadius={120}
-                      label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                      onClick={(data) => {
+                        setSelectedStaff(data);
+                      }}
+                      label={({ name, percent }) =>
+                        `${name} ${(percent * 100).toFixed(0)}%`
+                      }
                       labelLine={false}
                     >
                       {staff.map((_, i) => (
                         <Cell key={i} fill={COLORS[i % COLORS.length]} />
                       ))}
                     </Pie>
-                    <Tooltip contentStyle={{ backgroundColor: '#fff', border: '1px solid #e5e7eb', borderRadius: '8px' }} />
+                    <Tooltip
+                      contentStyle={{
+                        backgroundColor: "#fff",
+                        border: "1px solid #e5e7eb",
+                        borderRadius: "8px",
+                      }}
+                    />
                     <Legend />
                   </PieChart>
                 </ResponsiveContainer>
@@ -266,26 +402,45 @@ export default function Dashboard() {
           )}
         </div>
       </div>
+      {selectedStaff && (
+        <StaffPerformanceModal
+          staff={selectedStaff}
+          orders={staffOrders}
+          loading={staffLoading}
+          onClose={() => {
+            setSelectedStaff(null);
+            setStaffOrders([]);
+          }}
+        />
+      )}
     </div>
   );
 }
 
 /* ================= COMPONENTS ================= */
 
-const Kpi = ({ title, value, icon, onClick, accentColor = "red", clickable = false }) => (
+const Kpi = ({
+  title,
+  value,
+  icon,
+  onClick,
+  accentColor = "red",
+  clickable = false,
+}) => (
   <div
     onClick={onClick}
-    className={`bg-white border border-gray-200 rounded-2xl p-6 transition-all duration-200 shadow-sm hover:shadow-md flex flex-col justify-between h-full ${clickable ? 'cursor-pointer hover:bg-gray-50 hover:border-[#c62d23]' : ''
-      }`}
+    className={`bg-white border border-gray-200 rounded-2xl p-6 transition-all duration-200 shadow-sm hover:shadow-md flex flex-col justify-between h-full ${
+      clickable ? "cursor-pointer hover:bg-gray-50 hover:border-[#c62d23]" : ""
+    }`}
     style={{
-      ...(accentColor === "red" && { borderLeft: '4px solid #c62d23' }),
+      ...(accentColor === "red" && { borderLeft: "4px solid #c62d23" }),
     }}
   >
     <div className="flex justify-between items-start mb-4">
       <p className="text-sm text-gray-600 font-medium">{title}</p>
       {React.cloneElement(icon, { size: 24 })}
     </div>
-    {typeof value === 'number' ? (
+    {typeof value === "number" ? (
       <CountUp
         end={value}
         duration={1.5}
@@ -338,19 +493,21 @@ const TableView = ({
       <div className="flex gap-4 mb-6 bg-gray-50 p-2 rounded-xl">
         <button
           onClick={() => setInventoryTab("FULL")}
-          className={`px-6 py-2 rounded-lg font-medium transition-all ${inventoryTab === "FULL"
-            ? "bg-[#c62d23] text-white shadow-md"
-            : "bg-white text-gray-700 hover:bg-gray-100"
-            }`}
+          className={`px-6 py-2 rounded-lg font-medium transition-all ${
+            inventoryTab === "FULL"
+              ? "bg-[#c62d23] text-white shadow-md"
+              : "bg-white text-gray-700 hover:bg-gray-100"
+          }`}
         >
           Full Chairs
         </button>
         <button
           onClick={() => setInventoryTab("SPARE")}
-          className={`px-6 py-2 rounded-lg font-medium transition-all ${inventoryTab === "SPARE"
-            ? "bg-[#c62d23] text-white shadow-md"
-            : "bg-white text-gray-700 hover:bg-gray-100"
-            }`}
+          className={`px-6 py-2 rounded-lg font-medium transition-all ${
+            inventoryTab === "SPARE"
+              ? "bg-[#c62d23] text-white shadow-md"
+              : "bg-white text-gray-700 hover:bg-gray-100"
+          }`}
         >
           Spare Parts
         </button>
@@ -363,31 +520,59 @@ const TableView = ({
           <tr className="bg-gray-50">
             {view === "inward" && inventoryTab === "FULL" && (
               <>
-                <th className="text-left p-4 font-semibold text-gray-700">Date</th>
-                <th className="text-left p-4 font-semibold text-gray-700">Chair</th>
-                <th className="text-left p-4 font-semibold text-gray-700">Color</th>
-                <th className="text-left p-4 font-semibold text-gray-700">Qty</th>
-                <th className="text-left p-4 font-semibold text-gray-700">Vendor</th>
-                <th className="text-left p-4 font-semibold text-gray-700">Status</th>
+                <th className="text-left p-4 font-semibold text-gray-700">
+                  Date
+                </th>
+                <th className="text-left p-4 font-semibold text-gray-700">
+                  Chair
+                </th>
+                
+                <th className="text-left p-4 font-semibold text-gray-700">
+                  Qty
+                </th>
+                <th className="text-left p-4 font-semibold text-gray-700">
+                  Vendor
+                </th>
+                <th className="text-left p-4 font-semibold text-gray-700">
+                  Status
+                </th>
               </>
             )}
 
             {view === "inward" && inventoryTab === "SPARE" && (
               <>
-                <th className="text-left p-4 font-semibold text-gray-700">Date</th>
-                <th className="text-left p-4 font-semibold text-gray-700">Part</th>
-                <th className="text-left p-4 font-semibold text-gray-700">Location</th>
-                <th className="text-left p-4 font-semibold text-gray-700">Qty</th>
+                <th className="text-left p-4 font-semibold text-gray-700">
+                  Date
+                </th>
+                <th className="text-left p-4 font-semibold text-gray-700">
+                  Part
+                </th>
+                <th className="text-left p-4 font-semibold text-gray-700">
+                  Location
+                </th>
+                <th className="text-left p-4 font-semibold text-gray-700">
+                  Qty
+                </th>
               </>
             )}
 
             {view === "outward" && (
               <>
-                <th className="text-left p-4 font-semibold text-gray-700">Date</th>
-                <th className="text-left p-4 font-semibold text-gray-700">Product</th>
-                <th className="text-left p-4 font-semibold text-gray-700">Qty</th>
-                <th className="text-left p-4 font-semibold text-gray-700">Client</th>
-                <th className="text-left p-4 font-semibold text-gray-700">Status</th>
+                <th className="text-left p-4 font-semibold text-gray-700">
+                  Date
+                </th>
+                <th className="text-left p-4 font-semibold text-gray-700">
+                  Product
+                </th>
+                <th className="text-left p-4 font-semibold text-gray-700">
+                  Qty
+                </th>
+                <th className="text-left p-4 font-semibold text-gray-700">
+                  Client
+                </th>
+                <th className="text-left p-4 font-semibold text-gray-700">
+                  Status
+                </th>
               </>
             )}
           </tr>
@@ -397,19 +582,19 @@ const TableView = ({
           {data.map((r, index) => (
             <tr
               key={r._id}
-              className={`border-b border-gray-100 hover:bg-gray-50 transition-colors ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'
-                }`}
+              className={`border-b border-gray-100 hover:bg-gray-50 transition-colors ${
+                index % 2 === 0 ? "bg-white" : "bg-gray-50"
+              }`}
             >
               {view === "inward" && inventoryTab === "FULL" && (
                 <>
                   <td className="p-4 text-gray-900">
                     {new Date(r.createdAt).toLocaleDateString()}
                   </td>
-                  <td className="p-4 text-gray-900 font-medium">{r.chairType}</td>
-                  <td className="p-4">
-                    <span className="inline-block w-4 h-4 rounded-full bg-gray-400 mr-2" style={{ backgroundColor: r.color }} />
-                    {r.color}
+                  <td className="p-4 text-gray-900 font-medium">
+                    {r.chairType}
                   </td>
+                  
                   <td className="p-4 text-gray-900 font-semibold">
                     <CountUp end={r.quantity} duration={1} separator="," />
                   </td>
@@ -427,7 +612,9 @@ const TableView = ({
                   <td className="p-4 text-gray-900">
                     {new Date(r.createdAt).toLocaleDateString()}
                   </td>
-                  <td className="p-4 text-gray-900 font-medium">{r.chairType}</td>
+                  <td className="p-4 text-gray-900 font-medium">
+                    {r.partName}
+                  </td>
                   <td className="p-4 text-gray-700">{r.location}</td>
                   <td className="p-4 text-gray-900 font-semibold">
                     <CountUp end={r.quantity} duration={1} separator="," />
@@ -440,7 +627,9 @@ const TableView = ({
                   <td className="p-4 text-gray-900">
                     {new Date(r.createdAt).toLocaleDateString()}
                   </td>
-                  <td className="p-4 text-gray-900 font-medium">{r.chairModel}</td>
+                  <td className="p-4 text-gray-900 font-medium">
+                    {r.chairModel}
+                  </td>
                   <td className="p-4 text-gray-900 font-semibold">
                     <CountUp end={r.quantity} duration={1} separator="," />
                   </td>
@@ -477,8 +666,18 @@ const CalendarComponent = ({ selectedDate, onDateSelect, maxDate }) => {
   const selectedDateObj = new Date(selectedDate);
 
   const monthNames = [
-    "January", "February", "March", "April", "May", "June",
-    "July", "August", "September", "October", "November", "December"
+    "January",
+    "February",
+    "March",
+    "April",
+    "May",
+    "June",
+    "July",
+    "August",
+    "September",
+    "October",
+    "November",
+    "December",
   ];
 
   const daysOfWeek = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -527,15 +726,15 @@ const CalendarComponent = ({ selectedDate, onDateSelect, maxDate }) => {
 
     // Format date as YYYY-MM-DD
     const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
     const formattedDate = `${year}-${month}-${day}`;
 
     onDateSelect(formattedDate);
   };
 
   const navigateMonth = (direction) => {
-    setCurrentMonth(prev => {
+    setCurrentMonth((prev) => {
       const newMonth = new Date(prev);
       newMonth.setMonth(prev.getMonth() + direction);
       return newMonth;
@@ -569,8 +768,11 @@ const CalendarComponent = ({ selectedDate, onDateSelect, maxDate }) => {
 
       {/* Days of week header */}
       <div className="grid grid-cols-7 gap-1 mb-2">
-        {daysOfWeek.map(day => (
-          <div key={day} className="text-center text-xs font-medium text-gray-500 p-2">
+        {daysOfWeek.map((day) => (
+          <div
+            key={day}
+            className="text-center text-xs font-medium text-gray-500 p-2"
+          >
             {day}
           </div>
         ))}
@@ -590,12 +792,13 @@ const CalendarComponent = ({ selectedDate, onDateSelect, maxDate }) => {
               disabled={isDisabled}
               className={`
                 aspect-square p-2 text-sm rounded-lg transition-all min-h-[36px] flex items-center justify-center
-                ${!date ? 'invisible' : ''}
-                ${isSelected
-                  ? 'bg-[#c62d23] text-white font-semibold shadow-md'
-                  : isDisabled
-                    ? 'text-gray-300 cursor-not-allowed'
-                    : 'hover:bg-gray-100 text-gray-700 cursor-pointer'
+                ${!date ? "invisible" : ""}
+                ${
+                  isSelected
+                    ? "bg-[#c62d23] text-white font-semibold shadow-md"
+                    : isDisabled
+                      ? "text-gray-300 cursor-not-allowed"
+                      : "hover:bg-gray-100 text-gray-700 cursor-pointer"
                 }
               `}
             >
@@ -629,3 +832,145 @@ const CalendarComponent = ({ selectedDate, onDateSelect, maxDate }) => {
     </div>
   );
 };
+
+const StaffPerformanceModal = ({ staff, orders, loading, onClose }) => {
+  const router = useRouter();
+
+  // total quantity handled by staff
+  const totalQty = useMemo(
+    () => orders.reduce((sum, o) => sum + Number(o.quantity || 0), 0),
+    [orders],
+  );
+
+  // delayed orders (more than 3 days & not dispatched)
+  const delayedOrders = useMemo(
+    () =>
+      orders.filter((o) => {
+        const days =
+          (Date.now() - new Date(o.createdAt)) / (1000 * 60 * 60 * 24);
+        return days > 3 && o.progress !== "DISPATCHED";
+      }),
+    [orders],
+  );
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center">
+      <div className="bg-white w-full max-w-6xl rounded-2xl shadow-xl overflow-hidden">
+        {/* HEADER */}
+        <div className="flex justify-between items-center px-6 py-4 border-b">
+          <div>
+            <h2 className="text-xl font-bold text-gray-900">
+              {staff.name} – Performance
+            </h2>
+            <p className="text-sm text-gray-500">
+              Total Orders: {staff.orders}
+            </p>
+            <p
+              className={`text-sm mt-1 font-medium ${
+                delayedOrders.length ? "text-red-600" : "text-green-600"
+              }`}
+            >
+              {delayedOrders.length
+                ? `⚠️ ${delayedOrders.length} delayed order(s)`
+                : "✅ All recent orders on track"}
+            </p>
+          </div>
+
+          <button
+            onClick={onClose}
+            className="p-2 hover:bg-gray-100 rounded-lg"
+          >
+            <X />
+          </button>
+        </div>
+
+        {/* BODY */}
+        <div className="p-6 space-y-6">
+          {/* SUMMARY */}
+          <div className="grid grid-cols-3 gap-4">
+            <SummaryCard title="Orders" value={staff.orders} />
+            <SummaryCard title="Items Shown" value={orders.length} />
+            <SummaryCard title="Total Qty" value={totalQty} />
+          </div>
+
+          {/* ORDERS TABLE */}
+          <div className="border rounded-xl overflow-hidden">
+            {loading ? (
+              <p className="p-6 text-center text-gray-500">Loading...</p>
+            ) : orders.length === 0 ? (
+              <p className="p-6 text-center text-gray-500">No orders found</p>
+            ) : (
+              <table className="w-full text-sm">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="p-3 text-left">Date</th>
+                    <th className="p-3 text-left">Product</th>
+                    <th className="p-3 text-center">Qty</th>
+                    <th className="p-3 text-left">Client</th>
+                    <th className="p-3 text-left">Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {orders.slice(0, 3).map((o) => {
+                    const isDelayed =
+                      (Date.now() - new Date(o.createdAt)) /
+                        (1000 * 60 * 60 * 24) >
+                        3 && o.progress !== "DISPATCHED";
+
+                    return (
+                      <tr
+                        key={o._id}
+                        className={`border-t ${
+                          isDelayed ? "bg-red-50" : "hover:bg-gray-50"
+                        }`}
+                      >
+                        <td className="p-3">
+                          {new Date(o.createdAt).toLocaleDateString()}
+                        </td>
+                        <td className="p-3 font-medium">{o.chairModel}</td>
+                        <td className="p-3 text-center font-semibold">
+                          {o.quantity}
+                        </td>
+                        <td className="p-3">{o.dispatchedTo?.name || "—"}</td>
+                        <td className="p-3">
+                          <span
+                            className={`px-2 py-1 rounded-full text-xs font-medium ${
+                              o.progress === "DISPATCHED"
+                                ? "bg-green-100 text-green-800"
+                                : isDelayed
+                                  ? "bg-red-100 text-red-800"
+                                  : "bg-gray-100 text-gray-700"
+                            }`}
+                          >
+                            {o.progress}
+                          </span>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            )}
+          </div>
+
+          {/* FOOTER ACTION */}
+          <button
+            onClick={() =>
+              router.push(`/superadmin/order?staffId=${staff._id}`)
+            }
+            className="w-full bg-[#c62d23] text-white py-3 rounded-xl font-medium hover:opacity-90"
+          >
+            View All Orders
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const SummaryCard = ({ title, value }) => (
+  <div className="bg-gray-50 p-4 rounded-xl text-center">
+    <p className="text-sm text-gray-500">{title}</p>
+    <p className="text-2xl font-bold">{value}</p>
+  </div>
+);

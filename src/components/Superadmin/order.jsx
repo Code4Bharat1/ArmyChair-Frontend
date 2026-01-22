@@ -36,15 +36,17 @@ export default function Orders() {
   const [showForm, setShowForm] = useState(false);
   const [editingOrderId, setEditingOrderId] = useState(null);
 
-  const initialFormData = {
-    dispatchedTo: "",
-    chairModel: "",
-    orderType: "FULL",
-    orderDate: "",
-    deliveryDate: "",
-    quantity: "",
-    salesPerson: "",
-  };
+ const initialFormData = {
+  dispatchedTo: "",
+  chairModel: "",
+  partname: "",
+  orderType: "FULL",
+  orderDate: "",
+  deliveryDate: "",
+  quantity: "",
+  salesPerson: "",
+};
+
 
   const today = new Date();
   today.setHours(0, 0, 0, 0);
@@ -152,15 +154,23 @@ export default function Orders() {
     fetchOrders();
     fetchVendors();
   }, []);
-  const fetchChairModels = async () => {
-    const res = await axios.get(`${API}/inventory`, { headers });
+ const fetchChairModels = async () => {
+  const res = await axios.get(`${API}/inventory`, { headers });
 
-    const fullChairs = res.data.inventory
-      .filter((i) => i.type === "FULL")
-      .map((i) => i.chairType);
+  const inventory = res.data.inventory || [];
 
-    setChairModels([...new Set(fullChairs)]);
-  };
+  const fullChairs = inventory
+    .filter((i) => i.type === "FULL")
+    .map((i) => i.chairType);
+
+  const spare = inventory
+    .filter((i) => i.type === "SPARE")
+    .map((i) => i.partName);
+
+  setChairModels([...new Set(fullChairs)]);
+  setSpareParts([...new Set(spare)]);
+};
+
 
   useEffect(() => {
     fetchOrders();
@@ -206,15 +216,19 @@ export default function Orders() {
 
     try {
       const payload = {
-        dispatchedTo: formData.dispatchedTo,
-        chairModel: formData.chairModel,
-        orderType: formData.orderType,
-        orderDate: formData.orderDate || new Date().toISOString().split("T")[0],
-        deliveryDate: formData.deliveryDate,
-        quantity: Number(formData.quantity),
-        salesPerson: formData.salesPerson,
-        progress: "ORDER_PLACED",
-      };
+  dispatchedTo: formData.dispatchedTo,
+  chairModel:
+    formData.orderType === "FULL"
+      ? formData.chairModel
+      : formData.partname,
+  orderType: formData.orderType,
+  orderDate: formData.orderDate || new Date().toISOString().split("T")[0],
+  deliveryDate: formData.deliveryDate,
+  quantity: Number(formData.quantity),
+  salesPerson: formData.salesPerson,
+  progress: "ORDER_PLACED",
+};
+
 
       if (editingOrderId) {
         await axios.put(`${API}/orders/${editingOrderId}`, payload, {
@@ -380,9 +394,9 @@ export default function Orders() {
   };
 
   return (
-    <div className="flex min-h-screen bg-gray-50 text-gray-900">
+    <div className="flex h-screen bg-gray-50 text-gray-900">
       <SalesSidebar />
-      <div className="flex-1 overflow-auto">
+      <div className="flex-1 overflow-y-auto overflow-x-hidden">
         {/* ================= HIDDEN UPLOAD INPUT ================= */}
         <input
           type="file"
@@ -864,9 +878,9 @@ export default function Orders() {
                   </label>
 
                   <select
-                    value={formData.chairModel}
+                    value={formData.partname}
                     onChange={(e) =>
-                      setFormData({ ...formData, chairModel: e.target.value })
+                      setFormData({ ...formData, partname: e.target.value })
                     }
                     className="w-full p-3 bg-white rounded-xl border border-gray-300 focus:border-[#c62d23] focus:ring-2 focus:ring-[#c62d23]/20 outline-none transition-all"
                     required
