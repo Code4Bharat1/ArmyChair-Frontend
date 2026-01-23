@@ -36,17 +36,16 @@ export default function Orders() {
   const [showForm, setShowForm] = useState(false);
   const [editingOrderId, setEditingOrderId] = useState(null);
 
- const initialFormData = {
-  dispatchedTo: "",
-  chairModel: "",
-  partname: "",
-  orderType: "FULL",
-  orderDate: "",
-  deliveryDate: "",
-  quantity: "",
-  salesPerson: "",
-};
-
+  const initialFormData = {
+    dispatchedTo: "",
+    chairModel: "",
+    partname: "",
+    orderType: "FULL",
+    orderDate: "",
+    deliveryDate: "",
+    quantity: "",
+    salesPerson: "",
+  };
 
   const today = new Date();
   today.setHours(0, 0, 0, 0);
@@ -154,23 +153,22 @@ export default function Orders() {
     fetchOrders();
     fetchVendors();
   }, []);
- const fetchChairModels = async () => {
-  const res = await axios.get(`${API}/inventory`, { headers });
+  const fetchChairModels = async () => {
+    const res = await axios.get(`${API}/inventory`, { headers });
 
-  const inventory = res.data.inventory || [];
+    const inventory = res.data.inventory || [];
 
-  const fullChairs = inventory
-    .filter((i) => i.type === "FULL")
-    .map((i) => i.chairType);
+    const fullChairs = inventory
+      .filter((i) => i.type === "FULL")
+      .map((i) => i.chairType);
 
-  const spare = inventory
-    .filter((i) => i.type === "SPARE")
-    .map((i) => i.partName);
+    const spare = inventory
+      .filter((i) => i.type === "SPARE")
+      .map((i) => i.partName);
 
-  setChairModels([...new Set(fullChairs)]);
-  setSpareParts([...new Set(spare)]);
-};
-
+    setChairModels([...new Set(fullChairs)]);
+    setSpareParts([...new Set(spare)]);
+  };
 
   useEffect(() => {
     fetchOrders();
@@ -216,19 +214,18 @@ export default function Orders() {
 
     try {
       const payload = {
-  dispatchedTo: formData.dispatchedTo,
-  chairModel:
-    formData.orderType === "FULL"
-      ? formData.chairModel
-      : formData.partname,
-  orderType: formData.orderType,
-  orderDate: formData.orderDate || new Date().toISOString().split("T")[0],
-  deliveryDate: formData.deliveryDate,
-  quantity: Number(formData.quantity),
-  salesPerson: formData.salesPerson,
-  progress: "ORDER_PLACED",
-};
-
+        dispatchedTo: formData.dispatchedTo,
+        chairModel:
+          formData.orderType === "FULL"
+            ? formData.chairModel
+            : formData.partname,
+        orderType: formData.orderType,
+        orderDate: formData.orderDate || new Date().toISOString().split("T")[0],
+        deliveryDate: formData.deliveryDate,
+        quantity: Number(formData.quantity),
+        salesPerson: formData.salesPerson,
+        progress: "ORDER_PLACED",
+      };
 
       if (editingOrderId) {
         await axios.put(`${API}/orders/${editingOrderId}`, payload, {
@@ -330,8 +327,9 @@ export default function Orders() {
 
     return (
       <span
-        className={`text-sm font-medium ${isCompleted ? "text-green-600" : "text-amber-600"
-          }`}
+        className={`text-sm font-medium ${
+          isCompleted ? "text-green-600" : "text-amber-600"
+        }`}
       >
         {ORDER_STEPS[safeIndex]?.label}
       </span>
@@ -372,25 +370,51 @@ export default function Orders() {
   };
 
   /* ================= EXPORT CSV ================= */
-  const handleExportCSV = async () => {
-    try {
-      const res = await axios.get(`${API}/orders/export`, {
-        headers,
-        responseType: "blob",
-      });
-
-      const blob = new Blob([res.data], { type: "text/csv" });
-      const url = window.URL.createObjectURL(blob);
-
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = `orders_${new Date().toISOString().slice(0, 10)}.csv`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-    } catch (err) {
-      alert("Export failed");
+  const handleExportCSV = () => {
+    if (!orders.length) {
+      alert("No orders to export");
+      return;
     }
+
+    const headers = [
+      "Order ID",
+      "Vendor",
+      "Product",
+      "Order Type",
+      "Quantity",
+      "Order Date",
+      "Delivery Date",
+      "Status",
+    ];
+
+    const rows = orders.map((o) => [
+      o.orderId,
+      typeof o.dispatchedTo === "string"
+        ? o.dispatchedTo
+        : o.dispatchedTo?.name || "",
+      o.chairModel,
+      o.orderType,
+      o.quantity,
+      o.orderDate ? new Date(o.orderDate).toLocaleDateString() : "",
+      o.deliveryDate ? new Date(o.deliveryDate).toLocaleDateString() : "",
+      o.progress,
+    ]);
+
+    let csvContent =
+      headers.join(",") +
+      "\n" +
+      rows.map((row) => row.map((v) => `"${v}"`).join(",")).join("\n");
+
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `orders_${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
   };
 
   return (
@@ -411,7 +435,9 @@ export default function Orders() {
         {/* HEADER */}
         <div className="sticky top-0 z-10 bg-white/80 backdrop-blur border-b border-gray-200 p-6 shadow-sm flex justify-between items-center">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">Orders Management</h1>
+            <h1 className="text-3xl font-bold text-gray-900">
+              Orders Management
+            </h1>
             <p className="text-gray-600 mt-2">
               Create, track and manage all orders
             </p>
@@ -446,7 +472,7 @@ export default function Orders() {
             {/* EXPORT CSV */}
             <button
               onClick={handleExportCSV}
-              className="bg-gray-100 hover:bg-gray-200 text-gray-800 px-4 py-2.5 rounded-xl font-medium flex items-center gap-2 transition-all duration-200 border border-gray-300"
+              className="bg-green-600 hover:bg-green-700 text-white px-4 py-2.5 rounded-xl flex items-center gap-2 shadow-sm font-medium transition-all"
             >
               <Download size={18} />
               Export CSV
@@ -454,7 +480,7 @@ export default function Orders() {
 
             {/* PROFILE */}
             <button
-              onClick={() => router.push("/sales/profile")}
+              onClick={() => router.push("/profile")}
               title="My Profile"
               className="p-2 rounded-xl hover:bg-gray-100 transition-colors"
             >
@@ -568,8 +594,9 @@ export default function Orders() {
                         {/* MAIN ROW */}
                         <tr
                           onClick={() => handleRowClick(o._id)}
-                          className={`border-b border-gray-100 hover:bg-gray-50 transition-colors cursor-pointer ${index % 2 === 0 ? "bg-white" : "bg-gray-50"
-                            }`}
+                          className={`border-b border-gray-100 hover:bg-gray-50 transition-colors cursor-pointer ${
+                            index % 2 === 0 ? "bg-white" : "bg-gray-50"
+                          }`}
                         >
                           <td className="p-4 font-medium text-gray-900">
                             {o.orderId}
@@ -600,11 +627,16 @@ export default function Orders() {
                                 e.stopPropagation();
                                 handleEditOrder(o);
                               }}
-                              className={`p-2 rounded-lg transition-colors ${isOrderLocked(o.progress)
+                              className={`p-2 rounded-lg transition-colors ${
+                                isOrderLocked(o.progress)
                                   ? "cursor-not-allowed opacity-50"
                                   : "hover:bg-gray-100"
-                                }`}
-                              title={isOrderLocked(o.progress) ? "Cannot edit in current status" : "Edit"}
+                              }`}
+                              title={
+                                isOrderLocked(o.progress)
+                                  ? "Cannot edit in current status"
+                                  : "Edit"
+                              }
                               disabled={isOrderLocked(o.progress)}
                             >
                               <Pencil
@@ -626,7 +658,10 @@ export default function Orders() {
                               className="p-2 rounded-lg hover:bg-gray-100 transition-colors"
                               title="Delete"
                             >
-                              <Trash2 size={16} className="text-gray-600 hover:text-red-600" />
+                              <Trash2
+                                size={16}
+                                className="text-gray-600 hover:text-red-600"
+                              />
                             </button>
 
                             {/* DISPATCH BUTTON - Only for READY_FOR_DISPATCH orders */}
@@ -639,7 +674,10 @@ export default function Orders() {
                                 className="p-2 rounded-lg hover:bg-gray-100 transition-colors"
                                 title="Dispatch"
                               >
-                                <Truck size={16} className="text-gray-600 hover:text-green-600" />
+                                <Truck
+                                  size={16}
+                                  className="text-gray-600 hover:text-green-600"
+                                />
                               </button>
                             )}
                           </td>
@@ -660,7 +698,10 @@ export default function Orders() {
                                       <span
                                         key={step.key}
                                         className={
-                                          index <= ORDER_STEPS.findIndex((s) => s.key === o.progress)
+                                          index <=
+                                          ORDER_STEPS.findIndex(
+                                            (s) => s.key === o.progress,
+                                          )
                                             ? "text-gray-900 font-medium"
                                             : ""
                                         }
@@ -699,12 +740,16 @@ export default function Orders() {
                                             : "#c62d23",
                                       }}
                                     >
-                                      {ORDER_STEPS.findIndex((s) => s.key === o.progress) + 1}
+                                      {ORDER_STEPS.findIndex(
+                                        (s) => s.key === o.progress,
+                                      ) + 1}
                                     </div>
                                   </div>
 
                                   <p className="text-sm text-gray-700">
-                                    <span className="font-medium">Current Stage:</span>{" "}
+                                    <span className="font-medium">
+                                      Current Stage:
+                                    </span>{" "}
                                     <span className="text-[#c62d23] font-semibold">
                                       {
                                         ORDER_STEPS.find(
@@ -900,9 +945,7 @@ export default function Orders() {
                   Order Date
                 </label>
 
-                <div
-                  className="w-full p-3 bg-gray-50 rounded-xl border border-gray-300 text-gray-700"
-                >
+                <div className="w-full p-3 bg-gray-50 rounded-xl border border-gray-300 text-gray-700">
                   {formData.orderDate || new Date().toISOString().split("T")[0]}
                 </div>
               </div>
@@ -956,17 +999,20 @@ export default function Orders() {
 const KpiCard = ({ title, value, icon, danger = false, onClick, active }) => (
   <div
     onClick={onClick}
-    className={`bg-white border border-gray-200 rounded-2xl p-6 transition-all duration-200 shadow-sm hover:shadow-md flex flex-col justify-between h-full cursor-pointer ${active ? "border-[#c62d23] ring-2 ring-[#c62d23]/20" : ""
-      }`}
+    className={`bg-white border border-gray-200 rounded-2xl p-6 transition-all duration-200 shadow-sm hover:shadow-md flex flex-col justify-between h-full cursor-pointer ${
+      active ? "border-[#c62d23] ring-2 ring-[#c62d23]/20" : ""
+    }`}
     style={{
-      borderLeft: '4px solid #c62d23'
+      borderLeft: "4px solid #c62d23",
     }}
   >
     <div className="flex justify-between items-start mb-4">
       <p className="text-sm text-gray-600 font-medium">{title}</p>
       {React.cloneElement(icon, { size: 24 })}
     </div>
-    <p className={`text-3xl font-bold mb-1 ${danger ? 'text-red-600' : 'text-gray-900'}`}>
+    <p
+      className={`text-3xl font-bold mb-1 ${danger ? "text-red-600" : "text-gray-900"}`}
+    >
       {value}
     </p>
   </div>

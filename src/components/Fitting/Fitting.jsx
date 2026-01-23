@@ -1,10 +1,21 @@
 "use client";
+
+import { useRouter } from "next/navigation";
 import React, { useEffect, useMemo, useState } from "react";
-import { Wrench, CheckCircle, Package, Clock, TrendingUp, Search } from "lucide-react";
+import {
+  Wrench,
+  CheckCircle,
+  Package,
+  Clock,
+  TrendingUp,
+  Search,
+  UserCircle,
+} from "lucide-react";
 import axios from "axios";
 import FittingSidebar from "@/components/Fitting/sidebar";
 
 export default function Fitting() {
+  const router = useRouter();
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -20,9 +31,11 @@ export default function Fitting() {
     try {
       const res = await axios.get(`${API}/orders`, { headers });
       const fittingOrders = (res.data.orders || res.data).filter((o) =>
-        ["WAREHOUSE_COLLECTED", "FITTING_IN_PROGRESS", "FITTING_COMPLETED"].includes(
-          o.progress
-        )
+        [
+          "WAREHOUSE_COLLECTED",
+          "FITTING_IN_PROGRESS",
+          "FITTING_COMPLETED",
+        ].includes(o.progress),
       );
       setOrders(fittingOrders);
     } catch (err) {
@@ -40,7 +53,11 @@ export default function Fitting() {
   const updateProgress = async (id, progress) => {
     try {
       setProcessingId(id);
-      await axios.patch(`${API}/orders/${id}/progress`, { progress }, { headers });
+      await axios.patch(
+        `${API}/orders/${id}/progress`,
+        { progress },
+        { headers },
+      );
       fetchOrders();
     } catch {
       alert("Failed to update fitting status");
@@ -56,17 +73,17 @@ export default function Fitting() {
       (o) =>
         o.orderId?.toLowerCase().includes(q) ||
         o.dispatchedTo?.toLowerCase().includes(q) ||
-        o.chairModel?.toLowerCase().includes(q)
+        o.chairModel?.toLowerCase().includes(q),
     );
   }, [orders, search]);
 
   /* ================= STATS ================= */
   const totalOrders = filteredOrders.length;
   const inProgress = filteredOrders.filter(
-    (o) => o.progress === "FITTING_IN_PROGRESS"
+    (o) => o.progress === "FITTING_IN_PROGRESS",
   ).length;
   const completed = filteredOrders.filter(
-    (o) => o.progress === "FITTING_COMPLETED"
+    (o) => o.progress === "FITTING_COMPLETED",
   ).length;
 
   /* ================= BADGES ================= */
@@ -114,24 +131,34 @@ export default function Fitting() {
       <div className="flex-1 overflow-y-auto overflow-x-hidden">
         {/* Header */}
         <div className="sticky top-0 z-10 bg-white/80 backdrop-blur border-b border-gray-200 p-6 shadow-sm">
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-2">
-              <Wrench size={32} className="text-[#c62d23]" />
-              <span>Fitting / Assembly</span>
-            </h1>
-            <p className="text-sm text-gray-600 mt-1">
-              Assemble products after warehouse material collection
-            </p>
+          <div className="flex items-center justify-between pr-5">
+            <div>
+              <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-2">
+                <Wrench size={32} className="text-[#c62d23]" />
+                <span>Fitting / Assembly</span>
+              </h1>
+              <p className="text-sm text-gray-600 mt-1">
+                Assemble products after warehouse material collection
+              </p>
+            </div>
+
+            <button
+              onClick={() => router.push("/profile")}
+              title="My Profile"
+              className="text-gray-600 hover:text-[#c62d23] transition"
+            >
+              <UserCircle size={34} />
+            </button>
           </div>
         </div>
 
         <div className="p-8 space-y-8">
           {/* STATS */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <StatCard 
-              title="Total Orders" 
-              value={totalOrders} 
-              icon={<Package className="text-[#c62d23]" />} 
+            <StatCard
+              title="Total Orders"
+              value={totalOrders}
+              icon={<Package className="text-[#c62d23]" />}
             />
             <StatCard
               title="In Progress"
@@ -148,7 +175,10 @@ export default function Fitting() {
 
           {/* SEARCH */}
           <div className="relative">
-            <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
+            <Search
+              className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400"
+              size={20}
+            />
             <input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
@@ -178,7 +208,10 @@ export default function Fitting() {
                         "Fitting Status",
                         "Action",
                       ].map((h) => (
-                        <th key={h} className="p-4 text-left font-semibold text-gray-700">
+                        <th
+                          key={h}
+                          className="p-4 text-left font-semibold text-gray-700"
+                        >
                           {h}
                         </th>
                       ))}
@@ -188,41 +221,60 @@ export default function Fitting() {
                   <tbody>
                     {filteredOrders.length === 0 ? (
                       <tr>
-                        <td colSpan="7" className="p-8 text-center text-gray-500">
+                        <td
+                          colSpan="7"
+                          className="p-8 text-center text-gray-500"
+                        >
                           No fitting orders found
                         </td>
                       </tr>
                     ) : (
                       filteredOrders.map((o, index) => (
-                        <tr 
-                          key={o._id} 
+                        <tr
+                          key={o._id}
                           className={`border-b border-gray-100 hover:bg-gray-50 transition-colors ${
-                            index % 2 === 0 ? 'bg-white' : 'bg-gray-50'
+                            index % 2 === 0 ? "bg-white" : "bg-gray-50"
                           }`}
                         >
-                          <td className="p-4 font-medium text-gray-900">{o.orderId}</td>
-                          <td className="p-4 text-gray-700">{o.dispatchedTo?.name || "—"}</td>
+                          <td className="p-4 font-medium text-gray-900">
+                            {o.orderId}
+                          </td>
+                          <td className="p-4 text-gray-700">
+                            {o.dispatchedTo?.name || "—"}
+                          </td>
                           <td className="p-4 text-gray-900">{o.chairModel}</td>
-                          <td className="p-4 font-semibold text-gray-900">{o.quantity}</td>
-                          <td className="p-4">{getWarehouseBadge(o.progress)}</td>
+                          <td className="p-4 font-semibold text-gray-900">
+                            {o.quantity}
+                          </td>
+                          <td className="p-4">
+                            {getWarehouseBadge(o.progress)}
+                          </td>
                           <td className="p-4">{getFittingBadge(o.progress)}</td>
                           <td className="p-4">
                             {o.progress === "WAREHOUSE_COLLECTED" && (
                               <button
-                                onClick={() => updateProgress(o._id, "FITTING_IN_PROGRESS")}
+                                onClick={() =>
+                                  updateProgress(o._id, "FITTING_IN_PROGRESS")
+                                }
                                 disabled={processingId === o._id}
                                 className="bg-[#c62d23] hover:bg-[#a82419] text-white px-4 py-2 rounded-lg font-medium transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
                               >
-                                {processingId === o._id ? "Processing..." : "Start Fitting"}
+                                {processingId === o._id
+                                  ? "Processing..."
+                                  : "Start Fitting"}
                               </button>
                             )}
                             {o.progress === "FITTING_IN_PROGRESS" && (
                               <button
-                                onClick={() => updateProgress(o._id, "FITTING_COMPLETED")}
+                                onClick={() =>
+                                  updateProgress(o._id, "FITTING_COMPLETED")
+                                }
                                 disabled={processingId === o._id}
                                 className="bg-amber-600 hover:bg-amber-700 text-white px-4 py-2 rounded-lg font-medium transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
                               >
-                                {processingId === o._id ? "Processing..." : "Mark Complete"}
+                                {processingId === o._id
+                                  ? "Processing..."
+                                  : "Mark Complete"}
                               </button>
                             )}
                             {o.progress === "FITTING_COMPLETED" && (
@@ -243,7 +295,8 @@ export default function Fitting() {
 
           <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
             <p className="text-sm text-blue-800">
-              <strong>Note:</strong> Orders automatically move to dispatch after fitting completion.
+              <strong>Note:</strong> Orders automatically move to dispatch after
+              fitting completion.
             </p>
           </div>
         </div>
@@ -255,10 +308,10 @@ export default function Fitting() {
 const StatCard = ({ title, value, icon, danger }) => (
   <div
     className={`bg-white border rounded-2xl p-6 transition-all duration-200 shadow-sm hover:shadow-md flex flex-col justify-between h-full ${
-      danger ? 'border-amber-300 bg-amber-50' : 'border-gray-200'
+      danger ? "border-amber-300 bg-amber-50" : "border-gray-200"
     }`}
     style={{
-      borderLeft: '4px solid #c62d23'
+      borderLeft: "4px solid #c62d23",
     }}
   >
     <div className="flex justify-between items-start mb-4">

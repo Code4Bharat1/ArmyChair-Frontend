@@ -89,7 +89,7 @@ export default function Login() {
       <div className="w-full max-w-md">
         {/* Header */}
         <div className="text-center mb-8 flex flex-col items-center">
-          <div className="bg-white rounded-2xl p-4 shadow-lg mb-6 border border-gray-200">
+          <div className=" rounded-2xl p-4 mb-0 ">
             <img
               src="/image.png"
               alt="Army Industry Logo"
@@ -187,23 +187,7 @@ export default function Login() {
             </button>
           </div>
 
-          {/* Divider */}
-          <div className="relative my-6">
-            <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-gray-200"></div>
-            </div>
-            <div className="relative flex justify-center text-sm">
-              <span className="px-4 bg-white text-gray-500">New to Army Industry?</span>
-            </div>
-          </div>
-
-          {/* Sign Up Link */}
-          <Link
-            href="/signup"
-            className="block w-full text-center py-3 rounded-xl border-2 border-gray-200 text-gray-700 font-medium hover:border-[#c62d23] hover:text-[#c62d23] hover:bg-red-50 transition-all"
-          >
-            Create an account
-          </Link>
+         
         </div>
 
         {/* Footer */}

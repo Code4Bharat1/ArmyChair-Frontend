@@ -22,7 +22,7 @@ import InventorySidebar from "./sidebar";
 export default function InventoryPage() {
   const [inventory, setInventory] = useState([]);
   const [loading, setLoading] = useState(true);
-  
+
   /* FILTERS */
   const [searchTerm, setSearchTerm] = useState("");
   const [filterVendor, setFilterVendor] = useState("All");
@@ -73,14 +73,14 @@ export default function InventoryPage() {
   useEffect(() => {
     fetchInventory();
   }, []);
-useEffect(() => {
-  const fetchVendors = async () => {
-    const res = await axios.get(`${API}/vendors`, { headers });
-    setVendorsList(res.data);
-  };
+  useEffect(() => {
+    const fetchVendors = async () => {
+      const res = await axios.get(`${API}/vendors`, { headers });
+      setVendorsList(res.data);
+    };
 
-  fetchVendors();
-}, []);
+    fetchVendors();
+  }, []);
 
   /* ================= CREATE / UPDATE ================= */
   const submitInventory = async () => {
@@ -90,14 +90,14 @@ useEffect(() => {
       }
 
       const payload = {
-  type: "FULL",
-  chairType: form.chairType,
-  vendor: form.vendor, // ObjectId
-  quantity: Number(form.quantity),
-  minQuantity: 50,
-  maxQuantity: 500,
-  location: "WAREHOUSE",
-};
+        type: "FULL",
+        chairType: form.chairType,
+        vendor: form.vendor, // ObjectId
+        quantity: Number(form.quantity),
+        minQuantity: 50,
+        maxQuantity: 500,
+        location: "WAREHOUSE",
+      };
 
       if (editId) {
         await axios.patch(`${API}/inventory/update/${editId}`, payload, {
@@ -275,13 +275,10 @@ useEffect(() => {
                   className="bg-transparent outline-none text-sm text-gray-900 font-medium cursor-pointer"
                 >
                   {vendorsList.map((v) => (
-  <option key={v._id} value={v.name}>
-  {v.name}
-</option>
-
-
-))}
-
+                    <option key={v._id} value={v.name}>
+                      {v.name}
+                    </option>
+                  ))}
                 </select>
               </div>
 
@@ -372,8 +369,7 @@ useEffect(() => {
                                 setEditId(i.id);
                                 setForm({
                                   chairType: i.name,
-                                  vendor: i.vendor?.name,
-
+                                  vendor: i.vendor?._id,
                                   quantity: i.quantity,
                                 });
                                 setShowForm(true);
@@ -456,12 +452,11 @@ useEffect(() => {
                     className="w-full p-3 bg-white border border-gray-200 rounded-xl outline-none text-gray-900 focus:border-[#c62d23] focus:ring-2 focus:ring-[#c62d23]/20 transition-all"
                   >
                     <option value="">Select Vendor</option>
-                   {vendorsList.map((v) => (
-  <option key={v._id} value={v._id} className="bg-white">
-    {v.name}
-  </option>
-))}
-
+                    {vendorsList.map((v) => (
+                      <option key={v._id} value={v._id} className="bg-white">
+                        {v.name}
+                      </option>
+                    ))}
                   </select>
                 </div>
 

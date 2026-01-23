@@ -1,6 +1,6 @@
 "use client";
 import React, { useEffect, useMemo, useState } from "react";
-import { Search, Download, Plus, X, AlertCircle } from "lucide-react";
+import { Search, Download, Plus, X, TrendingUp } from "lucide-react";
 import Sidebar from "@/components/Superadmin/sidebar";
 import axios from "axios";
 
@@ -17,6 +17,7 @@ const getAuthHeaders = () => {
 const Return = () => {
   const [search, setSearch] = useState("");
   const [selectedType, setSelectedType] = useState("All");
+  const [selectedStatus, setSelectedStatus] = useState("All");
   const [returns, setReturns] = useState([]);
   const [loading, setLoading] = useState(false);
   const [openModal, setOpenModal] = useState(false);
@@ -50,7 +51,7 @@ const Return = () => {
         quantity: order.quantity,
         vendor: order.salesPerson?.name || "Sales",
         location: order.dispatchedTo,
-        returnedFrom: order.dispatchedTo,
+        returnedFrom: order.dispatchedTo?.name,
         deliveryDate: order.deliveryDate,
       }));
     } catch (error) {
@@ -80,6 +81,47 @@ const Return = () => {
     fetchReturns();
   }, []);
 
+  /* ================= CALCULATE STATS ================= */
+  const stats = useMemo(() => {
+    const totalReturns = returns.length;
+    const functionalCount = returns.filter(
+      (r) => r.category === "Functional",
+    ).length;
+    const nonFunctionalCount = returns.filter(
+      (r) => r.category === "Non-Functional",
+    ).length;
+    const pendingCount = returns.filter((r) => r.status === "Pending").length;
+    const inFittingCount = returns.filter(
+      (r) => r.status === "In-Fitting",
+    ).length;
+
+    // Find most returned product
+    const productCounts = {};
+    returns.forEach((r) => {
+      if (r.chairType) {
+        productCounts[r.chairType] = (productCounts[r.chairType] || 0) + 1;
+      }
+    });
+
+    const mostReturnedProduct = Object.entries(productCounts).sort(
+      (a, b) => b[1] - a[1],
+    )[0];
+
+    return {
+      totalReturns,
+      functionalCount,
+      nonFunctionalCount,
+      pendingCount,
+      inFittingCount,
+      mostReturnedProduct: mostReturnedProduct
+        ? {
+            name: mostReturnedProduct[0],
+            count: mostReturnedProduct[1],
+          }
+        : null,
+    };
+  }, [returns]);
+
   /* ================= FILTER ================= */
   const filteredReturns = useMemo(() => {
     return returns.filter((r) => {
@@ -89,11 +131,14 @@ const Return = () => {
 
       const matchType = selectedType === "All" || r.category === selectedType;
 
-      const matchStatus = ["Pending", "In-Fitting"].includes(r.status);
+      const matchStatus =
+        selectedStatus === "All" ||
+        (selectedStatus === "Pending" && r.status === "Pending") ||
+        (selectedStatus === "In-Fitting" && r.status === "In-Fitting");
 
       return matchSearch && matchType && matchStatus;
     });
-  }, [search, selectedType, returns]);
+  }, [search, selectedType, selectedStatus, returns]);
 
   /* ================= MOVE TO INVENTORY ================= */
   const moveToFitting = async (id) => {
@@ -182,7 +227,8 @@ const Return = () => {
               <span>Returns Management</span>
             </h1>
             <p className="text-gray-600 mt-2">
-              Track returned orders and route functional items to inventory and non-functional items to defects.
+              Track returned orders and route functional items to inventory and
+              non-functional items to defects.
             </p>
           </div>
 
@@ -191,7 +237,10 @@ const Return = () => {
               onClick={() => setOpenModal(true)}
               className="bg-[#c62d23] text-white px-5 py-3 rounded-xl border-2 border-gray-200 shadow-sm hover:bg-[#a8241c] hover:shadow-md transition-all duration-200 cursor-pointer group flex items-center gap-2 font-medium"
             >
-              <Plus size={18} className=" group-hover:scale-110 transition-transform" />
+              <Plus
+                size={18}
+                className=" group-hover:scale-110 transition-transform"
+              />
               Add Returns
             </button>
 
@@ -199,7 +248,10 @@ const Return = () => {
               onClick={exportCSV}
               className="bg-white px-5 py-3 rounded-xl border-2 border-gray-200 shadow-sm hover:border-[#c62d23] hover:shadow-md transition-all duration-200 cursor-pointer group flex items-center gap-2 font-medium"
             >
-              <Download size={18} className="text-[#c62d23] group-hover:scale-110 transition-transform" />
+              <Download
+                size={18}
+                className="text-[#c62d23] group-hover:scale-110 transition-transform"
+              />
               Export Report
             </button>
           </div>
@@ -207,6 +259,66 @@ const Return = () => {
 
         {/* ================= CONTENT ================= */}
         <div className="p-8 space-y-8">
+          {/* ================= STATS CARDS ================= */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
+            <StatCard
+              title="Total Returns"
+              value={stats.totalReturns}
+              onClick={() => {
+                setSelectedType("All");
+                setSelectedStatus("All");
+              }}
+              active={selectedType === "All" && selectedStatus === "All"}
+            />
+            <StatCard
+              title="Functional"
+              value={stats.functionalCount}
+              onClick={() => {
+                setSelectedType("Functional");
+                setSelectedStatus("All");
+              }}
+              active={selectedType === "Functional"}
+            />
+            <StatCard
+              title="Non-Functional"
+              value={stats.nonFunctionalCount}
+              onClick={() => {
+                setSelectedType("Non-Functional");
+                setSelectedStatus("All");
+              }}
+              active={selectedType === "Non-Functional"}
+            />
+            <StatCard
+              title="Pending"
+              value={stats.pendingCount}
+              onClick={() => {
+                setSelectedType("All");
+                setSelectedStatus("Pending");
+              }}
+              active={selectedStatus === "Pending"}
+            />
+            {stats.mostReturnedProduct && (
+              <div className="bg-white border-2 border-gray-200 rounded-2xl p-6 shadow-sm hover:shadow-md transition-all">
+                <div className="flex items-center gap-2 mb-2">
+                  <TrendingUp size={16} className="text-[#c62d23]" />
+                  <p className="text-sm text-gray-600 font-medium">
+                    Most Returned
+                  </p>
+                </div>
+                <p
+                  className="text-2xl font-bold text-gray-900 mb-1 truncate"
+                  title={stats.mostReturnedProduct.name}
+                >
+                  {stats.mostReturnedProduct.name}
+                </p>
+                <p className="text-sm text-[#c62d23] font-semibold">
+                  {stats.mostReturnedProduct.count} return
+                  {stats.mostReturnedProduct.count !== 1 ? "s" : ""}
+                </p>
+              </div>
+            )}
+          </div>
+
           {/* ================= FILTERS ================= */}
           <div className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm hover:shadow-md transition-shadow">
             <div className="flex flex-wrap items-end gap-6 mb-6">
@@ -223,7 +335,9 @@ const Return = () => {
               </div>
 
               <div className="flex flex-col min-w-[200px]">
-                <label className="mb-2 text-sm font-medium text-gray-700">Type</label>
+                <label className="mb-2 text-sm font-medium text-gray-700">
+                  Type
+                </label>
                 <select
                   value={selectedType}
                   onChange={(e) => setSelectedType(e.target.value)}
@@ -232,6 +346,21 @@ const Return = () => {
                   <option value="All">All</option>
                   <option value="Functional">Functional</option>
                   <option value="Non-Functional">Non-Functional</option>
+                </select>
+              </div>
+
+              <div className="flex flex-col min-w-[200px]">
+                <label className="mb-2 text-sm font-medium text-gray-700">
+                  Status
+                </label>
+                <select
+                  value={selectedStatus}
+                  onChange={(e) => setSelectedStatus(e.target.value)}
+                  className="p-3 bg-white rounded-xl border-2 border-gray-200 focus:border-[#c62d23] focus:ring-2 focus:ring-[#c62d23]/20 outline-none transition-all"
+                >
+                  <option value="All">All</option>
+                  <option value="Pending">Pending</option>
+                  <option value="In-Fitting">In-Fitting</option>
                 </select>
               </div>
             </div>
@@ -277,33 +406,41 @@ const Return = () => {
                           index % 2 === 0 ? "bg-white" : "bg-gray-50"
                         }`}
                       >
-                        <td className="p-4 font-medium text-gray-900">{r.orderId}</td>
+                        <td className="p-4 font-medium text-gray-900">
+                          {r.orderId}
+                        </td>
                         <td className="p-4 text-gray-700">{r.returnedFrom}</td>
                         <td className="p-4 text-gray-700">{r.chairType}</td>
                         <td className="p-4 text-gray-700">
                           {new Date(r.deliveryDate).toLocaleDateString()}
                         </td>
-                        <td className="p-4 font-semibold text-gray-900">{r.quantity}</td>
+                        <td className="p-4 font-semibold text-gray-900">
+                          {r.quantity}
+                        </td>
                         <td className="p-4 text-gray-700">
                           {new Date(r.returnDate).toLocaleDateString()}
                         </td>
                         <td className="p-4">
-                          <span className={`px-3 py-1.5 rounded-full text-xs font-medium ${
-                            r.category === "Functional" 
-                              ? "bg-green-100 text-green-800" 
-                              : "bg-red-100 text-red-800"
-                          }`}>
+                          <span
+                            className={`px-3 py-1.5 rounded-full text-xs font-medium ${
+                              r.category === "Functional"
+                                ? "bg-green-100 text-green-800"
+                                : "bg-red-100 text-red-800"
+                            }`}
+                          >
                             {r.category}
                           </span>
                         </td>
                         <td className="p-4">
-                          <span className={`px-3 py-1.5 rounded-full text-xs font-medium ${
-                            r.status === "Pending" 
-                              ? "bg-amber-100 text-amber-800" 
-                              : r.status === "In-Fitting"
-                              ? "bg-blue-100 text-blue-800"
-                              : "bg-gray-100 text-gray-800"
-                          }`}>
+                          <span
+                            className={`px-3 py-1.5 rounded-full text-xs font-medium ${
+                              r.status === "Pending"
+                                ? "bg-amber-100 text-amber-800"
+                                : r.status === "In-Fitting"
+                                  ? "bg-blue-100 text-blue-800"
+                                  : "bg-gray-100 text-gray-800"
+                            }`}
+                          >
                             {r.status}
                           </span>
                         </td>
@@ -406,7 +543,9 @@ const Return = () => {
                 </label>
                 <select
                   value={form.category}
-                  onChange={(e) => setForm({ ...form, category: e.target.value })}
+                  onChange={(e) =>
+                    setForm({ ...form, category: e.target.value })
+                  }
                   className="w-full p-3 bg-white rounded-xl border-2 border-gray-200 focus:border-[#c62d23] focus:ring-2 focus:ring-[#c62d23]/20 outline-none transition-all"
                 >
                   <option>Functional</option>
@@ -432,6 +571,28 @@ const Return = () => {
           </div>
         </div>
       )}
+    </div>
+  );
+};
+
+const StatCard = ({ title, value, onClick, active }) => {
+  return (
+    <div
+      onClick={onClick}
+      className={`cursor-pointer bg-white border-2 rounded-2xl p-6 transition-all shadow-sm hover:shadow-md hover:scale-[1.02] ${
+        active
+          ? "border-[#c62d23] bg-red-50 ring-2 ring-[#c62d23]"
+          : "border-gray-200 hover:border-gray-300"
+      }`}
+    >
+      <p className="text-sm text-gray-600 font-medium mb-2">{title}</p>
+      <p
+        className={`text-3xl font-bold transition-colors ${
+          active ? "text-[#c62d23]" : "text-gray-900"
+        }`}
+      >
+        {value}
+      </p>
     </div>
   );
 };
