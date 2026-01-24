@@ -184,7 +184,7 @@ const Return = () => {
 
       fetchReturns();
     } catch (error) {
-      console.log("FULL ERROR:", error);
+      alert(error.response?.data?.message || "Failed to create return");
       console.log("STATUS:", error.response?.status);
       console.log("DATA:", error.response?.data);
     }

@@ -792,9 +792,9 @@ export default function Orders() {
                   placeholder="Search or type vendor name"
                   value={vendorSearch}
                   onFocus={() => setShowVendorDropdown(true)}
-                  onBlur={() =>
-                    setTimeout(() => setShowVendorDropdown(false), 200)
-                  }
+                  // onBlur={() =>
+                  //   setTimeout(() => setShowVendorDropdown(false), 200)
+                  // }
                   onChange={(e) => {
                     setVendorSearch(e.target.value);
                   }}
@@ -804,11 +804,11 @@ export default function Orders() {
                 {showVendorDropdown && (
                   <div className="bg-white border border-gray-200 mt-1 rounded-xl shadow-lg max-h-48 overflow-auto">
                     {vendors
-                      .filter((v) =>
-                        v.name
-                          .toLowerCase()
-                          .includes(vendorSearch.toLowerCase()),
-                      )
+                      // .filter((v) =>
+                      //   v.name
+                      //     .toLowerCase()
+                      //     .includes(vendorSearch.toLowerCase()),
+                      // )
                       .map((v) => (
                         <div
                           key={v._id}

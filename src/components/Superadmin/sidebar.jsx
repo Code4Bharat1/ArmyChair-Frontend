@@ -48,12 +48,16 @@ export default function Sidebar() {
       {/* Footer */}
       <div className="absolute bottom-0 w-full border-t border-gray-200 bg-gray-50">
        
-        <Link
-          href="/logout"
-          className="block px-6 py-3 text-sm text-gray-600 hover:bg-gray-100 hover:text-gray-900 transition-colors border-t border-gray-200"
-        >
-          Logout
-        </Link>
+        <button
+  onClick={() => {
+    localStorage.removeItem("token");
+    window.location.href = "/login";
+  }}
+  className="w-full text-left px-6 py-3 text-sm text-gray-600 hover:bg-gray-100 hover:text-gray-900 transition-colors border-t border-gray-200"
+>
+  Logout
+</button>
+
       </div>
     </div>
   );

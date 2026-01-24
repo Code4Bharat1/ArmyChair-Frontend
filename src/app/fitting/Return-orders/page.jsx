@@ -18,6 +18,9 @@ const FittingReturn = () => {
   const [remarks, setRemarks] = useState("");
   const [inventoryType, setInventoryType] = useState("");
   const [uiDecision, setUiDecision] = useState(""); // only for UI
+  const [warehouseUsers, setWarehouseUsers] = useState([]);
+const [assignedTo, setAssignedTo] = useState("");
+
 
   const fetchReturns = async () => {
     const res = await axios.get(`${API}/returns?status=In-Fitting`, {
@@ -30,33 +33,63 @@ const FittingReturn = () => {
     fetchReturns();
   }, []);
 
-  const submitDecision = async () => {
+useEffect(() => {
+  const fetchWarehouseUsers = async () => {
     try {
-      const payload = {
-        decision,
-        remarks,
-      };
+      const res = await axios.get(`${API}/auth/staff`, {
+        headers: getAuthHeaders(),
+      });
 
-      // ✅ send inventoryType ONLY if accepted
-      if (decision === "Accepted") {
-        payload.inventoryType = inventoryType;
-      }
+      console.log("Full Staff Response:", res.data);
 
-      await axios.post(
-        `${API}/returns/${selected._id}/fitting-decision`,
-        payload,
-        { headers: getAuthHeaders() },
+      const staffList = res.data.users || res.data.data || res.data;
+
+      const onlyWarehouse = staffList.filter(
+        (user) => user.role === "warehouse"
       );
 
-      setOpenModal(false);
-      setSelected(null);
-      setRemarks("");
-      setInventoryType("");
-      fetchReturns();
+      setWarehouseUsers(onlyWarehouse);
     } catch (err) {
-      alert(err.response?.data?.message || "Action failed");
+      console.error("Failed to fetch warehouse users", err);
     }
   };
+
+  fetchWarehouseUsers();
+}, []);
+
+
+ const submitDecision = async () => {
+  try {
+    const payload = {
+      decision,
+      remarks,
+    };
+
+    if (decision === "Accepted") {
+      payload.inventoryType = inventoryType;
+
+      if (inventoryType === "GOOD") {
+        payload.assignedTo = assignedTo;
+      }
+    }
+
+    await axios.post(
+      `${API}/returns/${selected._id}/fitting-decision`,
+      payload,
+      { headers: getAuthHeaders() }
+    );
+
+    setOpenModal(false);
+    setSelected(null);
+    setRemarks("");
+    setInventoryType("");
+    setAssignedTo("");
+    fetchReturns();
+  } catch (err) {
+    alert(err.response?.data?.message || "Action failed");
+  }
+};
+
 
   const closeModal = () => {
     setOpenModal(false);
@@ -263,6 +296,26 @@ const FittingReturn = () => {
                   </div>
                 </div>
               )}
+              {inventoryType === "GOOD" && (
+  <div>
+    <label className="block text-sm font-semibold text-gray-900 mb-2">
+      Assign Warehouse Staff
+    </label>
+    <select
+      value={assignedTo}
+      onChange={(e) => setAssignedTo(e.target.value)}
+      className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl"
+    >
+      <option value="">Select Warehouse Staff</option>
+      {warehouseUsers.map((user) => (
+        <option key={user._id} value={user._id}>
+          {user.name}
+        </option>
+      ))}
+    </select>
+  </div>
+)}
+
 
               {/* Remarks */}
               <div>
@@ -288,7 +341,12 @@ const FittingReturn = () => {
                 Cancel
               </button>
               <button
-                disabled={uiDecision === "Accepted" && !inventoryType}
+              disabled={
+  uiDecision === "Accepted" &&
+  (!inventoryType ||
+    (inventoryType === "GOOD" && !assignedTo))
+}
+
                 onClick={submitDecision}
                 className={`flex-1 py-3 rounded-xl font-medium transition-colors ${
                   uiDecision === "Accepted" && !inventoryType

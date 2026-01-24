@@ -55,7 +55,7 @@ export default function Dashboard() {
   const [staff, setStaff] = useState([]);
   const [products, setProducts] = useState([]);
   const [productType, setProductType] = useState("ALL"); // ALL | FULL | SPARE
-
+const [allOrders, setAllOrders] = useState([]);
   const [token, setToken] = useState(null);
   const [selectedDate, setSelectedDate] = useState(
     new Date().toISOString().split("T")[0],
@@ -140,9 +140,10 @@ export default function Dashboard() {
       });
 
       const o = await axios.get(`${API}/orders`, {
-        headers: { Authorization: `Bearer ${token}` },
-        params: { progress: "DISPATCHED", from, to },
-      });
+  headers: { Authorization: `Bearer ${token}` },
+  params: { from, to }, // remove progress filter
+});
+
       const inventory = i.data.inventory || [];
 
       setInwardFull(inventory.filter((x) => x.type === "FULL"));
@@ -150,8 +151,15 @@ export default function Dashboard() {
 
       setStaff(s.data || []);
       setProducts(p.data || []);
+const ordersData = o.data.orders || [];
 
-      setOutward(o.data.orders || []);
+setAllOrders(ordersData); // 👈 THIS was missing
+
+// outward = only dispatched
+setOutward(
+  ordersData.filter((ord) => ord.progress === "DISPATCHED")
+);
+
     } catch (err) {
       console.error("Dashboard API Error:", err);
     } finally {
@@ -190,7 +198,8 @@ export default function Dashboard() {
     fetchStaffOrders();
   }, [selectedStaff, token, from, to]);
 
-  const totalOrders = staff.reduce((a, b) => a + (b.orders || 0), 0);
+  const totalOrders = allOrders.length;
+
   const topStaff = staff[0]?.name || "—";
   const topProduct = products[0]?.name || "—";
 

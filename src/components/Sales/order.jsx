@@ -145,7 +145,6 @@ export default function Orders() {
   const fetchVendors = async () => {
     try {
       const res = await axios.get(`${API}/vendors`, { headers });
-      console.log("VENDORS:", res.data.vendors || res.data);
       setVendors(res.data.vendors || res.data);
     } catch (err) {
       console.error("Fetch vendors failed", err);
@@ -868,13 +867,7 @@ export default function Orders() {
                   placeholder="Search or type vendor name"
                   value={vendorSearch}
                   onFocus={() => setShowVendorDropdown(true)}
-                  onBlur={() =>
-                    setTimeout(() => setShowVendorDropdown(false), 200)
-                  }
-                  onChange={(e) => {
-                    setVendorSearch(e.target.value);
-                    // ✅ DO NOT update dispatchedTo here
-                  }}
+                  onChange={(e) => setVendorSearch(e.target.value)}
                   className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl outline-none
       focus:border-[#c62d23] focus:ring-2 focus:ring-[#c62d23]/20 transition-all"
                 />
@@ -883,20 +876,20 @@ export default function Orders() {
                   <div className="bg-white border border-gray-200 mt-1 rounded-xl max-h-48 overflow-auto shadow-lg">
                     {/* EXISTING VENDORS */}
                     {vendors
-                      .filter((v) =>
-                        v.name
-                          .toLowerCase()
-                          .includes(vendorSearch.toLowerCase()),
-                      )
+                      // .filter((v) =>
+                      //   v.name
+                      //     .toLowerCase()
+                      //     .includes(vendorSearch.toLowerCase()),
+                      // )
                       .map((v) => (
                         <div
                           key={v._id}
                           onClick={() => {
+                            setVendorSearch(v.name);
                             setFormData((prev) => ({
                               ...prev,
                               dispatchedTo: v._id,
                             }));
-                            setVendorSearch(v.name);
                             setShowVendorDropdown(false);
                           }}
                           className="px-4 py-2 hover:bg-gray-50 cursor-pointer transition-colors"
