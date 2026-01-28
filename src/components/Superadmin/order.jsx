@@ -259,21 +259,7 @@ export default function Orders() {
     }
   };
 
-  /* ================= DISPATCH ================= */
-  const handleDispatch = async (orderId) => {
-    if (!window.confirm("Confirm dispatch of this order?")) return;
-
-    try {
-      await axios.patch(
-        `${API}/orders/${orderId}/progress`,
-        { progress: "DISPATCHED" },
-        { headers },
-      );
-      fetchOrders();
-    } catch (err) {
-      alert("Dispatch failed");
-    }
-  };
+  
 
   /* ================= STATS ================= */
   const totalOrders = filteredOrders.length;
@@ -664,22 +650,7 @@ export default function Orders() {
                               />
                             </button>
 
-                            {/* DISPATCH BUTTON - Only for READY_FOR_DISPATCH orders */}
-                            {o.progress === "READY_FOR_DISPATCH" && (
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleDispatch(o._id);
-                                }}
-                                className="p-2 rounded-lg hover:bg-gray-100 transition-colors"
-                                title="Dispatch"
-                              >
-                                <Truck
-                                  size={16}
-                                  className="text-gray-600 hover:text-green-600"
-                                />
-                              </button>
-                            )}
+                            
                           </td>
                         </tr>
 

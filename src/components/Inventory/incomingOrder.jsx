@@ -340,11 +340,20 @@ export default function WarehouseOrders() {
   };
 
   const handlePartialAccepted = async (orderId) => {
-    const parts = inventoryPreview[orderId];
+    let parts = inventoryPreview[orderId];
     if (!parts) return alert("No parts selected");
 
     const order = orders.find((o) => o._id === orderId);
     if (!order) return alert("Order not found");
+
+    // 🔥 FILTER FOR SPARE
+    if (order.orderType === "SPARE") {
+      parts = parts.filter(
+        (p) =>
+          p.partName?.toLowerCase().trim() ===
+          order.chairModel?.toLowerCase().trim(),
+      );
+    }
 
     let buildable;
 
@@ -356,12 +365,31 @@ export default function WarehouseOrders() {
 
     if (buildable > order.quantity) {
       return alert(
-        `You selected parts for ${buildable} chairs but order requires only ${order.quantity}.
+        `You selected parts for ${buildable} but order requires only ${order.quantity}.
 Please reduce picks to exactly ${order.quantity}.`,
       );
     }
 
     if (buildable >= order.quantity) {
+      // 🔥 SPARE ORDER → DIRECT DISPATCH
+      if (order.orderType === "SPARE") {
+        if (!confirm("All spare parts available. Mark as Ready for Dispatch?"))
+          return;
+
+        await axios.patch(
+          `${API}/orders/${orderId}/progress`,
+          { progress: "READY_FOR_DISPATCH" },
+          { headers },
+        );
+
+        alert("Spare order marked Ready for Dispatch");
+        fetchOrders();
+        setExpandedOrderId(null);
+        setShowDecisionPanel(false);
+        return;
+      }
+
+      // 🔥 FULL ORDER → SEND TO FITTING
       if (!confirm("All parts available. Send full order to fitting?")) return;
 
       await axios.post(
@@ -371,7 +399,10 @@ Please reduce picks to exactly ${order.quantity}.`,
           items: parts.flatMap((p) =>
             p.locations
               .filter((l) => l.picked > 0)
-              .map((l) => ({ inventoryId: l.inventoryId, qty: l.picked })),
+              .map((l) => ({
+                inventoryId: l.inventoryId,
+                qty: l.picked,
+              })),
           ),
         },
         { headers },
@@ -384,12 +415,10 @@ Please reduce picks to exactly ${order.quantity}.`,
       return;
     }
 
-    if (buildable === 0) return alert("Not enough parts to build even 1 chair");
+    if (buildable === 0) return alert("Not enough parts selected");
 
     if (
-      !confirm(
-        `Only ${buildable} chairs can be built. Save partial acceptance?`,
-      )
+      !confirm(`Only ${buildable} can be fulfilled. Save partial acceptance?`)
     )
       return;
 
@@ -397,7 +426,10 @@ Please reduce picks to exactly ${order.quantity}.`,
     parts.forEach((p) => {
       p.locations.forEach((l) => {
         if (l.picked > 0)
-          items.push({ inventoryId: l.inventoryId, qty: l.picked });
+          items.push({
+            inventoryId: l.inventoryId,
+            qty: l.picked,
+          });
       });
     });
 
@@ -408,7 +440,7 @@ Please reduce picks to exactly ${order.quantity}.`,
         { headers },
       );
 
-      alert(`Partial accepted for ${buildable} chairs`);
+      alert(`Partial accepted for ${buildable}`);
       setExpandedOrderId(null);
       setShowDecisionPanel(false);
       fetchOrders();
@@ -476,12 +508,19 @@ Please reduce picks to exactly ${order.quantity}.`,
     }
 
     if (o.progress === "READY_FOR_DISPATCH") {
-      return (
-        <span className="text-green-600 text-sm flex items-center gap-1 font-medium">
-          <CheckCircle size={16} /> Waiting for Sales Dispatch
-        </span>
-      );
-    }
+  return (
+    <div className="flex gap-2">
+      <button
+        disabled={processingId === o._id}
+        onClick={() => handleDispatch(o._id)}
+        className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-all shadow-sm hover:shadow-md disabled:opacity-50"
+      >
+        {processingId === o._id ? "Dispatching..." : "Dispatch Order"}
+      </button>
+    </div>
+  );
+}
+
 
     if (o.progress === "DISPATCHED" || o.progress === "COMPLETED") {
       return (
@@ -510,8 +549,6 @@ Please reduce picks to exactly ${order.quantity}.`,
           >
             Recheck Inventory
           </button>
-
-          
         </div>
       );
     }
@@ -738,6 +775,28 @@ const OrdersTable = ({
       </div>
     );
   }
+  const getLiveBuildable = (orderId, order) => {
+    const parts = inventoryPreview[orderId];
+    if (!parts || parts.length === 0) return 0;
+
+    let filteredParts = parts;
+
+    if (order.orderType === "SPARE") {
+      filteredParts = parts.filter(
+        (p) =>
+          p.partName?.toLowerCase().trim() ===
+          order.chairModel?.toLowerCase().trim(),
+      );
+    }
+
+    if (!filteredParts || filteredParts.length === 0) return 0;
+
+    const totals = filteredParts.map((p) =>
+      p.locations.reduce((sum, l) => sum + Number(l.picked || 0), 0),
+    );
+
+    return Math.min(...totals);
+  };
 
   return (
     <div className="bg-white rounded-2xl overflow-hidden border border-gray-200 shadow-sm">
@@ -896,149 +955,185 @@ const OrdersTable = ({
                                 </div>
                               ) : (
                                 <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-                                  {inventoryPreview[o._id].map((part, idx) => (
-                                    <div
-                                      key={`${o._id}-${part.partName}`}
-                                      className="bg-white border-2 border-gray-200 rounded-xl p-5 hover:border-[#c62d23] transition-all hover:shadow-md"
-                                      style={{
-                                        animation: `fadeIn ${0.6 + idx * 0.1}s ease-out`,
-                                      }}
-                                    >
-                                      <div className="flex items-center justify-between mb-4 pb-3 border-b border-gray-200">
-                                        <h5 className="font-bold text-gray-900 text-lg capitalize">
-                                          {part.partName}
-                                        </h5>
-                                        <div className="bg-[#c62d23] text-white text-xs font-bold px-2.5 py-1 rounded-full">
-                                          {part.locations.reduce(
-                                            (sum, l) => sum + (l.picked || 0),
-                                            0,
-                                          )}{" "}
-                                          picked
+                                  {inventoryPreview[o._id]
+                                    ?.filter((part) => {
+                                      if (o.orderType === "FULL") return true;
+
+                                      if (o.orderType === "SPARE") {
+                                        return (
+                                          part.partName?.toLowerCase() ===
+                                          o.chairModel?.toLowerCase()
+                                        );
+                                      }
+
+                                      return false;
+                                    })
+                                    .map((part, idx) => (
+                                      <div
+                                        key={`${o._id}-${part.partName}`}
+                                        className="bg-white border-2 border-gray-200 rounded-xl p-5 hover:border-[#c62d23] transition-all hover:shadow-md"
+                                        style={{
+                                          animation: `fadeIn ${0.6 + idx * 0.1}s ease-out`,
+                                        }}
+                                      >
+                                        <div className="flex items-center justify-between mb-4 pb-3 border-b border-gray-200">
+                                          <h5 className="font-bold text-gray-900 text-lg capitalize">
+                                            {part.partName}
+                                          </h5>
+                                          <div className="bg-[#c62d23] text-white text-xs font-bold px-2.5 py-1 rounded-full">
+                                            {part.locations.reduce(
+                                              (sum, l) => sum + (l.picked || 0),
+                                              0,
+                                            )}{" "}
+                                            picked
+                                          </div>
                                         </div>
-                                      </div>
 
-                                      <div className="space-y-3">
-                                        {part.locations.map((loc) => (
-                                          <div
-                                            key={loc.inventoryId}
-                                            className="bg-gray-50 border border-gray-200 rounded-lg p-3 hover:bg-gray-100 transition-colors"
-                                          >
-                                            <div className="flex items-center justify-between mb-2">
-                                              <div className="flex-1">
-                                                <p className="font-semibold text-sm text-gray-900">
-                                                  {loc.location}
-                                                </p>
-                                                <p className="text-xs text-gray-600 mt-0.5">
-                                                  Available:{" "}
-                                                  <span className="font-semibold text-gray-900">
-                                                    {loc.available}
-                                                  </span>
-                                                </p>
-                                              </div>
+                                        <div className="space-y-3">
+                                          {part.locations.map((loc) => (
+                                            <div
+                                              key={loc.inventoryId}
+                                              className="bg-gray-50 border border-gray-200 rounded-lg p-3 hover:bg-gray-100 transition-colors"
+                                            >
+                                              <div className="flex items-center justify-between mb-2">
+                                                <div className="flex-1">
+                                                  <p className="font-semibold text-sm text-gray-900">
+                                                    {loc.location}
+                                                  </p>
+                                                  <p className="text-xs text-gray-600 mt-0.5">
+                                                    Available:{" "}
+                                                    <span className="font-semibold text-gray-900">
+                                                      {loc.available}
+                                                    </span>
+                                                  </p>
+                                                </div>
 
-                                              <input
-                                                type="number"
-                                                min="0"
-                                                max={loc.available}
-                                                value={loc.picked || ""}
-                                                placeholder="0"
-                                                className="w-20 bg-white border-2 border-gray-300 px-3 py-2 rounded-lg text-center font-bold focus:border-[#c62d23] focus:ring-2 focus:ring-[#c62d23]/20 transition-all outline-none"
-                                                onChange={(e) => {
-                                                  let qty = Number(
-                                                    e.target.value,
-                                                  );
-                                                  if (qty < 0) qty = 0;
-                                                  if (qty > loc.available)
-                                                    qty = loc.available;
+                                                <input
+                                                  type="number"
+                                                  min="0"
+                                                  max={loc.available}
+                                                  value={loc.picked || ""}
+                                                  placeholder="0"
+                                                  className="w-20 bg-white border-2 border-gray-300 px-3 py-2 rounded-lg text-center font-bold focus:border-[#c62d23] focus:ring-2 focus:ring-[#c62d23]/20 transition-all outline-none"
+                                                  onChange={(e) => {
+                                                    let qty = Number(
+                                                      e.target.value,
+                                                    );
+                                                    if (qty < 0) qty = 0;
+                                                    if (qty > loc.available)
+                                                      qty = loc.available;
 
-                                                  setInventoryPreview(
-                                                    (prev) => {
-                                                      const parts = prev[
-                                                        o._id
-                                                      ].map((p) => {
-                                                        if (
-                                                          p.partName !==
-                                                          part.partName
-                                                        )
-                                                          return p;
+                                                    setInventoryPreview(
+                                                      (prev) => {
+                                                        const parts = prev[
+                                                          o._id
+                                                        ].map((p) => {
+                                                          if (
+                                                            p.partName !==
+                                                            part.partName
+                                                          )
+                                                            return p;
 
-                                                        let remaining =
-                                                          o.quantity;
+                                                          let remaining =
+                                                            o.quantity;
 
-                                                        const locations =
-                                                          p.locations.map(
-                                                            (l) => {
-                                                              if (
-                                                                l.inventoryId ===
-                                                                loc.inventoryId
-                                                              ) {
+                                                          const locations =
+                                                            p.locations.map(
+                                                              (l) => {
+                                                                if (
+                                                                  l.inventoryId ===
+                                                                  loc.inventoryId
+                                                                ) {
+                                                                  remaining -=
+                                                                    qty;
+                                                                  return {
+                                                                    ...l,
+                                                                    picked: qty,
+                                                                  };
+                                                                }
+
+                                                                const safe =
+                                                                  Math.min(
+                                                                    l.picked ||
+                                                                      0,
+                                                                    remaining,
+                                                                  );
                                                                 remaining -=
-                                                                  qty;
+                                                                  safe;
                                                                 return {
                                                                   ...l,
-                                                                  picked: qty,
+                                                                  picked: safe,
                                                                 };
-                                                              }
+                                                              },
+                                                            );
 
-                                                              const safe =
-                                                                Math.min(
-                                                                  l.picked || 0,
-                                                                  remaining,
-                                                                );
-                                                              remaining -= safe;
-                                                              return {
-                                                                ...l,
-                                                                picked: safe,
-                                                              };
-                                                            },
-                                                          );
+                                                          return {
+                                                            ...p,
+                                                            locations,
+                                                          };
+                                                        });
 
                                                         return {
-                                                          ...p,
-                                                          locations,
+                                                          ...prev,
+                                                          [o._id]: parts,
                                                         };
-                                                      });
-
-                                                      return {
-                                                        ...prev,
-                                                        [o._id]: parts,
-                                                      };
-                                                    },
-                                                  );
-                                                }}
-                                              />
+                                                      },
+                                                    );
+                                                  }}
+                                                />
+                                              </div>
                                             </div>
-                                          </div>
-                                        ))}
+                                          ))}
+                                        </div>
                                       </div>
-                                    </div>
-                                  ))}
+                                    ))}
                                 </div>
                               )}
                             </div>
 
                             {/* Action Buttons */}
-                            <div
-                              className="flex gap-3 pt-6 border-t border-gray-200"
-                              style={{ animation: "fadeIn 0.7s ease-out" }}
-                            >
-                              <button
-                                onClick={() => handlePartialAccepted(o._id)}
-                                className="bg-[#c62d23] hover:bg-[#a82419] text-white px-6 py-3 rounded-xl font-semibold transition-all shadow-md hover:shadow-lg flex items-center gap-2"
-                              >
-                                <CheckCircle size={18} />
-                                Partial Accepted
-                              </button>
+                            {/* Action Buttons */}
+                            <div className="flex gap-3 pt-6 border-t border-gray-200">
+                              {(() => {
+                                const liveBuildable = getLiveBuildable(
+                                  o._id,
+                                  o,
+                                );
+                                const isOver = liveBuildable > o.quantity;
+                                const isExact = liveBuildable === o.quantity;
 
-                              <button
-                                onClick={() => {
-                                  setExpandedOrderId(null);
-                                  setShowDecisionPanel(false);
-                                }}
-                                className="bg-white border-2 border-gray-300 hover:border-gray-400 text-gray-700 px-6 py-3 rounded-xl font-semibold transition-all hover:bg-gray-50"
-                              >
-                                Cancel
-                              </button>
+                                return (
+                                  <>
+                                    <button
+                                      onClick={() =>
+                                        handlePartialAccepted(o._id)
+                                      }
+                                      disabled={liveBuildable === 0 || isOver}
+                                      className={`px-6 py-3 rounded-xl font-semibold transition-all shadow-md hover:shadow-lg flex items-center gap-2
+    ${
+      liveBuildable === 0 || isOver
+        ? "bg-gray-300 cursor-not-allowed text-gray-600"
+        : "bg-[#c62d23] hover:bg-[#a82419] text-white"
+    }`}
+                                    >
+                                      <CheckCircle size={18} />
+                                      {isExact
+                                        ? "Accept Order"
+                                        : "Partial Accept"}
+                                    </button>
+
+                                    <button
+                                      onClick={() => {
+                                        setExpandedOrderId(null);
+                                        setShowDecisionPanel(false);
+                                      }}
+                                      className="bg-white border-2 border-gray-300 hover:border-gray-400 text-gray-700 px-6 py-3 rounded-xl font-semibold transition-all hover:bg-gray-50"
+                                    >
+                                      Cancel
+                                    </button>
+                                  </>
+                                );
+                              })()}
                             </div>
                           </div>
                         </div>
