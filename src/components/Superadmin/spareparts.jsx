@@ -1,6 +1,9 @@
 "use client";
 
 import React, { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { useRef } from "react";
+
 import {
   AlertCircle,
   Plus,
@@ -24,6 +27,11 @@ export default function SparePartsInventory() {
     typeof window !== "undefined"
       ? JSON.parse(localStorage.getItem("user"))?.role
       : null;
+const searchParams = useSearchParams();
+const highlightId = searchParams.get("highlight");
+
+const rowRefs = useRef({});
+const [activeHighlight, setActiveHighlight] = useState(null);
 
   /* FORM */
   const [showForm, setShowForm] = useState(false);
@@ -70,6 +78,31 @@ export default function SparePartsInventory() {
   useEffect(() => {
     fetchParts();
   }, []);
+useEffect(() => {
+  if (!highlightId || !items.length) return;
+
+  const exists = items.find((i) => i._id === highlightId);
+  if (!exists) return;
+
+  const timer = setTimeout(() => {
+    const row = rowRefs.current[highlightId];
+
+    if (row) {
+      row.scrollIntoView({
+        behavior: "smooth",
+        block: "center",
+      });
+
+      setActiveHighlight(highlightId);
+
+      setTimeout(() => {
+        setActiveHighlight(null);
+      }, 5000);
+    }
+  }, 300);
+
+  return () => clearTimeout(timer);
+}, [highlightId, items]);
 
   /* ================= SAVE ================= */
   const submitPart = async () => {
@@ -324,11 +357,17 @@ const overStock = data.filter((i) => i.status === "Overstocked").length;
                     filteredData.map((i, index) => (
 
                       <tr
-                        key={i.id}
-                        className={`border-b border-gray-100 hover:bg-gray-50 transition-colors ${
-                          index % 2 === 0 ? "bg-white" : "bg-gray-50"
-                        }`}
-                      >
+  key={i.id}
+  ref={(el) => (rowRefs.current[i.id] = el)}
+  className={`border-b transition-all duration-500 ${
+    activeHighlight === i.id
+      ? "bg-yellow-100 ring-2 ring-yellow-400"
+      : index % 2 === 0
+      ? "bg-white hover:bg-gray-50"
+      : "bg-gray-50 hover:bg-gray-100"
+  }`}
+>
+
                         <td className="p-4 font-medium text-gray-900">
                           {i.name}
                         </td>

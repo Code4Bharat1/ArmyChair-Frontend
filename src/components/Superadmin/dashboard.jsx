@@ -857,7 +857,7 @@ const StaffPerformanceModal = ({ staff, orders, loading, onClose }) => {
       orders.filter((o) => {
         const days =
           (Date.now() - new Date(o.createdAt)) / (1000 * 60 * 60 * 24);
-        return days > 3 && o.progress !== "DISPATCHED";
+        return days > 10 && o.progress !== "DISPATCHED";
       }),
     [orders],
   );
@@ -920,7 +920,7 @@ const StaffPerformanceModal = ({ staff, orders, loading, onClose }) => {
                   </tr>
                 </thead>
                 <tbody>
-                  {orders.slice(0, 3).map((o) => {
+                  {orders.slice(0, 5).map((o) => {
                     const isDelayed =
                       (Date.now() - new Date(o.createdAt)) /
                         (1000 * 60 * 60 * 24) >

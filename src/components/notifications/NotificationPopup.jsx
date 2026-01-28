@@ -22,7 +22,7 @@ export default function NotificationPopup({ close }) {
           headers: {
             Authorization: `Bearer ${token}`,
           },
-        }
+        },
       );
 
       setNotifications(res.data);
@@ -32,14 +32,27 @@ export default function NotificationPopup({ close }) {
   };
 
   const handleClick = (n) => {
-    close();
-    router.push(`${n.redirectUrl}?highlight=${n.entityId}`);
+    console.log("Notification clicked:", n);
 
+    let realId = n.entityId;
+
+    // If entityId not present, extract from _id
+    if (!realId && n._id.includes("-")) {
+      const parts = n._id.split("-");
+      realId = parts[parts.length - 1]; // last part is real Mongo ID
+    }
+
+    console.log("Final Entity ID:", realId);
+
+    const finalUrl = `${n.redirectUrl}?highlight=${realId}`;
+    console.log("Redirecting to:", finalUrl);
+
+    close();
+    router.push(finalUrl);
   };
 
   return (
     <div className="absolute top-14 right-0 left-2 w-80 z-10 bg-white shadow-xl rounded-xl border border-gray-300 overflow-hidden max-h-[400px] flex flex-col">
-      
       {/* Header */}
       <div className="px-4 py-3 border-b border-gray-300 font-semibold">
         Notifications
@@ -47,9 +60,7 @@ export default function NotificationPopup({ close }) {
 
       {/* Content */}
       {notifications.length === 0 ? (
-        <p className="p-4 text-sm text-gray-500">
-          No notifications
-        </p>
+        <p className="p-4 text-sm text-gray-500">No notifications</p>
       ) : (
         <div className="overflow-y-auto flex-1">
           <ul className="divide-y divide-gray-200">

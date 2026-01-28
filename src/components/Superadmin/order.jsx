@@ -1,5 +1,5 @@
 "use client";
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState, useRef } from "react";
 import { Upload, Download } from "lucide-react";
 import {
   Pencil,
@@ -14,7 +14,7 @@ import {
 import axios from "axios";
 import SalesSidebar from "./sidebar";
 import { UserCircle } from "lucide-react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 
 export default function Orders() {
   const [salesUsers, setSalesUsers] = useState([]);
@@ -26,6 +26,11 @@ export default function Orders() {
   const [showChairDropdown, setShowChairDropdown] = useState(false);
   const [showVendorDropdown, setShowVendorDropdown] = useState(false);
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const highlightId = searchParams.get("highlight");
+  const rowRefs = useRef({});
+  const [activeHighlight, setActiveHighlight] = useState(null);
+
   const [uploading, setUploading] = useState(false);
   const [statusFilter, setStatusFilter] = useState("ALL");
   const [orders, setOrders] = useState([]);
@@ -116,9 +121,40 @@ export default function Orders() {
     }
   };
 
+  // useEffect(() => {
+  //   fetchOrders();
+  // }, []);
+
   useEffect(() => {
-    fetchOrders();
-  }, []);
+  if (!highlightId || !orders.length) return;
+
+  // ensure order is visible
+  setStatusFilter("ALL");
+  setSearch("");
+
+  const exists = orders.find((o) => o._id === highlightId);
+  if (!exists) return;
+
+  const timer = setTimeout(() => {
+    const row = rowRefs.current[highlightId];
+
+    if (row) {
+      row.scrollIntoView({
+        behavior: "smooth",
+        block: "center",
+      });
+
+      setExpandedOrderId(highlightId);
+      setActiveHighlight(highlightId);
+
+      setTimeout(() => {
+        setActiveHighlight(null);
+      }, 5000);
+    }
+  }, 300);
+
+  return () => clearTimeout(timer);
+}, [highlightId, orders]);
 
   const fetchMe = async () => {
     const res = await axios.get(`${API}/auth/me`, { headers });
@@ -149,10 +185,22 @@ export default function Orders() {
     }
   };
 
+  // useEffect(() => {
+  //   fetchOrders();
+  //   fetchVendors();
+  // }, []);
   useEffect(() => {
-    fetchOrders();
-    fetchVendors();
-  }, []);
+  console.log("Highlight ID from URL:", highlightId);
+}, [highlightId]);
+
+useEffect(() => {
+  console.log("Order IDs:", orders.map(o => o._id));
+}, [orders]);
+
+useEffect(() => {
+  console.log("Highlight ID:", highlightId);
+}, [highlightId]);
+
   const fetchChairModels = async () => {
     const res = await axios.get(`${API}/inventory`, { headers });
 
@@ -258,8 +306,6 @@ export default function Orders() {
       alert("Delete failed");
     }
   };
-
-  
 
   /* ================= STATS ================= */
   const totalOrders = filteredOrders.length;
@@ -579,9 +625,16 @@ export default function Orders() {
                       <React.Fragment key={o._id}>
                         {/* MAIN ROW */}
                         <tr
+                        ref={(el) => (rowRefs.current[o._id] = el)}
+
                           onClick={() => handleRowClick(o._id)}
-                          className={`border-b border-gray-100 hover:bg-gray-50 transition-colors cursor-pointer ${
-                            index % 2 === 0 ? "bg-white" : "bg-gray-50"
+                          className={`border-b transition-all duration-500 cursor-pointer ${
+                            activeHighlight === o._id
+
+                              ? "bg-yellow-100 ring-2 ring-yellow-400"
+                              : index % 2 === 0
+                                ? "bg-white hover:bg-gray-50"
+                                : "bg-gray-50 hover:bg-gray-100"
                           }`}
                         >
                           <td className="p-4 font-medium text-gray-900">
@@ -649,8 +702,6 @@ export default function Orders() {
                                 className="text-gray-600 hover:text-red-600"
                               />
                             </button>
-
-                            
                           </td>
                         </tr>
 
