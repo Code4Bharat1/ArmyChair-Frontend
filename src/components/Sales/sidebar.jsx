@@ -63,6 +63,16 @@ export default function SalesSidebar() {
 
       {/* FOOTER */}
       <div className="p-4 border-t border-gray-200 text-xs text-gray-500 text-center">
+        <button
+  onClick={() => {
+    localStorage.removeItem("token");
+    window.location.href = "/login";
+  }}
+  className="w-full text-left px-6 py-3 text-sm text-gray-600 hover:bg-gray-100 hover:text-gray-900 transition-colors "
+>
+  Logout
+</button>
+
         Army Industry © 2026
       </div>
     </div>

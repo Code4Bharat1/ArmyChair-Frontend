@@ -78,6 +78,15 @@ export default function InventorySidebar() {
       {/* Footer */}
       <div className="absolute bottom-0 w-full border-t border-gray-200 bg-gray-50">
         <p className="px-6 py-3 text-xs text-gray-500 text-center font-medium">
+          <button
+  onClick={() => {
+    localStorage.removeItem("token");
+    window.location.href = "/login";
+  }}
+  className="w-full text-left px-6 py-3 text-sm text-gray-600 hover:bg-gray-100 hover:text-gray-900 transition-colors "
+>
+  Logout
+</button>
           Army Industry © 2026
         </p>
       </div>

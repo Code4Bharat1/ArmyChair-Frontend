@@ -1,4 +1,5 @@
 "use client";
+import { useRouter } from "next/navigation";
 import React, { useEffect, useMemo, useState } from "react";
 import {
   AlertCircle,
@@ -12,12 +13,12 @@ import {
   Search,
   Filter,
   X,
+  Package,
+  UserCircle,
 } from "lucide-react";
 import axios from "axios";
 
-export default function SalesInventory() {
-    const [activeStat, setActiveStat] = useState("ALL");
-
+export default function InventoryPage() {
   const [inventory, setInventory] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -29,11 +30,15 @@ export default function SalesInventory() {
   /* MODAL STATE */
   const [showForm, setShowForm] = useState(false);
   const [editId, setEditId] = useState(null);
+  const [vendorsList, setVendorsList] = useState([]);
+
   const [form, setForm] = useState({
     chairType: "",
     vendor: "",
     quantity: "",
   });
+
+  const router = useRouter();
 
   const API = process.env.NEXT_PUBLIC_API_URL;
   const token =
@@ -46,15 +51,17 @@ export default function SalesInventory() {
     try {
       const res = await axios.get(`${API}/inventory`, { headers });
 
-      const data = res.data.inventory || res.data || [];
+      const data = res.data.inventory || [];
 
-      // 🔥 normalize quantity immediately
       const safeData = data.map((i) => ({
         ...i,
         quantity: Number(i.quantity || 0),
       }));
 
-      setInventory(safeData);
+      // ✅ ONLY FULL CHAIRS
+      const onlyFullChairs = safeData.filter((i) => i.type === "FULL");
+
+      setInventory(onlyFullChairs);
     } catch (err) {
       console.error("Fetch failed", err);
     } finally {
@@ -65,48 +72,14 @@ export default function SalesInventory() {
   useEffect(() => {
     fetchInventory();
   }, []);
+  useEffect(() => {
+    const fetchVendors = async () => {
+      const res = await axios.get(`${API}/vendors`, { headers });
+      setVendorsList(res.data);
+    };
 
-  /* ================= CREATE / UPDATE ================= */
-  const submitInventory = async () => {
-    try {
-      if (!form.chairType || !form.vendor || form.quantity === "") {
-        return alert("All fields required");
-      }
-
-      const payload = {
-        chairType: form.chairType,
-        vendor: form.vendor,
-        quantity: Number(form.quantity),
-        type: "FULL",
-      };
-
-      if (editId) {
-        await axios.patch(`${API}/inventory/update/${editId}`, payload, {
-          headers,
-        });
-      } else {
-        await axios.post(`${API}/inventory`, payload, { headers });
-      }
-
-      setShowForm(false);
-      setForm({ chairType: "", vendor: "", quantity: "" });
-      setEditId(null);
-      fetchInventory();
-    } catch (err) {
-      console.error("Save failed", err);
-    }
-  };
-
-  /* ================= DELETE ================= */
-  const deleteInventory = async (id) => {
-    if (!confirm("Delete this inventory item?")) return;
-    try {
-      await axios.delete(`${API}/inventory/delete/${id}`, { headers });
-      fetchInventory();
-    } catch (err) {
-      console.error("Delete failed", err);
-    }
-  };
+    fetchVendors();
+  }, []);
 
   /* ================= TRANSFORM ================= */
   const inventoryData = useMemo(() => {
@@ -117,16 +90,10 @@ export default function SalesInventory() {
       if (qty === 0) status = "Critical";
       else if (qty < 100) status = "Low Stock";
 
-      // Handle vendor - it might be an object or string
-      const vendorName =
-        typeof item.vendor === "object" && item.vendor?.name
-          ? item.vendor.name
-          : item.vendor || "Internal";
-
       return {
         id: item._id,
         name: item.chairType || "",
-        vendor: vendorName,
+        vendor: item.vendor || null,
         quantity: qty,
         status,
       };
@@ -135,39 +102,29 @@ export default function SalesInventory() {
 
   /* ===== FILTER OPTIONS ===== */
   const vendors = useMemo(() => {
-    return [
-      "All",
-      ...new Set(inventoryData.map((i) => i.vendor || "Internal")),
-    ];
+    const names = inventoryData.map((i) => i.vendor?.name).filter(Boolean);
+
+    return ["All", ...new Set(names)];
   }, [inventoryData]);
 
   const statuses = ["All", "Healthy", "Low Stock", "Critical"];
 
   /* ================= FILTER ================= */
   const filteredData = useMemo(() => {
-  const term = (searchTerm || "").toLowerCase();
+    const term = (searchTerm || "").toLowerCase();
 
-  return inventoryData.filter((i) => {
-    const name = (i.name || "").toLowerCase();
-    const vendor = i.vendor || "";
-    const status = i.status || "";
+    return inventoryData.filter((i) => {
+      const name = (i.name || "").toLowerCase();
+      const vendor = i.vendor?.name || "";
+      const status = i.status || "";
 
-    const matchesSearch = name.includes(term);
-    const matchesVendor =
-      filterVendor === "All" || vendor === filterVendor;
-    const matchesStatus =
-      filterStatus === "All" || status === filterStatus;
-
-    const matchesStat =
-      activeStat === "ALL"
-        ? true
-        : activeStat === "LOW"
-        ? status !== "Healthy"
-        : true;
-
-    return matchesSearch && matchesVendor && matchesStatus && matchesStat;
-  });
-}, [inventoryData, searchTerm, filterVendor, filterStatus, activeStat]);
+      return (
+        name.includes(term) &&
+        (filterVendor === "All" || vendor === filterVendor) &&
+        (filterStatus === "All" || status === filterStatus)
+      );
+    });
+  }, [inventoryData, searchTerm, filterVendor, filterStatus]);
 
   /* ================= STATS ================= */
   const totalStock = useMemo(
@@ -182,22 +139,34 @@ export default function SalesInventory() {
     [inventoryData],
   );
 
+
   /* ================= UI ================= */
   return (
-    <div className="flex min-h-screen bg-gray-50 text-gray-900">
-      {" "}
-      <div className="flex-1 overflow-auto">
+    <div className="flex h-screen bg-gray-50 text-gray-900">
+      <div className="flex-1 overflow-y-auto overflow-x-hidden">
         {/* HEADER */}
         <div className="sticky top-0 z-10 bg-white/80 backdrop-blur border-b border-gray-200 p-6 shadow-sm">
           <div className="flex items-center justify-between">
+            {/* LEFT SIDE */}
             <div>
               <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-2">
-                <Warehouse size={32} className="text-[#c62d23]" />
-                <span>Full Chair Inventory</span>
+                <Package size={32} className="text-[#c62d23]" />
+                <span>Inventory Management</span>
               </h1>
               <p className="text-sm text-gray-600 mt-1">
                 Track stock, vendors and availability
               </p>
+            </div>
+
+            {/* RIGHT SIDE */}
+            <div className="flex items-center gap-4">
+              <button
+                onClick={() => router.push("/profile")}
+                title="My Profile"
+                className="text-gray-600 hover:text-[#c62d23] transition"
+              >
+                <UserCircle size={34} />
+              </button>
             </div>
           </div>
         </div>
@@ -206,38 +175,29 @@ export default function SalesInventory() {
           {/* ===== TOP CARDS ===== */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <StatCard
-  title="Total Stock"
-  value={totalStock}
-  icon={<Warehouse className="text-[#c62d23]" />}
-  active={activeStat === "ALL"}
-  onClick={() => setActiveStat("ALL")}
-/>
-
-<StatCard
-  title="Total Products"
-  value={totalProducts}
-  icon={<Boxes className="text-[#c62d23]" />}
-  active={activeStat === "ALL"}
-  onClick={() => setActiveStat("ALL")}
-/>
-
-<StatCard
-  title="Low / Critical"
-  value={lowStockCount}
-  danger={lowStockCount > 0}
-  icon={<TrendingDown className="text-[#c62d23]" />}
-  active={activeStat === "LOW"}
-  onClick={() => setActiveStat("LOW")}
-/>
-
+              title="Total Stock"
+              value={totalStock}
+              icon={<Warehouse className="text-[#c62d23]" />}
+            />
+            <StatCard
+              title="Total Products"
+              value={totalProducts}
+              icon={<Boxes className="text-[#c62d23]" />}
+            />
+            <StatCard
+              title="Low / Critical"
+              value={lowStockCount}
+              danger
+              icon={<TrendingDown className="text-[#c62d23]" />}
+            />
           </div>
 
           {/* ===== FILTER BAR ===== */}
-          <div className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm">
+          <div className="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm">
             <div className="flex flex-col md:flex-row gap-4">
               {/* Search */}
-              <div className="flex items-center gap-2 bg-gray-50 px-4 py-3 rounded-xl flex-1 border border-gray-200">
-                <Search size={16} className="text-gray-400" />
+              <div className="flex items-center gap-3 bg-gray-50 px-4 py-3 rounded-xl border border-gray-200 flex-1">
+                <Search size={18} className="text-gray-400" />
                 <input
                   placeholder="Search product..."
                   value={searchTerm}
@@ -247,31 +207,31 @@ export default function SalesInventory() {
               </div>
 
               {/* Vendor */}
-              <div className="flex items-center gap-2 bg-gray-50 px-4 py-3 rounded-xl border border-gray-200">
-                <Building2 size={16} className="text-gray-400" />
+              <div className="flex items-center gap-3 bg-gray-50 px-4 py-3 rounded-xl border border-gray-200">
+                <Building2 size={18} className="text-gray-400" />
                 <select
                   value={filterVendor}
                   onChange={(e) => setFilterVendor(e.target.value)}
-                  className="bg-transparent outline-none text-sm text-gray-900"
+                  className="bg-transparent outline-none text-sm text-gray-900 font-medium cursor-pointer"
                 >
-                  {vendors.map((v) => (
-                    <option key={v} value={v}>
-                      {v}
+                  {vendorsList.map((v) => (
+                    <option key={v._id} value={v.name}>
+                      {v.name}
                     </option>
                   ))}
                 </select>
               </div>
 
               {/* Status */}
-              <div className="flex items-center gap-2 bg-gray-50 px-4 py-3 rounded-xl border border-gray-200">
-                <Filter size={16} className="text-gray-400" />
+              <div className="flex items-center gap-3 bg-gray-50 px-4 py-3 rounded-xl border border-gray-200">
+                <Filter size={18} className="text-gray-400" />
                 <select
                   value={filterStatus}
                   onChange={(e) => setFilterStatus(e.target.value)}
-                  className="bg-transparent outline-none text-sm text-gray-900"
+                  className="bg-transparent outline-none text-sm text-gray-900 font-medium cursor-pointer"
                 >
                   {statuses.map((s) => (
-                    <option key={s} value={s}>
+                    <option key={s} value={s} className="bg-white">
                       {s}
                     </option>
                   ))}
@@ -282,9 +242,9 @@ export default function SalesInventory() {
 
           {/* ALERT */}
           {lowStockCount > 0 && (
-            <div className="bg-red-50 border border-red-200 p-4 rounded-xl flex gap-3">
-              <AlertCircle className="text-red-600" size={20} />
-              <span className="text-sm text-red-800 font-medium">
+            <div className="bg-amber-50 border border-amber-200 p-4 flex gap-3 rounded-xl">
+              <AlertCircle className="text-amber-600 flex-shrink-0" size={20} />
+              <span className="text-sm text-amber-800 font-medium">
                 {lowStockCount} items need immediate restocking
               </span>
             </div>
@@ -302,16 +262,14 @@ export default function SalesInventory() {
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="bg-gray-50 border-b border-gray-200">
-                      {["Product", "Vendor", "Qty", "Status"].map(
-                        (h) => (
-                          <th
-                            key={h}
-                            className="p-4 text-left font-semibold text-gray-700"
-                          >
-                            {h}
-                          </th>
-                        ),
-                      )}
+                      {["Product", "Vendor", "Quantity", "Status"].map((h) => (
+                        <th
+                          key={h}
+                          className="p-4 text-left font-semibold text-gray-700"
+                        >
+                          {h}
+                        </th>
+                      ))}
                     </tr>
                   </thead>
 
@@ -326,9 +284,11 @@ export default function SalesInventory() {
                         <td className="p-4 font-medium text-gray-900">
                           {i.name}
                         </td>
-                        <td className="p-4 flex items-center gap-2 text-gray-700">
-                          <Building2 size={14} className="text-gray-400" />
-                          {i.vendor}
+                        <td className="p-4">
+                          <div className="flex items-center gap-2 text-gray-700">
+                            <Building2 size={16} className="text-gray-400" />
+                            {i.vendor?.name || "—"}
+                          </div>
                         </td>
                         <td className="p-4 font-semibold text-gray-900">
                           {i.quantity}
@@ -355,8 +315,6 @@ export default function SalesInventory() {
             )}
           </div>
         </div>
-
-        
       </div>
     </div>
   );
@@ -364,21 +322,15 @@ export default function SalesInventory() {
 
 /* ================= SMALL COMPONENTS ================= */
 
-const StatCard = ({ title, value, icon, danger, onClick, active }) => {
+const StatCard = ({ title, value, icon, danger }) => {
   const safeValue =
     typeof value === "number" && !Number.isNaN(value) ? value : 0;
 
   return (
     <div
-      onClick={onClick}
-      className={`cursor-pointer bg-white border rounded-2xl p-6 transition-all duration-200 shadow-sm hover:shadow-md flex flex-col justify-between h-full
-        ${
-          active
-            ? "ring-2 ring-[#c62d23] border-[#c62d23]"
-            : "border-gray-200"
-        }
-        ${danger ? "bg-red-50 border-red-300" : ""}
-      `}
+      className={`bg-white border rounded-2xl p-6 transition-all duration-200 shadow-sm hover:shadow-md flex flex-col justify-between h-full ${
+        danger ? "border-amber-300 bg-amber-50" : "border-gray-200"
+      }`}
       style={{
         borderLeft: "4px solid #c62d23",
       }}
@@ -387,11 +339,10 @@ const StatCard = ({ title, value, icon, danger, onClick, active }) => {
         <p className="text-sm text-gray-600 font-medium">{title}</p>
         {React.cloneElement(icon, { size: 24 })}
       </div>
-      <p className="text-3xl font-bold text-gray-900 mb-1">{safeValue}</p>
+      <p className="text-3xl font-bold text-gray-900">{safeValue}</p>
     </div>
   );
 };
-
 
 const StatusBadge = ({ status }) => {
   const map = {
@@ -408,16 +359,17 @@ const StatusBadge = ({ status }) => {
   );
 };
 
-const Input = ({ label, value, onChange, type = "text" }) => (
+const Input = ({ label, value, onChange, type = "text", placeholder = "" }) => (
   <div>
-    <label className="text-sm text-gray-700 font-semibold block mb-2">
+    <label className="block text-sm font-semibold text-gray-900 mb-2">
       {label}
     </label>
     <input
       type={type}
       value={value}
       onChange={(e) => onChange(e.target.value)}
-      className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl outline-none focus:border-[#c62d23] focus:ring-2 focus:ring-[#c62d23]/20 transition-all text-gray-900"
+      placeholder={placeholder}
+      className="w-full p-3 bg-white border border-gray-200 rounded-xl outline-none text-gray-900 placeholder-gray-400 focus:border-[#c62d23] focus:ring-2 focus:ring-[#c62d23]/20 transition-all"
     />
   </div>
 );
