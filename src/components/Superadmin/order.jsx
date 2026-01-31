@@ -60,9 +60,14 @@ export default function Orders() {
     return orders.filter((o) => {
       // 🔍 Search filter
       const matchesSearch =
-        o.orderId?.toLowerCase().includes(q) ||
-        o.dispatchedTo?.toLowerCase().includes(q) ||
-        o.chairModel?.toLowerCase().includes(q);
+  o.orderId?.toLowerCase().includes(q) ||
+  (
+    typeof o.dispatchedTo === "string"
+      ? o.dispatchedTo
+      : o.dispatchedTo?.name
+  )?.toLowerCase().includes(q) ||
+  o.chairModel?.toLowerCase().includes(q);
+
 
       if (!matchesSearch) return false;
 
