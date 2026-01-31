@@ -11,12 +11,17 @@ import {
   TrendingUp,
   X,
   AlertCircle,
+  Menu,
+  UserCircle,
 } from "lucide-react";
 import InventorySidebar from "./sidebar";
+import { useRouter } from "next/navigation";
 
 export default function StockMovementsPage() {
+  const router = useRouter();
   const [movements, setMovements] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   /* FILTERS */
   const [search, setSearch] = useState("");
@@ -46,25 +51,23 @@ export default function StockMovementsPage() {
   }, []);
 
   /* ================= NORMALIZE ================= */
-const normalized = useMemo(() => {
-  return movements.map((m) => {
-    // Extract quantity safely from description
-    const qtyMatch = m.description.match(/Transferred\s(\d+)/i);
-    const qty = qtyMatch ? Number(qtyMatch[1]) : 0;
+  const normalized = useMemo(() => {
+    return movements.map((m) => {
+      // Extract quantity safely from description
+      const qtyMatch = m.description.match(/Transferred\s(\d+)/i);
+      const qty = qtyMatch ? Number(qtyMatch[1]) : 0;
 
-    return {
-      id: m._id,
-      part: m.description,
-      from: m.sourceLocation,
-      to: m.destination,
-      qty,
-      user: m.userName,
-      time: m.createdAt,
-    };
-  });
-}, [movements]);
-
-
+      return {
+        id: m._id,
+        part: m.description,
+        from: m.sourceLocation,
+        to: m.destination,
+        qty,
+        user: m.userName,
+        time: m.createdAt,
+      };
+    });
+  }, [movements]);
 
   /* ================= LOCATIONS ================= */
   const locations = useMemo(() => {
@@ -118,27 +121,60 @@ const normalized = useMemo(() => {
   /* ================= UI ================= */
   return (
     <div className="flex h-screen bg-gray-50 text-gray-900">
-      <InventorySidebar />
+      {/* Mobile Sidebar Overlay */}
+      {sidebarOpen && (
+        <div
+          className="fixed inset-0 bg-black/50 z-40 lg:hidden"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
 
-      <div className="flex-1 overflow-y-auto overflow-x-hidden">
+      {/* Sidebar */}
+      <div
+        className={`fixed lg:static inset-y-0 left-0 z-50 transform transition-transform duration-300 ease-in-out ${
+          sidebarOpen ? "translate-x-0" : "-translate-x-full"
+        } lg:translate-x-0`}
+      >
+        <InventorySidebar />
+      </div>
+
+      <div className="flex-1 overflow-y-auto overflow-x-hidden w-full">
         {/* HEADER */}
-        <div className="sticky top-0 z-10 bg-white/80 backdrop-blur border-b border-gray-200 p-6 shadow-sm">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-2">
-                <ArrowRightLeft size={32} className="text-[#c62d23]" />
-                <span>Stock Movement History</span>
-              </h1>
-              <p className="text-sm text-gray-600 mt-1">
-                Track all inventory transfers between locations
-              </p>
+        <div className="sticky top-0 z-10 bg-white/80 backdrop-blur border-b border-gray-200 p-3 sm:p-4 md:p-6 shadow-sm">
+          <div className="flex items-center justify-between gap-2 sm:gap-4">
+            <div className="flex items-center gap-2 sm:gap-4 flex-1 min-w-0">
+              {/* Mobile Menu Button */}
+              <button
+                onClick={() => setSidebarOpen(!sidebarOpen)}
+                className="lg:hidden text-gray-600 hover:text-[#c62d23] transition p-2 hover:bg-gray-100 rounded-lg flex-shrink-0"
+              >
+                <Menu size={24} />
+              </button>
+
+              <div className="min-w-0 flex-1">
+                <h1 className="text-lg sm:text-2xl md:text-3xl font-bold text-gray-900 flex items-center gap-2 truncate">
+                  <ArrowRightLeft size={20} className="text-[#c62d23] sm:w-6 sm:h-6 md:w-8 md:h-8 flex-shrink-0" />
+                  <span className="truncate">Stock Movement History</span>
+                </h1>
+                <p className="text-xs sm:text-sm text-gray-600 mt-0.5 sm:mt-1 hidden sm:block">
+                  Track all inventory transfers between locations
+                </p>
+              </div>
             </div>
+
+            <button
+              onClick={() => router.push("/profile")}
+              title="My Profile"
+              className="text-gray-600 hover:text-[#c62d23] transition p-1 sm:p-0 flex-shrink-0"
+            >
+              <UserCircle size={28} className="sm:w-8 sm:h-8 md:w-9 md:h-9" />
+            </button>
           </div>
         </div>
 
-        <div className="p-8 space-y-8">
+        <div className="p-3 sm:p-4 md:p-6 lg:p-8 space-y-4 sm:space-y-6 md:space-y-8">
           {/* STATS */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 md:gap-6">
             <StatCard 
               title="Total Movements" 
               value={totalMovements} 
@@ -165,16 +201,16 @@ const normalized = useMemo(() => {
 
           {/* FILTER BADGE */}
           {activeStatFilter !== "ALL" && (
-            <div className="flex items-center gap-3">
-              <div className="bg-amber-100 border border-amber-300 px-4 py-2 rounded-xl flex items-center gap-2">
-                <AlertCircle className="text-amber-700" size={18} />
-                <span className="text-sm font-medium text-amber-800">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-3">
+              <div className="bg-amber-100 border border-amber-300 px-3 sm:px-4 py-2 rounded-lg sm:rounded-xl flex items-center gap-2">
+                <AlertCircle className="text-amber-700 flex-shrink-0" size={16} />
+                <span className="text-xs sm:text-sm font-medium text-amber-800">
                   Showing only today's movements
                 </span>
               </div>
               <button
                 onClick={() => setActiveStatFilter("ALL")}
-                className="text-sm text-gray-600 hover:text-[#c62d23] font-medium"
+                className="text-xs sm:text-sm text-gray-600 hover:text-[#c62d23] font-medium"
               >
                 Clear filter
               </button>
@@ -182,18 +218,18 @@ const normalized = useMemo(() => {
           )}
 
           {/* FILTERS */}
-          <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm grid grid-cols-1 md:grid-cols-4 gap-3">
+          <div className="bg-white p-3 sm:p-4 rounded-xl border border-gray-200 shadow-sm grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
             <input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search part, location or user..."
-              className="bg-white border border-gray-200 px-4 py-3 rounded-xl outline-none text-gray-900 placeholder-gray-400 focus:border-[#c62d23] focus:ring-2 focus:ring-[#c62d23]/20 transition-all"
+              className="bg-white border border-gray-200 px-3 sm:px-4 py-2.5 sm:py-3 rounded-lg sm:rounded-xl outline-none text-gray-900 placeholder-gray-400 focus:border-[#c62d23] focus:ring-2 focus:ring-[#c62d23]/20 transition-all text-sm sm:text-base"
             />
 
             <select
               value={fromFilter}
               onChange={(e) => setFromFilter(e.target.value)}
-              className="bg-white border border-gray-200 px-4 py-3 rounded-xl outline-none text-gray-900 focus:border-[#c62d23] focus:ring-2 focus:ring-[#c62d23]/20 transition-all"
+              className="bg-white border border-gray-200 px-3 sm:px-4 py-2.5 sm:py-3 rounded-lg sm:rounded-xl outline-none text-gray-900 focus:border-[#c62d23] focus:ring-2 focus:ring-[#c62d23]/20 transition-all text-sm sm:text-base"
             >
               <option value="All">From (All)</option>
               {locations.map((l) => (
@@ -206,7 +242,7 @@ const normalized = useMemo(() => {
             <select
               value={toFilter}
               onChange={(e) => setToFilter(e.target.value)}
-              className="bg-white border border-gray-200 px-4 py-3 rounded-xl outline-none text-gray-900 focus:border-[#c62d23] focus:ring-2 focus:ring-[#c62d23]/20 transition-all"
+              className="bg-white border border-gray-200 px-3 sm:px-4 py-2.5 sm:py-3 rounded-lg sm:rounded-xl outline-none text-gray-900 focus:border-[#c62d23] focus:ring-2 focus:ring-[#c62d23]/20 transition-all text-sm sm:text-base"
             >
               <option value="All">To (All)</option>
               {locations.map((l) => (
@@ -223,35 +259,35 @@ const normalized = useMemo(() => {
                 setToFilter("All");
                 setActiveStatFilter("ALL");
               }}
-              className="bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl px-4 py-3 font-medium transition-all"
+              className="bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg sm:rounded-xl px-3 sm:px-4 py-2.5 sm:py-3 font-medium transition-all text-sm sm:text-base"
             >
               Reset All Filters
             </button>
           </div>
 
-          {/* TABLE */}
-          <div className="bg-white rounded-2xl overflow-hidden border border-gray-200 shadow-sm">
+          {/* TABLE - Desktop */}
+          <div className="hidden md:block bg-white rounded-xl lg:rounded-2xl overflow-hidden border border-gray-200 shadow-sm">
             {loading ? (
-              <div className="p-8 text-center">
+              <div className="p-6 sm:p-8 text-center">
                 <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-[#c62d23]"></div>
-                <p className="mt-2 text-gray-500">Loading...</p>
+                <p className="mt-2 text-gray-500 text-sm sm:text-base">Loading...</p>
               </div>
             ) : filtered.length === 0 ? (
-              <div className="text-center text-gray-500 py-16">
-                <Package size={48} className="mx-auto mb-4 text-gray-300" />
-                <p className="text-lg font-medium">No stock movements found</p>
+              <div className="text-center text-gray-500 py-12 sm:py-16">
+                <Package size={40} className="mx-auto mb-3 sm:mb-4 text-gray-300 sm:w-12 sm:h-12" />
+                <p className="text-base sm:text-lg font-medium">No stock movements found</p>
               </div>
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="bg-gray-50 border-b border-gray-200">
-                      <th className="p-4 text-left font-semibold text-gray-700">Part</th>
-                      <th className="p-4 text-left font-semibold text-gray-700">From</th>
-                      <th className="p-4 text-left font-semibold text-gray-700">To</th>
-                      <th className="p-4 text-center font-semibold text-gray-700">Qty</th>
-                      <th className="p-4 text-left font-semibold text-gray-700">Moved By</th>
-                      <th className="p-4 text-left font-semibold text-gray-700">Time</th>
+                      <th className="p-3 lg:p-4 text-left font-semibold text-gray-700 text-xs lg:text-sm">Part</th>
+                      <th className="p-3 lg:p-4 text-left font-semibold text-gray-700 text-xs lg:text-sm">From</th>
+                      <th className="p-3 lg:p-4 text-left font-semibold text-gray-700 text-xs lg:text-sm">To</th>
+                      <th className="p-3 lg:p-4 text-center font-semibold text-gray-700 text-xs lg:text-sm">Qty</th>
+                      <th className="p-3 lg:p-4 text-left font-semibold text-gray-700 text-xs lg:text-sm">Moved By</th>
+                      <th className="p-3 lg:p-4 text-left font-semibold text-gray-700 text-xs lg:text-sm">Time</th>
                     </tr>
                   </thead>
 
@@ -263,41 +299,41 @@ const normalized = useMemo(() => {
                           index % 2 === 0 ? 'bg-white' : 'bg-gray-50'
                         }`}
                       >
-                        <td className="p-4">
+                        <td className="p-3 lg:p-4">
                           <div className="flex items-center gap-2">
-                            <Package size={16} className="text-gray-400" />
-                            <span className="font-medium text-gray-900">{m.part}</span>
+                            <Package size={14} className="text-gray-400 lg:w-4 lg:h-4 flex-shrink-0" />
+                            <span className="font-medium text-gray-900 text-xs lg:text-sm">{m.part}</span>
                           </div>
                         </td>
 
-                        <td className="p-4">
-                          <div className="flex items-center gap-2 text-gray-700">
-                            <MapPin size={16} className="text-gray-400" />
+                        <td className="p-3 lg:p-4">
+                          <div className="flex items-center gap-2 text-gray-700 text-xs lg:text-sm">
+                            <MapPin size={14} className="text-gray-400 lg:w-4 lg:h-4 flex-shrink-0" />
                             {m.from}
                           </div>
                         </td>
 
-                        <td className="p-4">
-                          <div className="flex items-center gap-2 text-gray-700">
-                            <MapPin size={16} className="text-gray-400" />
+                        <td className="p-3 lg:p-4">
+                          <div className="flex items-center gap-2 text-gray-700 text-xs lg:text-sm">
+                            <MapPin size={14} className="text-gray-400 lg:w-4 lg:h-4 flex-shrink-0" />
                             {m.to}
                           </div>
                         </td>
 
-                        <td className="p-4 text-center">
-                          <span className="font-semibold text-[#c62d23]">{m.qty}</span>
+                        <td className="p-3 lg:p-4 text-center">
+                          <span className="font-semibold text-[#c62d23] text-xs lg:text-sm">{m.qty}</span>
                         </td>
 
-                        <td className="p-4">
-                          <div className="flex items-center gap-2 text-gray-700">
-                            <User size={16} className="text-gray-400" />
+                        <td className="p-3 lg:p-4">
+                          <div className="flex items-center gap-2 text-gray-700 text-xs lg:text-sm">
+                            <User size={14} className="text-gray-400 lg:w-4 lg:h-4 flex-shrink-0" />
                             {m.user}
                           </div>
                         </td>
 
-                        <td className="p-4 text-gray-700">
+                        <td className="p-3 lg:p-4 text-gray-700 text-xs lg:text-sm">
                           <div className="flex items-center gap-2">
-                            <Clock size={16} className="text-gray-400" />
+                            <Clock size={14} className="text-gray-400 lg:w-4 lg:h-4 flex-shrink-0" />
                             {formatDate(m.time)}
                           </div>
                         </td>
@@ -306,6 +342,69 @@ const normalized = useMemo(() => {
                   </tbody>
                 </table>
               </div>
+            )}
+          </div>
+
+          {/* CARDS - Mobile/Tablet */}
+          <div className="md:hidden space-y-3">
+            {loading ? (
+              <div className="bg-white rounded-xl p-8 text-center border border-gray-200">
+                <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-[#c62d23]"></div>
+                <p className="mt-2 text-gray-500 text-sm">Loading...</p>
+              </div>
+            ) : filtered.length === 0 ? (
+              <div className="bg-white rounded-xl p-8 text-center text-gray-500 border border-gray-200">
+                <Package size={40} className="mx-auto mb-3 text-gray-300" />
+                <p className="text-base font-medium">No stock movements found</p>
+              </div>
+            ) : (
+              filtered.map((m) => (
+                <div key={m.id} className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
+                  <div className="flex items-start justify-between mb-3">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Package size={14} className="text-gray-400 flex-shrink-0" />
+                        <h3 className="font-semibold text-gray-900 text-sm truncate">
+                          {m.part}
+                        </h3>
+                      </div>
+                      <div className="flex items-center gap-2 text-xs text-gray-600">
+                        <User size={12} className="text-gray-400 flex-shrink-0" />
+                        <span className="truncate">{m.user}</span>
+                      </div>
+                    </div>
+                    <div className="flex-shrink-0 ml-2">
+                      <div className="bg-[#c62d23] text-white text-xs font-bold px-2.5 py-1 rounded-full">
+                        {m.qty}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3 mb-3 text-xs">
+                    <div>
+                      <p className="text-gray-500 mb-0.5 flex items-center gap-1">
+                        <MapPin size={12} className="text-gray-400" />
+                        From
+                      </p>
+                      <p className="font-medium text-gray-900">{m.from}</p>
+                    </div>
+                    <div>
+                      <p className="text-gray-500 mb-0.5 flex items-center gap-1">
+                        <MapPin size={12} className="text-gray-400" />
+                        To
+                      </p>
+                      <p className="font-medium text-gray-900">{m.to}</p>
+                    </div>
+                  </div>
+
+                  <div className="pt-3 border-t border-gray-100">
+                    <div className="flex items-center gap-2 text-xs text-gray-600">
+                      <Clock size={12} className="text-gray-400 flex-shrink-0" />
+                      {formatDate(m.time)}
+                    </div>
+                  </div>
+                </div>
+              ))
             )}
           </div>
         </div>
@@ -319,7 +418,7 @@ const normalized = useMemo(() => {
 const StatCard = ({ title, value, icon, clickable, active, onClick }) => (
   <div
     onClick={clickable ? onClick : undefined}
-    className={`bg-white border rounded-2xl p-6 transition-all duration-200 shadow-sm hover:shadow-md flex flex-col justify-between h-full border-gray-200 ${
+    className={`bg-white border rounded-xl sm:rounded-2xl p-4 sm:p-5 md:p-6 transition-all duration-200 shadow-sm hover:shadow-md flex flex-col justify-between h-full border-gray-200 ${
       clickable ? 'cursor-pointer hover:bg-gray-50 hover:border-[#c62d23]' : ''
     } ${
       active ? 'ring-2 ring-[#c62d23]' : ''
@@ -328,13 +427,13 @@ const StatCard = ({ title, value, icon, clickable, active, onClick }) => (
       borderLeft: '4px solid #c62d23'
     }}
   >
-    <div className="flex justify-between items-start mb-4">
-      <p className="text-sm text-gray-600 font-medium">{title}</p>
-      {React.cloneElement(icon, { size: 24 })}
+    <div className="flex justify-between items-start mb-3 sm:mb-4">
+      <p className="text-xs sm:text-sm text-gray-600 font-medium">{title}</p>
+      {React.cloneElement(icon, { size: 20, className: `sm:w-6 sm:h-6 ${icon.props.className}` })}
     </div>
-    <p className="text-3xl font-bold text-gray-900 mb-1">{value}</p>
+    <p className="text-2xl sm:text-3xl font-bold text-gray-900 mb-1">{value}</p>
     {clickable && (
-      <div className="mt-2 text-xs text-gray-500 flex items-center gap-1">
+      <div className="mt-2 text-[10px] sm:text-xs text-gray-500 flex items-center gap-1">
         <span>{active ? 'Click to show all' : 'Click to view details'}</span>
         <span className="text-[#c62d23]">→</span>
       </div>
