@@ -2,12 +2,10 @@
 import React from "react"
 import { useEffect, useState } from "react";
 import axios from "axios";
-import useAuthGuard from "@/hooks/useAuthGuard";
 import { Plus, Package, Clock, CheckCircle, UserCircle, LogOut, Menu, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 
 export default function ProductionPage() {
-  useAuthGuard(["production"]);
   const router = useRouter();
   const API = process.env.NEXT_PUBLIC_API_URL;
 

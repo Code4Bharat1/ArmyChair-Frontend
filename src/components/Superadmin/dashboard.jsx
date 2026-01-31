@@ -2,7 +2,6 @@
 import { useRouter } from "next/navigation";
 import React, { useEffect, useState, useRef, useMemo } from "react";
 import axios from "axios";
-
 import CountUp from "react-countup";
 import {
   Calendar,
@@ -56,7 +55,6 @@ const COLORS = [
 ];
 
 export default function Dashboard() {
-
   const [staff, setStaff] = useState([]);
   const [products, setProducts] = useState([]);
   const [productType, setProductType] = useState("ALL"); // ALL | FULL | SPARE

@@ -1,7 +1,6 @@
 "use client";
 import { useRouter } from "next/navigation";
 import React, { useEffect, useMemo, useState } from "react";
-import useAuthGuard from "@/hooks/useAuthGuard";
 import {
   AlertCircle,
   Plus,
@@ -22,7 +21,6 @@ import axios from "axios";
 import InventorySidebar from "./sidebar";
 
 export default function InventoryPage() {
-  useAuthGuard(["warehouse"]);
   const [inventory, setInventory] = useState([]);
   const [loading, setLoading] = useState(true);
   const [sidebarOpen, setSidebarOpen] = useState(false);

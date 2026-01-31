@@ -24,9 +24,7 @@ export default function HomePage() {
     }
 
     /* ===== ROLE BASED ROUTING ===== */
-    if (user.role === "admin") {
-      router.replace("/superadmin/dashboard");
-    } else if (user.role === "warehouse") {
+     if (user.role === "warehouse") {
       router.replace("/inventory/full-chair");
     } else if (user.role === "fitting") {
       router.replace("/fitting");

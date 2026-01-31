@@ -1,7 +1,6 @@
 "use client";
 import React, { useEffect, useMemo, useState } from "react";
 import { Upload, Download, X } from "lucide-react";
-import useAuthGuard from "@/hooks/useAuthGuard";
 
 import {
   Pencil,
@@ -19,7 +18,6 @@ import { UserCircle } from "lucide-react";
 import { useRouter } from "next/navigation";
 
 export default function Orders() {
-  useAuthGuard(["sales"]);
   const [vendors, setVendors] = useState([]);
   const [vendorSearch, setVendorSearch] = useState("");
   const [showVendorDropdown, setShowVendorDropdown] = useState(false);
