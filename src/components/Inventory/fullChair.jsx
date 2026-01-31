@@ -305,11 +305,13 @@ export default function InventoryPage() {
                     onChange={(e) => setFilterVendor(e.target.value)}
                     className="bg-transparent outline-none text-xs sm:text-sm text-gray-900 font-medium cursor-pointer w-full"
                   >
-                    {vendorsList.map((v) => (
-                      <option key={v._id} value={v.name}>
-                        {v.name}
-                      </option>
-                    ))}
+                    <option value="All">All</option>
+{vendorsList.map((v) => (
+  <option key={v._id} value={v.name}>
+    {v.name}
+  </option>
+))}
+
                   </select>
                 </div>
 

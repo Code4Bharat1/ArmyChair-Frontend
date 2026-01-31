@@ -49,10 +49,12 @@ body {
   background-color: #737373; /* neutral-500 */
 }
 
-input[type="date"]::-webkit-calendar-picker-indicator {
-  filter: invert(1);
-  cursor: pointer;
+@media (prefers-color-scheme: dark) {
+  input[type="date"]::-webkit-calendar-picker-indicator {
+    filter: invert(1);
+  }
 }
+
 /* ===== Custom Dark Scrollbar ===== */
 ::-webkit-scrollbar {
   width: 6px;

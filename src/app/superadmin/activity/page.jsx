@@ -7,6 +7,9 @@ import Sidebar from "@/components/Superadmin/sidebar";
 import { Download, RefreshCw, Calendar, ChevronDown } from "lucide-react";
 
 export default function ActivityLogPage() {
+  const [mode, setMode] = useState("logs");
+  const [dailyData, setDailyData] = useState([]);
+
   const [logs, setLogs] = useState([]);
   const [files, setFiles] = useState([]);
   const [selectedDate, setSelectedDate] = useState(
@@ -61,13 +64,15 @@ export default function ActivityLogPage() {
 
   // 1️⃣ Export CSV (current table)
   const exportCSV = () => {
-    if (!logs.length) {
+    if (!filteredLogs.length) {
+
       toast.error("No logs available to export");
       return;
     }
 
     const headers = ["Time", "User", "Role", "Action", "Module", "Description"];
-    const rows = logs.map((l) => [
+    const rows = filteredLogs.map((l) => [
+
       new Date(l.createdAt).toLocaleString(),
       l.user?.name || "",
       l.user?.role || "",
@@ -129,6 +134,16 @@ export default function ActivityLogPage() {
   const downloadFile = (file) => {
     window.open(`${API}/activity/files/${file}?token=${token}`, "_blank");
   };
+  const formatDuration = (seconds) => {
+    if (!seconds) return "0h 0m";
+    const hrs = Math.floor(seconds / 3600);
+    const mins = Math.floor((seconds % 3600) / 60);
+    return `${hrs}h ${mins}m`;
+  };
+
+  const filteredLogs = logs.filter(
+  (l) => l.action !== "WORK_TIME"
+);
 
   return (
     <ProtectedRoute allowedRoles={["admin"]}>
@@ -227,26 +242,58 @@ export default function ActivityLogPage() {
                   />
                   Refresh Logs
                 </button>
+                <button
+                  onClick={async () => {
+                    if (!token) return toast.error("Session expired");
+
+                    const res = await axios.get(
+                      `${API}/work/daily?date=${selectedDate}`,
+                      { headers: { Authorization: `Bearer ${token}` } },
+                    );
+
+                    setDailyData(res.data.data);
+                    setMode("daily");
+                  }}
+                  className="bg-white px-5 py-3 rounded-xl border-2 border-gray-200 shadow-sm hover:border-[#c62d23]"
+                >
+                  Daily Login Time
+                </button>
+
+                {mode === "daily" && (
+                  <button
+                    onClick={() => setMode("logs")}
+                    className="bg-white px-5 py-3 rounded-xl border-2 border-gray-200 shadow-sm hover:border-[#c62d23]"
+                  >
+                    Back to Activity Logs
+                  </button>
+                )}
               </div>
             </div>
 
             {/* TABLE */}
+            {/* TABLE */}
             <div className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm hover:shadow-md transition-shadow">
               <h2 className="text-xl font-bold text-gray-900 mb-6">
-                Activity Logs
+                {mode === "logs"
+                  ? "Activity Logs"
+                  : `Daily Login Summary (${selectedDate})`}
               </h2>
+
               <div className="overflow-auto rounded-lg border border-gray-200">
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="bg-gray-50">
-                      {[
-                        "Time",
-                        "User",
-                        "Role",
-                        "Action",
-                        "Module",
-                        "Description",
-                      ].map((h) => (
+                      {(mode === "logs"
+                        ? [
+                            "Time",
+                            "User",
+                            "Role",
+                            "Action",
+                            "Module",
+                            "Description",
+                          ]
+                        : ["User", "Role", "Module", "Total Time"]
+                      ).map((h) => (
                         <th
                           key={h}
                           className="text-left p-4 font-semibold text-gray-700"
@@ -256,37 +303,62 @@ export default function ActivityLogPage() {
                       ))}
                     </tr>
                   </thead>
-                  <tbody>
-                    {logs.map((l, index) => (
-                      <tr
-                        key={l._id}
-                        className={`border-b border-gray-100 hover:bg-gray-50 transition-colors ${
-                          index % 2 === 0 ? "bg-white" : "bg-gray-50"
-                        }`}
-                      >
-                        <td className="p-4 font-semibold text-[15px] text-gray-700">
-                          {new Date(l.createdAt).toLocaleString([], {
-                            year: "numeric",
-                            month: "short",
-                            day: "2-digit",
-                            hour: "2-digit",
-                            minute: "2-digit",
-                          })}
-                        </td>
 
-                        <td className="p-4 text-gray-700">{l.user?.name}</td>
-                        <td className="p-4 text-gray-700">{l.user?.role}</td>
-                        <td className="p-4 text-gray-700">{l.action}</td>
-                        <td className="p-4 text-gray-700">{l.module}</td>
-                        <td className="p-4 text-gray-700">{l.description}</td>
-                      </tr>
-                    ))}
+                  <tbody>
+                    {mode === "logs" &&
+                      filteredLogs.map((l, index) => (
+                          <tr
+                            key={l._id}
+                            className={`border-b border-gray-100 hover:bg-gray-50 ${
+                              index % 2 === 0 ? "bg-white" : "bg-gray-50"
+                            }`}
+                          >
+                            <td className="p-4 font-semibold text-gray-700">
+                              {new Date(l.createdAt).toLocaleString([], {
+                                year: "numeric",
+                                month: "short",
+                                day: "2-digit",
+                                hour: "2-digit",
+                                minute: "2-digit",
+                              })}
+                            </td>
+                            <td className="p-4">{l.user?.name}</td>
+                            <td className="p-4">{l.user?.role}</td>
+                            <td className="p-4">{l.action}</td>
+                            <td className="p-4">{l.module}</td>
+                            <td className="p-4">{l.description}</td>
+                          </tr>
+                        ))}
+
+                    {mode === "daily" &&
+                      dailyData.map((d, index) => (
+                        <tr
+                          key={index}
+                          className={`border-b border-gray-100 hover:bg-gray-50 ${
+                            index % 2 === 0 ? "bg-white" : "bg-gray-50"
+                          }`}
+                        >
+                          <td className="p-4">{d.user?.name}</td>
+                          <td className="p-4">{d.user?.role}</td>
+                          <td className="p-4">{d.module}</td>
+                          <td className="p-4 font-semibold">
+                            {formatDuration(d.totalSeconds)}
+                          </td>
+                        </tr>
+                      ))}
                   </tbody>
                 </table>
               </div>
-              {logs.length === 0 && (
+
+              {mode === "logs" && logs.length === 0 && (
                 <div className="p-8 text-center text-gray-500">
                   No activity logs found
+                </div>
+              )}
+
+              {mode === "daily" && dailyData.length === 0 && (
+                <div className="p-8 text-center text-gray-500">
+                  No work data found for selected date
                 </div>
               )}
             </div>

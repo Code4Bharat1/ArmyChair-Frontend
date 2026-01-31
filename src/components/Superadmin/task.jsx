@@ -1,6 +1,19 @@
 "use client";
 import { useEffect, useState } from "react";
-import { Send, CheckCircle, Clock, Trash2, Edit2, Search, Filter, TrendingUp, Users, AlertCircle, Target, X } from "lucide-react";
+import {
+  Send,
+  CheckCircle,
+  Clock,
+  Trash2,
+  Edit2,
+  Search,
+  Filter,
+  TrendingUp,
+  Users,
+  AlertCircle,
+  Target,
+  X,
+} from "lucide-react";
 import Sidebar from "@/components/Superadmin/sidebar";
 import axios from "axios";
 
@@ -21,17 +34,17 @@ export default function AssignTasks() {
   const [loading, setLoading] = useState(true);
   const [loadingStaff, setLoadingStaff] = useState(false);
   const [token, setToken] = useState(null);
-  
+
   // Filter states
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("All");
   const [departmentFilter, setDepartmentFilter] = useState("All");
-  
+
   // Edit states
   const [editingTask, setEditingTask] = useState(null);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showAssignModal, setShowAssignModal] = useState(false);
-  
+
   // Toast notification
   const [toast, setToast] = useState({ show: false, message: "", type: "" });
 
@@ -99,27 +112,30 @@ export default function AssignTasks() {
   // Filter tasks
   useEffect(() => {
     let filtered = [...tasks];
-    
+
     if (searchQuery) {
-      filtered = filtered.filter(t => 
-        t.task.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        t.assignedTo?.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        t.assignedTo?.email.toLowerCase().includes(searchQuery.toLowerCase())
+      filtered = filtered.filter(
+        (t) =>
+          t.task.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          t.assignedTo?.name
+            .toLowerCase()
+            .includes(searchQuery.toLowerCase()) ||
+          t.assignedTo?.email.toLowerCase().includes(searchQuery.toLowerCase()),
       );
     }
-    
+
     if (statusFilter !== "All") {
       if (statusFilter === "Delayed") {
-        filtered = filtered.filter(t => t.isDelayed);
+        filtered = filtered.filter((t) => t.isDelayed);
       } else {
-        filtered = filtered.filter(t => t.status === statusFilter);
+        filtered = filtered.filter((t) => t.status === statusFilter);
       }
     }
-    
+
     if (departmentFilter !== "All") {
-      filtered = filtered.filter(t => t.department === departmentFilter);
+      filtered = filtered.filter((t) => t.department === departmentFilter);
     }
-    
+
     setFilteredTasks(filtered);
   }, [searchQuery, statusFilter, departmentFilter, tasks]);
 
@@ -144,26 +160,32 @@ export default function AssignTasks() {
       fetchTasks();
       showToast("Task assigned successfully!");
     } catch (err) {
-      showToast(err.response?.data?.message || "Failed to assign task", "error");
+      showToast(
+        err.response?.data?.message || "Failed to assign task",
+        "error",
+      );
     }
   };
 
   const deleteTask = async (taskId) => {
     if (!auth) return;
     if (!confirm("Are you sure you want to delete this task?")) return;
-    
+
     try {
       await axios.delete(`${API}/tasks/${taskId}`, auth);
       fetchTasks();
       showToast("Task deleted successfully!");
     } catch (err) {
-      showToast(err.response?.data?.message || "Failed to delete task", "error");
+      showToast(
+        err.response?.data?.message || "Failed to delete task",
+        "error",
+      );
     }
   };
 
   const updateTask = async () => {
     if (!auth || !editingTask) return;
-    
+
     try {
       await axios.put(`${API}/tasks/${editingTask._id}`, editingTask, auth);
       setShowEditModal(false);
@@ -171,7 +193,10 @@ export default function AssignTasks() {
       fetchTasks();
       showToast("Task updated successfully!");
     } catch (err) {
-      showToast(err.response?.data?.message || "Failed to update task", "error");
+      showToast(
+        err.response?.data?.message || "Failed to update task",
+        "error",
+      );
     }
   };
 
@@ -179,17 +204,17 @@ export default function AssignTasks() {
     const now = new Date();
     const due = new Date(dueAt);
     const diff = due - now;
-    
+
     if (diff < 0) {
       const hours = Math.floor(Math.abs(diff) / (1000 * 60 * 60));
       const days = Math.floor(hours / 24);
       if (days > 0) return `Overdue by ${days}d`;
       return `Overdue by ${hours}h`;
     }
-    
+
     const hours = Math.floor(diff / (1000 * 60 * 60));
     const days = Math.floor(hours / 24);
-    
+
     if (days > 0) return `Due in ${days}d`;
     if (hours > 0) return `Due in ${hours}h`;
     return "Due soon";
@@ -198,30 +223,31 @@ export default function AssignTasks() {
   const getRowColor = (t) => {
     if (t.status === "Completed") return "";
     if (t.isDelayed) return "bg-red-50";
-    
+
     const now = new Date();
     const due = new Date(t.dueAt);
     const diff = due - now;
     const hours = diff / (1000 * 60 * 60);
-    
+
     if (hours < 24 && hours > 0) return "bg-yellow-50";
     return "";
   };
 
   // Calculate stats
   const totalTasks = tasks.length;
-  const completedTasks = tasks.filter(t => t.status === "Completed").length;
-  const pendingTasks = tasks.filter(t => t.status === "Pending").length;
-  const delayedTasks = tasks.filter(t => t.isDelayed).length;
-  const completionRate = totalTasks > 0 ? ((completedTasks / totalTasks) * 100).toFixed(1) : 0;
-  const uniqueEmployees = new Set(tasks.map(t => t.assignedTo?._id)).size;
+  const completedTasks = tasks.filter((t) => t.status === "Completed").length;
+  const pendingTasks = tasks.filter((t) => t.status === "Pending").length;
+  const delayedTasks = tasks.filter((t) => t.isDelayed).length;
+  const completionRate =
+    totalTasks > 0 ? ((completedTasks / totalTasks) * 100).toFixed(1) : 0;
+  const uniqueEmployees = new Set(tasks.map((t) => t.assignedTo?._id)).size;
 
   // Handle stat card clicks
   const handleStatClick = (filterType) => {
     setSearchQuery("");
     setDepartmentFilter("All");
-    
-    switch(filterType) {
+
+    switch (filterType) {
       case "all":
         setStatusFilter("All");
         break;
@@ -245,10 +271,18 @@ export default function AssignTasks() {
 
       {/* Toast Notification */}
       {toast.show && (
-        <div className={`fixed top-4 right-4 z-50 px-6 py-4 rounded-xl shadow-lg flex items-center gap-3 animate-slide-in ${
-          toast.type === "success" ? "bg-green-500 text-white" : "bg-red-500 text-white"
-        }`}>
-          {toast.type === "success" ? <CheckCircle size={20} /> : <AlertCircle size={20} />}
+        <div
+          className={`fixed top-4 right-4 z-50 px-6 py-4 rounded-xl shadow-lg flex items-center gap-3 animate-slide-in ${
+            toast.type === "success"
+              ? "bg-green-500 text-white"
+              : "bg-red-500 text-white"
+          }`}
+        >
+          {toast.type === "success" ? (
+            <CheckCircle size={20} />
+          ) : (
+            <AlertCircle size={20} />
+          )}
           <span className="font-medium">{toast.message}</span>
         </div>
       )}
@@ -259,11 +293,14 @@ export default function AssignTasks() {
           <div className="bg-white rounded-2xl p-6 max-w-md w-full max-h-[90vh] overflow-y-auto">
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-xl font-bold">Assign New Task</h3>
-              <button onClick={() => setShowAssignModal(false)} className="p-2 hover:bg-gray-100 rounded-lg">
+              <button
+                onClick={() => setShowAssignModal(false)}
+                className="p-2 hover:bg-gray-100 rounded-lg"
+              >
                 <X size={20} />
               </button>
             </div>
-            
+
             <div className="space-y-5">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -367,47 +404,67 @@ export default function AssignTasks() {
           <div className="bg-white rounded-2xl p-6 max-w-md w-full">
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-xl font-bold">Edit Task</h3>
-              <button onClick={() => setShowEditModal(false)} className="p-2 hover:bg-gray-100 rounded-lg">
+              <button
+                onClick={() => setShowEditModal(false)}
+                className="p-2 hover:bg-gray-100 rounded-lg"
+              >
                 <X size={20} />
               </button>
             </div>
-            
+
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Task Description</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Task Description
+                </label>
                 <textarea
                   value={editingTask.task}
-                  onChange={(e) => setEditingTask({...editingTask, task: e.target.value})}
+                  onChange={(e) =>
+                    setEditingTask({ ...editingTask, task: e.target.value })
+                  }
                   rows={4}
                   className="w-full p-3 bg-white rounded-xl border-2 border-gray-200 focus:border-[#c62d23] focus:ring-2 focus:ring-[#c62d23]/20 outline-none transition-all resize-none"
                 />
               </div>
-              
+
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Due Date</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Due Date
+                  </label>
                   <input
                     type="date"
-                    value={editingTask.dueAt?.split('T')[0] || ''}
-                    onChange={(e) => setEditingTask({...editingTask, dueAt: e.target.value})}
+                    value={editingTask.dueAt?.split("T")[0] || ""}
+                    onChange={(e) =>
+                      setEditingTask({ ...editingTask, dueAt: e.target.value })
+                    }
                     className="w-full p-3 bg-white rounded-xl border-2 border-gray-200 focus:border-[#c62d23] focus:ring-2 focus:ring-[#c62d23]/20"
                   />
                 </div>
-                
+
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Due Time</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Due Time
+                  </label>
                   <input
                     type="time"
-                    value={editingTask.dueAt?.split('T')[1]?.substring(0, 5) || ''}
+                    value={
+                      editingTask.dueAt?.split("T")[1]?.substring(0, 5) || ""
+                    }
                     onChange={(e) => {
-                      const date = editingTask.dueAt?.split('T')[0] || new Date().toISOString().split('T')[0];
-                      setEditingTask({...editingTask, dueAt: `${date}T${e.target.value}`});
+                      const date =
+                        editingTask.dueAt?.split("T")[0] ||
+                        new Date().toISOString().split("T")[0];
+                      setEditingTask({
+                        ...editingTask,
+                        dueAt: `${date}T${e.target.value}`,
+                      });
                     }}
                     className="w-full p-3 bg-white rounded-xl border-2 border-gray-200 focus:border-[#c62d23] focus:ring-2 focus:ring-[#c62d23]/20"
                   />
                 </div>
               </div>
-              
+
               <div className="flex gap-3 pt-2">
                 <button
                   onClick={updateTask}
@@ -431,28 +488,28 @@ export default function AssignTasks() {
         {/* HEADER */}
         <div className="sticky top-0 z-20 bg-white/80 backdrop-blur border-b border-gray-200 p-6 shadow-sm">
           <div className="flex items-center justify-between">
-    <div>
-      <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-2">
-        <span>Task Management</span>
-      </h1>
-      <p className="text-gray-600 mt-2">
-        Assign work to staff and track completion in real-time.
-      </p>
-    </div>
-    <button
-      onClick={() => setShowAssignModal(true)}
-      className="bg-[#c62d23] hover:bg-[#a8241c] text-white px-6 py-3 rounded-lg flex items-center gap-2 font-medium transition-all shadow-sm hover:shadow-md"
-    >
-      <Send size={18} /> Assign New Task
-    </button>
-  </div>
-</div>
+            <div>
+              <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-2">
+                <span>Task Management</span>
+              </h1>
+              <p className="text-gray-600 mt-2">
+                Assign work to staff and track completion in real-time.
+              </p>
+            </div>
+            <button
+              onClick={() => setShowAssignModal(true)}
+              className="bg-[#c62d23] hover:bg-[#a8241c] text-white px-6 py-3 rounded-lg flex items-center gap-2 font-medium transition-all shadow-sm hover:shadow-md"
+            >
+              <Send size={18} /> Assign New Task
+            </button>
+          </div>
+        </div>
 
         <div className="p-8 space-y-8">
           {/* STATS CARDS - CLICKABLE */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
             {/* Total Tasks */}
-            <button 
+            <button
               onClick={() => handleStatClick("all")}
               className="bg-white border-2 border-gray-200 hover:border-blue-400 rounded-xl p-5 shadow-sm hover:shadow-md transition-all text-left group cursor-pointer"
             >
@@ -460,14 +517,20 @@ export default function AssignTasks() {
                 <div className="p-3 bg-blue-50 rounded-lg group-hover:bg-blue-100 transition-colors">
                   <Target size={24} className="text-blue-600" />
                 </div>
-                <div className="text-xs font-medium text-gray-500 bg-gray-100 px-2 py-1 rounded">ALL</div>
+                <div className="text-xs font-medium text-gray-500 bg-gray-100 px-2 py-1 rounded">
+                  ALL
+                </div>
               </div>
-              <div className="text-3xl font-bold text-gray-900 mb-1">{totalTasks}</div>
-              <div className="text-sm font-medium text-gray-600">Total Tasks</div>
+              <div className="text-3xl font-bold text-gray-900 mb-1">
+                {totalTasks}
+              </div>
+              <div className="text-sm font-medium text-gray-600">
+                Total Tasks
+              </div>
             </button>
 
             {/* Completed */}
-            <button 
+            <button
               onClick={() => handleStatClick("completed")}
               className="bg-white border-2 border-gray-200 hover:border-green-400 rounded-xl p-5 shadow-sm hover:shadow-md transition-all text-left group cursor-pointer"
             >
@@ -475,14 +538,18 @@ export default function AssignTasks() {
                 <div className="p-3 bg-green-50 rounded-lg group-hover:bg-green-100 transition-colors">
                   <CheckCircle size={24} className="text-green-600" />
                 </div>
-                <div className="text-xs font-medium text-green-700 bg-green-100 px-2 py-1 rounded">DONE</div>
+                <div className="text-xs font-medium text-green-700 bg-green-100 px-2 py-1 rounded">
+                  DONE
+                </div>
               </div>
-              <div className="text-3xl font-bold text-gray-900 mb-1">{completedTasks}</div>
+              <div className="text-3xl font-bold text-gray-900 mb-1">
+                {completedTasks}
+              </div>
               <div className="text-sm font-medium text-gray-600">Completed</div>
             </button>
 
             {/* Pending */}
-            <button 
+            <button
               onClick={() => handleStatClick("pending")}
               className="bg-white border-2 border-gray-200 hover:border-amber-400 rounded-xl p-5 shadow-sm hover:shadow-md transition-all text-left group cursor-pointer"
             >
@@ -490,14 +557,18 @@ export default function AssignTasks() {
                 <div className="p-3 bg-amber-50 rounded-lg group-hover:bg-amber-100 transition-colors">
                   <Clock size={24} className="text-amber-600" />
                 </div>
-                <div className="text-xs font-medium text-amber-700 bg-amber-100 px-2 py-1 rounded">ACTIVE</div>
+                <div className="text-xs font-medium text-amber-700 bg-amber-100 px-2 py-1 rounded">
+                  ACTIVE
+                </div>
               </div>
-              <div className="text-3xl font-bold text-gray-900 mb-1">{pendingTasks}</div>
+              <div className="text-3xl font-bold text-gray-900 mb-1">
+                {pendingTasks}
+              </div>
               <div className="text-sm font-medium text-gray-600">Pending</div>
             </button>
 
             {/* Delayed */}
-            <button 
+            <button
               onClick={() => handleStatClick("delayed")}
               className="bg-white border-2 border-gray-200 hover:border-red-400 rounded-xl p-5 shadow-sm hover:shadow-md transition-all text-left group cursor-pointer"
             >
@@ -505,13 +576,15 @@ export default function AssignTasks() {
                 <div className="p-3 bg-red-50 rounded-lg group-hover:bg-red-100 transition-colors">
                   <AlertCircle size={24} className="text-red-600" />
                 </div>
-                <div className="text-xs font-medium text-red-700 bg-red-100 px-2 py-1 rounded">URGENT</div>
+                <div className="text-xs font-medium text-red-700 bg-red-100 px-2 py-1 rounded">
+                  URGENT
+                </div>
               </div>
-              <div className="text-3xl font-bold text-gray-900 mb-1">{delayedTasks}</div>
+              <div className="text-3xl font-bold text-gray-900 mb-1">
+                {delayedTasks}
+              </div>
               <div className="text-sm font-medium text-gray-600">Delayed</div>
             </button>
-
-          
           </div>
 
           {/* TABLE - FULL WIDTH */}
@@ -527,10 +600,11 @@ export default function AssignTasks() {
               </h2>
 
               <div className="flex flex-col sm:flex-row gap-3">
-                
-
                 <div className="relative">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+                  <Search
+                    className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+                    size={18}
+                  />
                   <input
                     type="text"
                     placeholder="Search tasks..."
@@ -565,143 +639,150 @@ export default function AssignTasks() {
               </div>
             </div>
 
-              {loading ? (
-                <div className="p-8 text-center flex-1 flex items-center justify-center">
-                  <div>
-                    <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-[#c62d23] border-r-transparent"></div>
-                    <p className="mt-4 text-gray-500">Loading tasks...</p>
-                  </div>
+            {loading ? (
+              <div className="p-8 text-center flex-1 flex items-center justify-center">
+                <div>
+                  <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-[#c62d23] border-r-transparent"></div>
+                  <p className="mt-4 text-gray-500">Loading tasks...</p>
                 </div>
-              ) : filteredTasks.length === 0 ? (
-                <div className="p-12 text-center flex-1 flex items-center justify-center">
-                  <div>
-                    <Target size={48} className="mx-auto text-gray-300 mb-4" />
-                    <p className="text-gray-500 text-lg font-medium">
-                      {searchQuery || statusFilter !== "All" || departmentFilter !== "All" 
-                        ? "No tasks match your filters" 
-                        : "No tasks assigned yet"}
-                    </p>
-                    <p className="text-gray-400 text-sm mt-2">
-                      {searchQuery || statusFilter !== "All" || departmentFilter !== "All"
-                        ? "Try adjusting your search or filters"
-                        : "Start by assigning your first task"}
-                    </p>
-                  </div>
+              </div>
+            ) : filteredTasks.length === 0 ? (
+              <div className="p-12 text-center flex-1 flex items-center justify-center">
+                <div>
+                  <Target size={48} className="mx-auto text-gray-300 mb-4" />
+                  <p className="text-gray-500 text-lg font-medium">
+                    {searchQuery ||
+                    statusFilter !== "All" ||
+                    departmentFilter !== "All"
+                      ? "No tasks match your filters"
+                      : "No tasks assigned yet"}
+                  </p>
+                  <p className="text-gray-400 text-sm mt-2">
+                    {searchQuery ||
+                    statusFilter !== "All" ||
+                    departmentFilter !== "All"
+                      ? "Try adjusting your search or filters"
+                      : "Start by assigning your first task"}
+                  </p>
                 </div>
-              ) : (
-                <div className="overflow-auto flex-1 rounded-lg border border-gray-200">
-                  <table className="w-full text-sm min-w-[1000px]">
-                    <thead className="sticky top-0 bg-gray-50 z-10">
-                      <tr className="bg-gray-50">
-                        <th className="text-left p-4 font-semibold text-gray-700">
-                          Department
-                        </th>
-                        <th className="text-left p-4 font-semibold text-gray-700">
-                          Employee
-                        </th>
-                        <th className="text-left p-4 font-semibold text-gray-700">
-                          Task
-                        </th>
-                        <th className="text-left p-4 font-semibold text-gray-700">
-                          Due By
-                        </th>
-                        <th className="text-left p-4 font-semibold text-gray-700">
-                          Status
-                        </th>
-                        <th className="text-left p-4 font-semibold text-gray-700">
-                          Assigned
-                        </th>
-                        <th className="text-left p-4 font-semibold text-gray-700">
-                          Completed
-                        </th>
-                        <th className="text-left p-4 font-semibold text-gray-700">
-                          Actions
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {filteredTasks.map((t, index) => (
-                        <tr
-                          key={t._id}
-                          className={`border-b border-gray-100 hover:bg-gray-50 transition-colors ${getRowColor(t)}`}
-                        >
-                          <td className="p-4 text-gray-700">{t.department}</td>
-                          <td className="p-4">
-                            <div className="font-medium text-gray-900">
-                              {t.assignedTo?.name}
+              </div>
+            ) : (
+              <div className="overflow-auto flex-1 rounded-lg border border-gray-200">
+                <table className="w-full text-sm min-w-[1000px]">
+                  <thead className="sticky top-0 bg-gray-50 z-10">
+                    <tr className="bg-gray-50">
+                      <th className="text-left p-4 font-semibold text-gray-700">
+                        Department
+                      </th>
+                      <th className="text-left p-4 font-semibold text-gray-700">
+                        Employee
+                      </th>
+                      <th className="text-left p-4 font-semibold text-gray-700">
+                        Task
+                      </th>
+                      <th className="text-left p-4 font-semibold text-gray-700">
+                        Due By
+                      </th>
+                      <th className="text-left p-4 font-semibold text-gray-700">
+                        Status
+                      </th>
+                      <th className="text-left p-4 font-semibold text-gray-700">
+                        Assigned
+                      </th>
+                      <th className="text-left p-4 font-semibold text-gray-700">
+                        Completed
+                      </th>
+                      <th className="text-left p-4 font-semibold text-gray-700">
+                        Actions
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredTasks.map((t, index) => (
+                      <tr
+                        key={t._id}
+                        className={`border-b border-gray-100 hover:bg-gray-50 transition-colors ${getRowColor(t)}`}
+                      >
+                        <td className="p-4 text-gray-700">{t.department}</td>
+                        <td className="p-4">
+                          <div className="font-medium text-gray-900">
+                            {t.assignedTo?.name}
+                          </div>
+                          <div className="text-xs text-gray-500">
+                            {t.assignedTo?.email}
+                          </div>
+                        </td>
+                        <td className="p-4 text-gray-700 max-w-md">{t.task}</td>
+                        <td className="p-4">
+                          <div className="text-gray-700">
+                            {new Date(t.dueAt).toLocaleString()}
+                          </div>
+                          {t.status !== "Completed" && (
+                            <div className="text-xs text-gray-500 mt-1">
+                              {getTimeRemaining(t.dueAt)}
                             </div>
-                            <div className="text-xs text-gray-500">
-                              {t.assignedTo?.email}
-                            </div>
-                          </td>
-                          <td className="p-4 text-gray-700 max-w-md">
-                            {t.task}
-                          </td>
-                          <td className="p-4">
-                            <div className="text-gray-700">
-                              {new Date(t.dueAt).toLocaleString()}
-                            </div>
-                            {t.status !== "Completed" && (
-                              <div className="text-xs text-gray-500 mt-1">
-                                {getTimeRemaining(t.dueAt)}
-                              </div>
-                            )}
-                          </td>
-                          <td className="p-4">
-                            {t.status === "Completed" ? (
+                          )}
+                        </td>
+                        <td className="p-4">
+                          {t.status === "Completed" ? (
+                            new Date(t.completedAt) > new Date(t.dueAt) ? (
+                              <span className="inline-flex items-center gap-2 text-red-600 font-semibold">
+                                ⏰ Done Late
+                              </span>
+                            ) : (
                               <span className="inline-flex items-center gap-2 text-green-600 font-medium">
                                 <CheckCircle size={16} /> Completed
                               </span>
-                            ) : t.isDelayed ? (
-                              <span className="text-red-600 font-semibold">
-                                ⏰ Delayed
-                              </span>
-                            ) : (
-                              <span className="inline-flex items-center gap-2 text-amber-600 font-medium">
-                                <Clock size={16} /> Pending
-                              </span>
-                            )}
-                          </td>
-                          <td className="p-4 text-gray-700">
-                            {new Date(t.createdAt).toLocaleDateString()}
-                          </td>
-                          <td className="p-4 text-gray-700">
-                            {t.completedAt
-                              ? new Date(t.completedAt).toLocaleDateString()
-                              : "—"}
-                          </td>
-                          <td className="p-4">
-                            <div className="flex gap-2">
-                              <button
-                                onClick={() => {
-                                  setEditingTask(t);
-                                  setShowEditModal(true);
-                                }}
-                                className="p-2 hover:bg-blue-50 text-blue-600 rounded-lg transition-colors"
-                                title="Edit task"
-                              >
-                                <Edit2 size={16} />
-                              </button>
-                              <button
-                                onClick={() => deleteTask(t._id)}
-                                className="p-2 hover:bg-red-50 text-red-600 rounded-lg transition-colors"
-                                title="Delete task"
-                              >
-                                <Trash2 size={16} />
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </div>
-            
+                            )
+                          ) : t.isDelayed ? (
+                            <span className="text-red-600 font-semibold">
+                              ⏰ Delayed
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-2 text-amber-600 font-medium">
+                              <Clock size={16} /> Pending
+                            </span>
+                          )}
+                        </td>
+
+                        <td className="p-4 text-gray-700">
+                          {new Date(t.createdAt).toLocaleDateString()}
+                        </td>
+                        <td className="p-4 text-gray-700">
+                          {t.completedAt
+                            ? new Date(t.completedAt).toLocaleDateString()
+                            : "—"}
+                        </td>
+                        <td className="p-4">
+                          <div className="flex gap-2">
+                            <button
+                              onClick={() => {
+                                setEditingTask(t);
+                                setShowEditModal(true);
+                              }}
+                              className="p-2 hover:bg-blue-50 text-blue-600 rounded-lg transition-colors"
+                              title="Edit task"
+                            >
+                              <Edit2 size={16} />
+                            </button>
+                            <button
+                              onClick={() => deleteTask(t._id)}
+                              className="p-2 hover:bg-red-50 text-red-600 rounded-lg transition-colors"
+                              title="Delete task"
+                            >
+                              <Trash2 size={16} />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
         </div>
-      
+      </div>
     </div>
   );
 }
