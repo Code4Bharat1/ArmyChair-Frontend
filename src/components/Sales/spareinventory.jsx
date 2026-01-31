@@ -11,6 +11,7 @@ import {
   Warehouse,
   MapPin,
   Building2,
+  Wrench,
   ArrowLeftRight,
 } from "lucide-react";
 import axios from "axios";
@@ -207,9 +208,10 @@ const overStock = data.filter((i) => i.status === "Overstocked").length;
         {/* HEADER */}
         <div className="sticky top-0 z-10 bg-white/80 backdrop-blur border-b border-gray-200 p-6 shadow-sm flex justify-between items-center">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">
-              Spare Parts Inventory
-            </h1>
+           <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-2">
+                <Wrench size={32} className="text-[#c62d23]" />
+                <span>Spare Parts Inventory</span>
+              </h1>
             <p className="text-gray-600 mt-2">
               Manage your spare parts stock levels and details
             </p>

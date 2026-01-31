@@ -1,13 +1,21 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { Wrench, CheckCircle, RotateCcw, X, Menu } from "lucide-react";
+import { usePathname, useRouter } from "next/navigation";
+import {
+  Wrench,
+  CheckCircle,
+  RotateCcw,
+  X,
+  Menu,
+  UserCircle,
+} from "lucide-react";
 import { useState } from "react";
 
 export default function FittingSidebar() {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
+  const router = useRouter();
 
   const itemClass = (path) =>
     `flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200
@@ -54,15 +62,17 @@ export default function FittingSidebar() {
                 <div className="w-10 h-10 bg-[#c62d23] rounded-xl flex items-center justify-center">
                   <Wrench size={20} className="text-white" />
                 </div>
-                <h2 className="text-xl font-bold text-gray-900">
-                  Fitting
-                </h2>
+                <h2 className="text-xl font-bold text-gray-900">Fitting</h2>
               </div>
-              <p className="text-xs text-gray-500 ml-12">
-                Fitting Department
-              </p>
+              <p className="text-xs text-gray-500 ml-12">Fitting Department</p>
             </div>
-
+            <button
+              onClick={() => router.push("/profile")}
+              title="My Profile"
+              className="text-gray-600 top-2 hover:text-[#c62d23] transition"
+            >
+              <UserCircle size={34} />
+            </button>
             {/* Close button - mobile only */}
             <button
               onClick={() => setOpen(false)}
@@ -92,7 +102,7 @@ export default function FittingSidebar() {
               <CheckCircle size={18} className="flex-shrink-0" />
               <span className="truncate">My Tasks</span>
             </Link>
-            
+
             <Link
               href="/fitting/Return-orders"
               onClick={() => setOpen(false)}
@@ -105,7 +115,16 @@ export default function FittingSidebar() {
         </div>
 
         {/* FOOTER */}
-        <div className="p-6 border-t border-gray-200 bg-gray-50">
+        <div className="p-5 pt-1 border-t border-gray-200 bg-gray-50">
+          <button
+            onClick={() => {
+              localStorage.removeItem("token");
+              window.location.href = "/login";
+            }}
+            className="w-full text-left py-3 px-5 text-sm text-gray-600 rounded-md hover:bg-red-100 hover:text-red-500 transition-colors "
+          >
+            Logout
+          </button>
           <p className="text-xs text-gray-500 text-center font-medium">
             Army Industry © 2026
           </p>

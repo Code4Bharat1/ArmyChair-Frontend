@@ -13,7 +13,7 @@ import {
   Search,
   Filter,
   X,
-  Package,
+  RockingChair,
   UserCircle,
 } from "lucide-react";
 import axios from "axios";
@@ -150,7 +150,7 @@ export default function InventoryPage() {
             {/* LEFT SIDE */}
             <div>
               <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-2">
-                <Package size={32} className="text-[#c62d23]" />
+                <RockingChair size={32} className="text-[#c62d23]" />
                 <span>Inventory Management</span>
               </h1>
               <p className="text-sm text-gray-600 mt-1">

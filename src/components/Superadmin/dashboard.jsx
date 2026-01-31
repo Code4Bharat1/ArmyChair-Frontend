@@ -14,6 +14,9 @@ import {
   X,
   ArrowRight,
   ChevronDown,
+  Menu,
+  LogOut,
+  UserCircle,
 } from "lucide-react";
 import Sidebar from "./sidebar";
 import {
@@ -57,12 +60,13 @@ export default function Dashboard() {
   const [staff, setStaff] = useState([]);
   const [products, setProducts] = useState([]);
   const [productType, setProductType] = useState("ALL"); // ALL | FULL | SPARE
-const [allOrders, setAllOrders] = useState([]);
+  const [allOrders, setAllOrders] = useState([]);
   const [token, setToken] = useState(null);
   const [selectedDate, setSelectedDate] = useState(
     new Date().toISOString().split("T")[0],
   );
   const [showCalendar, setShowCalendar] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const calendarRef = useRef(null);
   const [inward, setInward] = useState([]);
   const [inwardFull, setInwardFull] = useState([]);
@@ -142,9 +146,9 @@ const [allOrders, setAllOrders] = useState([]);
       });
 
       const o = await axios.get(`${API}/orders`, {
-  headers: { Authorization: `Bearer ${token}` },
-  params: { from, to }, // remove progress filter
-});
+        headers: { Authorization: `Bearer ${token}` },
+        params: { from, to }, // remove progress filter
+      });
 
       const inventory = i.data.inventory || [];
 
@@ -153,15 +157,12 @@ const [allOrders, setAllOrders] = useState([]);
 
       setStaff(s.data || []);
       setProducts(p.data || []);
-const ordersData = o.data.orders || [];
+      const ordersData = o.data.orders || [];
 
-setAllOrders(ordersData); // 👈 THIS was missing
+      setAllOrders(ordersData); // 👈 THIS was missing
 
-// outward = only dispatched
-setOutward(
-  ordersData.filter((ord) => ord.progress === "DISPATCHED")
-);
-
+      // outward = only dispatched
+      setOutward(ordersData.filter((ord) => ord.progress === "DISPATCHED"));
     } catch (err) {
       console.error("Dashboard API Error:", err);
     } finally {
@@ -203,62 +204,98 @@ setOutward(
   const totalOrders = allOrders.length;
 
   const topStaff = staff[0]?.name || "—";
-  const topProduct = products[0]?.name || "—";
+  const topProduct = filteredProducts[0]?.name || "—";
 
   return (
     <div className="flex h-screen bg-gray-50 text-gray-900">
-      <Sidebar />
+      {/* DESKTOP SIDEBAR */}
+      <div className="hidden lg:block">
+        <Sidebar />
+      </div>
+
+      {/* MOBILE SIDEBAR OVERLAY */}
+      {mobileMenuOpen && (
+        <>
+          {/* Backdrop */}
+          <div
+            className="lg:hidden fixed inset-0 bg-black/50 backdrop-blur-sm z-40 animate-fadeIn"
+            onClick={() => setMobileMenuOpen(false)}
+          />
+          
+          {/* Sidebar - Slides in from left */}
+          <div className="lg:hidden fixed inset-y-0 left-0 z-50 transform transition-transform duration-300 ease-in-out">
+            <div className="animate-slideInLeft">
+              <Sidebar onClose={() => setMobileMenuOpen(false)} />
+            </div>
+          </div>
+        </>
+      )}
 
       <div className="flex-1 overflow-y-auto overflow-x-hidden">
         {/* Header */}
-        <div className="sticky top-0 z-10 bg-white/80 backdrop-blur border-b border-gray-200 p-6 flex justify-between shadow-sm">
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-2">
-              <span>Executive Dashboard</span>
-            </h1>
-          </div>
-
-          <div className="relative" ref={calendarRef}>
-            <div
-              onClick={() => setShowCalendar(!showCalendar)}
-              className="flex items-center gap-3 bg-white px-5 py-3 rounded-xl border-2 border-gray-200 shadow-sm hover:border-[#c62d23] hover:shadow-md transition-all duration-200 cursor-pointer group"
-            >
-              <Calendar
-                size={18}
-                className="text-[#c62d23] group-hover:scale-110 transition-transform"
-              />
-              <span className="text-sm font-medium text-gray-900 min-w-[140px]">
-                {new Date(selectedDate).toLocaleDateString("en-US", {
-                  year: "numeric",
-                  month: "long",
-                  day: "numeric",
-                })}
-              </span>
-              <ChevronDown
-                size={16}
-                className={`text-gray-500 transition-transform ${showCalendar ? "rotate-180" : ""}`}
-              />
-              <div className="absolute inset-0 rounded-xl bg-gradient-to-r from-[#c62d23]/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
-            </div>
-
-            {showCalendar && (
-              <div className="absolute top-full mt-2 right-0 z-50 bg-white border border-gray-200 rounded-xl shadow-lg p-4 min-w-[320px]">
-                <CalendarComponent
-                  selectedDate={selectedDate}
-                  onDateSelect={(date) => {
-                    setSelectedDate(date);
-                    setShowCalendar(false);
-                  }}
-                  maxDate={new Date().toISOString().split("T")[0]}
-                />
+        <div className="sticky top-0 z-10 bg-white/80 backdrop-blur border-b border-gray-200 shadow-sm">
+          <div className="p-4 md:p-6">
+            <div className="flex items-center justify-between gap-3">
+              {/* LEFT - TITLE */}
+              <div className="flex-1 min-w-0">
+                <h1 className="text-lg sm:text-2xl md:text-3xl font-bold text-gray-900 flex items-center gap-2">
+                  <TrendingUp size={24} className="text-[#c62d23] flex-shrink-0 sm:w-8 sm:h-8" />
+                  <span className="truncate">Dashboard</span>
+                </h1>
               </div>
-            )}
+
+              {/* DESKTOP - DATE PICKER */}
+              <div className="hidden md:block relative" ref={calendarRef}>
+                <div
+                  onClick={() => setShowCalendar(!showCalendar)}
+                  className="flex items-center gap-3 bg-white px-5 py-3 rounded-xl border-2 border-gray-200 shadow-sm hover:border-[#c62d23] hover:shadow-md transition-all duration-200 cursor-pointer group"
+                >
+                  <Calendar
+                    size={18}
+                    className="text-[#c62d23] group-hover:scale-110 transition-transform"
+                  />
+                  <span className="text-sm font-medium text-gray-900 min-w-[140px]">
+                    {new Date(selectedDate).toLocaleDateString("en-US", {
+                      year: "numeric",
+                      month: "long",
+                      day: "numeric",
+                    })}
+                  </span>
+                  <ChevronDown
+                    size={16}
+                    className={`text-gray-500 transition-transform ${showCalendar ? "rotate-180" : ""}`}
+                  />
+                  <div className="absolute inset-0 rounded-xl bg-gradient-to-r from-[#c62d23]/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
+                </div>
+
+                {showCalendar && (
+                  <div className="absolute top-full mt-2 right-0 z-50 bg-white border border-gray-200 rounded-xl shadow-lg p-4 min-w-[320px]">
+                    <CalendarComponent
+                      selectedDate={selectedDate}
+                      onDateSelect={(date) => {
+                        setSelectedDate(date);
+                        setShowCalendar(false);
+                      }}
+                      maxDate={new Date().toISOString().split("T")[0]}
+                    />
+                  </div>
+                )}
+              </div>
+
+              {/* MOBILE MENU BUTTON */}
+              <button
+                onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+                className="lg:hidden text-gray-600 hover:text-[#c62d23] transition p-2"
+              >
+                {mobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
+              </button>
+            </div>
           </div>
         </div>
 
-        <div className="p-8 space-y-10">
-          {/* KPI */}
-          <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
+        <div className="p-4 md:p-8 space-y-6 md:space-y-10">
+          {/* KPI - RESPONSIVE GRID */}
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 md:gap-6">
             <Kpi
               title="Total Orders"
               value={totalOrders}
@@ -319,19 +356,19 @@ setOutward(
 
           {/* Charts */}
           {!view && (
-            <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
+            <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 md:gap-8">
               <Card title="Most Purchased Products">
                 {/* TOGGLE */}
-                <div className="flex gap-2 mb-4">
+                <div className="flex gap-2 mb-4 bg-gray-50 p-1 rounded-xl">
                   {["ALL", "FULL", "SPARE"].map((t) => (
                     <button
                       key={t}
                       onClick={() => setProductType(t)}
-                      className={`px-4 py-2 text-sm rounded-lg font-medium transition
+                      className={`flex-1 px-3 md:px-4 py-2 text-xs md:text-sm rounded-lg font-medium transition
           ${
             productType === t
-              ? "bg-[#c62d23] text-white"
-              : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+              ? "bg-[#c62d23] text-white shadow-md"
+              : "bg-white text-gray-700 hover:bg-gray-100"
           }`}
                     >
                       {t}
@@ -339,22 +376,22 @@ setOutward(
                   ))}
                 </div>
 
-                <ResponsiveContainer width="100%" height={400}>
+                <ResponsiveContainer width="100%" height={300} className="md:h-[400px]">
                   <BarChart
                     data={filteredProducts}
-                    margin={{ top: 20, right: 30, left: 20, bottom: 100 }}
+                    margin={{ top: 20, right: 10, left: 0, bottom: 80 }}
                   >
                     <XAxis
                       dataKey="name"
                       angle={-45}
                       textAnchor="end"
                       interval={0}
-                      height={100}
-                      tick={{ fontSize: 11, fill: "#374151" }}
+                      height={80}
+                      tick={{ fontSize: 9, fill: "#374151" }}
                       stroke="#E5E7EB"
                     />
                     <YAxis
-                      tick={{ fontSize: 12, fill: "#6B7280" }}
+                      tick={{ fontSize: 10, fill: "#6B7280" }}
                       stroke="#E5E7EB"
                       axisLine={false}
                     />
@@ -365,6 +402,7 @@ setOutward(
                         borderRadius: "12px",
                         boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1)",
                         padding: "12px",
+                        fontSize: "12px",
                       }}
                       cursor={{ fill: "rgba(198, 45, 35, 0.1)" }}
                     />
@@ -379,13 +417,13 @@ setOutward(
               </Card>
 
               <Card title="Staff Performance">
-                <ResponsiveContainer width="100%" height={350}>
+                <ResponsiveContainer width="100%" height={300} className="md:h-[350px]">
                   <PieChart>
                     <Pie
                       data={staff}
                       dataKey="orders"
                       nameKey="name"
-                      outerRadius={120}
+                      outerRadius={window.innerWidth < 768 ? 80 : 120}
                       onClick={(data) => {
                         setSelectedStaff(data);
                       }}
@@ -403,9 +441,10 @@ setOutward(
                         backgroundColor: "#fff",
                         border: "1px solid #e5e7eb",
                         borderRadius: "8px",
+                        fontSize: "12px",
                       }}
                     />
-                    <Legend />
+                    <Legend wrapperStyle={{ fontSize: "12px" }} />
                   </PieChart>
                 </ResponsiveContainer>
               </Card>
@@ -440,30 +479,31 @@ const Kpi = ({
 }) => (
   <div
     onClick={onClick}
-    className={`bg-white border border-gray-200 rounded-2xl p-6 transition-all duration-200 shadow-sm hover:shadow-md flex flex-col justify-between h-full ${
+    className={`bg-white border border-gray-200 rounded-xl md:rounded-2xl p-4 md:p-6 transition-all duration-200 shadow-sm hover:shadow-md flex flex-col justify-between h-full ${
       clickable ? "cursor-pointer hover:bg-gray-50 hover:border-[#c62d23]" : ""
     }`}
     style={{
       ...(accentColor === "red" && { borderLeft: "4px solid #c62d23" }),
     }}
   >
-    <div className="flex justify-between items-start mb-4">
-      <p className="text-sm text-gray-600 font-medium">{title}</p>
-      {React.cloneElement(icon, { size: 24 })}
+    <div className="flex justify-between items-start mb-3 md:mb-4">
+      <p className="text-xs md:text-sm text-gray-600 font-medium">{title}</p>
+      {React.cloneElement(icon, { size: 18, className: "md:w-6 md:h-6 text-[#c62d23]" })}
     </div>
     {typeof value === "number" ? (
       <CountUp
         end={value}
         duration={1.5}
-        className="text-3xl font-bold text-gray-900 mb-1"
+        className="text-xl md:text-3xl font-bold text-gray-900 mb-1"
         separator=","
       />
     ) : (
-      <p className="text-3xl font-bold text-gray-900 mb-1">{value}</p>
+      <p className="text-lg md:text-3xl font-bold text-gray-900 mb-1 truncate">{value}</p>
     )}
     {clickable && (
       <div className="mt-2 text-xs text-gray-500 flex items-center gap-1">
-        <span>Click to view details</span>
+        <span className="hidden sm:inline">Click to view details</span>
+        <span className="sm:hidden">View</span>
         <span className="text-[#c62d23]">→</span>
       </div>
     )}
@@ -471,8 +511,8 @@ const Kpi = ({
 );
 
 const Card = ({ title, children }) => (
-  <div className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm hover:shadow-md transition-shadow">
-    <h2 className="font-bold text-lg text-gray-900 mb-6 flex items-center gap-2">
+  <div className="bg-white border border-gray-200 rounded-xl md:rounded-2xl p-4 md:p-6 shadow-sm hover:shadow-md transition-shadow">
+    <h2 className="font-bold text-base md:text-lg text-gray-900 mb-4 md:mb-6 flex items-center gap-2">
       {title}
     </h2>
     {children}
@@ -486,9 +526,9 @@ const TableView = ({
   setInventoryTab,
   close,
 }) => (
-  <div className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm">
-    <div className="flex justify-between items-center mb-6">
-      <h2 className="font-bold text-xl text-gray-900">
+  <div className="bg-white border border-gray-200 rounded-xl md:rounded-2xl p-4 md:p-6 shadow-sm">
+    <div className="flex justify-between items-center mb-4 md:mb-6">
+      <h2 className="font-bold text-lg md:text-xl text-gray-900">
         {view === "inward" ? "Inward Inventory" : "Dispatched Orders"}
       </h2>
       <button
@@ -496,15 +536,15 @@ const TableView = ({
         className="flex items-center gap-1 text-sm text-gray-500 hover:text-[#c62d23] transition-colors p-2 rounded-lg hover:bg-gray-100"
       >
         <X size={16} />
-        Close
+        <span className="hidden sm:inline">Close</span>
       </button>
     </div>
 
     {view === "inward" && (
-      <div className="flex gap-4 mb-6 bg-gray-50 p-2 rounded-xl">
+      <div className="flex gap-2 md:gap-4 mb-4 md:mb-6 bg-gray-50 p-2 rounded-xl">
         <button
           onClick={() => setInventoryTab("FULL")}
-          className={`px-6 py-2 rounded-lg font-medium transition-all ${
+          className={`flex-1 px-4 md:px-6 py-2 rounded-lg font-medium text-sm md:text-base transition-all ${
             inventoryTab === "FULL"
               ? "bg-[#c62d23] text-white shadow-md"
               : "bg-white text-gray-700 hover:bg-gray-100"
@@ -514,7 +554,7 @@ const TableView = ({
         </button>
         <button
           onClick={() => setInventoryTab("SPARE")}
-          className={`px-6 py-2 rounded-lg font-medium transition-all ${
+          className={`flex-1 px-4 md:px-6 py-2 rounded-lg font-medium text-sm md:text-base transition-all ${
             inventoryTab === "SPARE"
               ? "bg-[#c62d23] text-white shadow-md"
               : "bg-white text-gray-700 hover:bg-gray-100"
@@ -525,65 +565,37 @@ const TableView = ({
       </div>
     )}
 
-    <div className="overflow-auto rounded-lg border border-gray-200">
+    {/* DESKTOP TABLE */}
+    <div className="hidden md:block overflow-auto rounded-lg border border-gray-200">
       <table className="w-full text-sm">
         <thead>
           <tr className="bg-gray-50">
             {view === "inward" && inventoryTab === "FULL" && (
               <>
-                <th className="text-left p-4 font-semibold text-gray-700">
-                  Date
-                </th>
-                <th className="text-left p-4 font-semibold text-gray-700">
-                  Chair
-                </th>
-                
-                <th className="text-left p-4 font-semibold text-gray-700">
-                  Qty
-                </th>
-                <th className="text-left p-4 font-semibold text-gray-700">
-                  Vendor
-                </th>
-                <th className="text-left p-4 font-semibold text-gray-700">
-                  Status
-                </th>
+                <th className="text-left p-4 font-semibold text-gray-700">Date</th>
+                <th className="text-left p-4 font-semibold text-gray-700">Chair</th>
+                <th className="text-left p-4 font-semibold text-gray-700">Qty</th>
+                <th className="text-left p-4 font-semibold text-gray-700">Vendor</th>
+                <th className="text-left p-4 font-semibold text-gray-700">Status</th>
               </>
             )}
 
             {view === "inward" && inventoryTab === "SPARE" && (
               <>
-                <th className="text-left p-4 font-semibold text-gray-700">
-                  Date
-                </th>
-                <th className="text-left p-4 font-semibold text-gray-700">
-                  Part
-                </th>
-                <th className="text-left p-4 font-semibold text-gray-700">
-                  Location
-                </th>
-                <th className="text-left p-4 font-semibold text-gray-700">
-                  Qty
-                </th>
+                <th className="text-left p-4 font-semibold text-gray-700">Date</th>
+                <th className="text-left p-4 font-semibold text-gray-700">Part</th>
+                <th className="text-left p-4 font-semibold text-gray-700">Location</th>
+                <th className="text-left p-4 font-semibold text-gray-700">Qty</th>
               </>
             )}
 
             {view === "outward" && (
               <>
-                <th className="text-left p-4 font-semibold text-gray-700">
-                  Date
-                </th>
-                <th className="text-left p-4 font-semibold text-gray-700">
-                  Product
-                </th>
-                <th className="text-left p-4 font-semibold text-gray-700">
-                  Qty
-                </th>
-                <th className="text-left p-4 font-semibold text-gray-700">
-                  Client
-                </th>
-                <th className="text-left p-4 font-semibold text-gray-700">
-                  Status
-                </th>
+                <th className="text-left p-4 font-semibold text-gray-700">Date</th>
+                <th className="text-left p-4 font-semibold text-gray-700">Product</th>
+                <th className="text-left p-4 font-semibold text-gray-700">Qty</th>
+                <th className="text-left p-4 font-semibold text-gray-700">Client</th>
+                <th className="text-left p-4 font-semibold text-gray-700">Status</th>
               </>
             )}
           </tr>
@@ -602,10 +614,7 @@ const TableView = ({
                   <td className="p-4 text-gray-900">
                     {new Date(r.createdAt).toLocaleDateString()}
                   </td>
-                  <td className="p-4 text-gray-900 font-medium">
-                    {r.chairType}
-                  </td>
-                  
+                  <td className="p-4 text-gray-900 font-medium">{r.chairType}</td>
                   <td className="p-4 text-gray-900 font-semibold">
                     <CountUp end={r.quantity} duration={1} separator="," />
                   </td>
@@ -623,9 +632,7 @@ const TableView = ({
                   <td className="p-4 text-gray-900">
                     {new Date(r.createdAt).toLocaleDateString()}
                   </td>
-                  <td className="p-4 text-gray-900 font-medium">
-                    {r.partName}
-                  </td>
+                  <td className="p-4 text-gray-900 font-medium">{r.partName}</td>
                   <td className="p-4 text-gray-700">{r.location}</td>
                   <td className="p-4 text-gray-900 font-semibold">
                     <CountUp end={r.quantity} duration={1} separator="," />
@@ -638,9 +645,7 @@ const TableView = ({
                   <td className="p-4 text-gray-900">
                     {new Date(r.createdAt).toLocaleDateString()}
                   </td>
-                  <td className="p-4 text-gray-900 font-medium">
-                    {r.chairModel}
-                  </td>
+                  <td className="p-4 text-gray-900 font-medium">{r.chairModel}</td>
                   <td className="p-4 text-gray-900 font-semibold">
                     <CountUp end={r.quantity} duration={1} separator="," />
                   </td>
@@ -664,6 +669,92 @@ const TableView = ({
         </tbody>
       </table>
     </div>
+
+    {/* MOBILE CARDS */}
+    <div className="md:hidden space-y-3">
+      {data.length === 0 ? (
+        <div className="p-8 text-center text-gray-500">No data available</div>
+      ) : (
+        data.map((r) => (
+          <div key={r._id} className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+            {view === "inward" && inventoryTab === "FULL" && (
+              <>
+                <div className="flex justify-between items-start mb-3">
+                  <div>
+                    <h3 className="font-semibold text-gray-900">{r.chairType}</h3>
+                    <p className="text-xs text-gray-500 mt-1">
+                      {new Date(r.createdAt).toLocaleDateString()}
+                    </p>
+                  </div>
+                  <span className="px-2 py-1 bg-[#fef2f2] text-[#991b1b] text-xs rounded-full font-medium">
+                    {r.status}
+                  </span>
+                </div>
+                <div className="grid grid-cols-2 gap-3 text-sm">
+                  <div>
+                    <span className="text-gray-500 text-xs">Quantity</span>
+                    <p className="font-semibold text-gray-900">{r.quantity}</p>
+                  </div>
+                  <div>
+                    <span className="text-gray-500 text-xs">Vendor</span>
+                    <p className="font-semibold text-gray-900">{r.vendor?.name || "—"}</p>
+                  </div>
+                </div>
+              </>
+            )}
+
+            {view === "inward" && inventoryTab === "SPARE" && (
+              <>
+                <div className="flex justify-between items-start mb-3">
+                  <div>
+                    <h3 className="font-semibold text-gray-900">{r.partName}</h3>
+                    <p className="text-xs text-gray-500 mt-1">
+                      {new Date(r.createdAt).toLocaleDateString()}
+                    </p>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-3 text-sm">
+                  <div>
+                    <span className="text-gray-500 text-xs">Location</span>
+                    <p className="font-semibold text-gray-900">{r.location}</p>
+                  </div>
+                  <div>
+                    <span className="text-gray-500 text-xs">Quantity</span>
+                    <p className="font-semibold text-gray-900">{r.quantity}</p>
+                  </div>
+                </div>
+              </>
+            )}
+
+            {view === "outward" && (
+              <>
+                <div className="flex justify-between items-start mb-3">
+                  <div>
+                    <h3 className="font-semibold text-gray-900">{r.chairModel}</h3>
+                    <p className="text-xs text-gray-500 mt-1">
+                      {new Date(r.createdAt).toLocaleDateString()}
+                    </p>
+                  </div>
+                  <span className="px-2 py-1 bg-green-100 text-green-800 text-xs rounded-full font-medium">
+                    {r.progress}
+                  </span>
+                </div>
+                <div className="grid grid-cols-2 gap-3 text-sm">
+                  <div>
+                    <span className="text-gray-500 text-xs">Quantity</span>
+                    <p className="font-semibold text-gray-900">{r.quantity}</p>
+                  </div>
+                  <div>
+                    <span className="text-gray-500 text-xs">Client</span>
+                    <p className="font-semibold text-gray-900">{r.dispatchedTo?.name}</p>
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+        ))
+      )}
+    </div>
   </div>
 );
 
@@ -673,22 +764,11 @@ const CalendarComponent = ({ selectedDate, onDateSelect, maxDate }) => {
     return new Date(date.getFullYear(), date.getMonth(), 1);
   });
 
-  // Don't use local state for selected date, use the prop directly
   const selectedDateObj = new Date(selectedDate);
 
   const monthNames = [
-    "January",
-    "February",
-    "March",
-    "April",
-    "May",
-    "June",
-    "July",
-    "August",
-    "September",
-    "October",
-    "November",
-    "December",
+    "January", "February", "March", "April", "May", "June",
+    "July", "August", "September", "October", "November", "December",
   ];
 
   const daysOfWeek = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -703,12 +783,10 @@ const CalendarComponent = ({ selectedDate, onDateSelect, maxDate }) => {
 
     const days = [];
 
-    // Add empty cells for days before the first day of the month
     for (let i = 0; i < startingDayOfWeek; i++) {
       days.push(null);
     }
 
-    // Add days of the month
     for (let day = 1; day <= daysInMonth; day++) {
       days.push(new Date(year, month, day));
     }
@@ -719,7 +797,7 @@ const CalendarComponent = ({ selectedDate, onDateSelect, maxDate }) => {
   const isDateDisabled = (date) => {
     if (!date) return true;
     const maxDateObj = new Date(maxDate);
-    maxDateObj.setHours(23, 59, 59, 999); // Set to end of day for comparison
+    maxDateObj.setHours(23, 59, 59, 999);
     return date > maxDateObj;
   };
 
@@ -735,7 +813,6 @@ const CalendarComponent = ({ selectedDate, onDateSelect, maxDate }) => {
   const handleDateClick = (date) => {
     if (!date || isDateDisabled(date)) return;
 
-    // Format date as YYYY-MM-DD
     const year = date.getFullYear();
     const month = String(date.getMonth() + 1).padStart(2, "0");
     const day = String(date.getDate()).padStart(2, "0");
@@ -765,7 +842,7 @@ const CalendarComponent = ({ selectedDate, onDateSelect, maxDate }) => {
         >
           <span className="text-xl font-bold text-gray-600">‹</span>
         </button>
-        <h3 className="text-lg font-semibold text-gray-900">
+        <h3 className="text-base md:text-lg font-semibold text-gray-900">
           {monthNames[currentMonth.getMonth()]} {currentMonth.getFullYear()}
         </h3>
         <button
@@ -847,13 +924,11 @@ const CalendarComponent = ({ selectedDate, onDateSelect, maxDate }) => {
 const StaffPerformanceModal = ({ staff, orders, loading, onClose }) => {
   const router = useRouter();
 
-  // total quantity handled by staff
   const totalQty = useMemo(
     () => orders.reduce((sum, o) => sum + Number(o.quantity || 0), 0),
     [orders],
   );
 
-  // delayed orders (more than 3 days & not dispatched)
   const delayedOrders = useMemo(
     () =>
       orders.filter((o) => {
@@ -865,19 +940,19 @@ const StaffPerformanceModal = ({ staff, orders, loading, onClose }) => {
   );
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center">
-      <div className="bg-white w-full max-w-6xl rounded-2xl shadow-xl overflow-hidden">
+    <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
+      <div className="bg-white w-full max-w-6xl rounded-2xl shadow-xl overflow-hidden max-h-[90vh] overflow-y-auto">
         {/* HEADER */}
-        <div className="flex justify-between items-center px-6 py-4 border-b">
-          <div>
-            <h2 className="text-xl font-bold text-gray-900">
+        <div className="flex justify-between items-start px-4 md:px-6 py-4 border-b sticky top-0 bg-white z-10">
+          <div className="flex-1 min-w-0">
+            <h2 className="text-lg md:text-xl font-bold text-gray-900 truncate">
               {staff.name} – Performance
             </h2>
             <p className="text-sm text-gray-500">
               Total Orders: {staff.orders}
             </p>
             <p
-              className={`text-sm mt-1 font-medium ${
+              className={`text-xs md:text-sm mt-1 font-medium ${
                 delayedOrders.length ? "text-red-600" : "text-green-600"
               }`}
             >
@@ -889,23 +964,23 @@ const StaffPerformanceModal = ({ staff, orders, loading, onClose }) => {
 
           <button
             onClick={onClose}
-            className="p-2 hover:bg-gray-100 rounded-lg"
+            className="p-2 hover:bg-gray-100 rounded-lg flex-shrink-0"
           >
-            <X />
+            <X size={20} />
           </button>
         </div>
 
         {/* BODY */}
-        <div className="p-6 space-y-6">
+        <div className="p-4 md:p-6 space-y-4 md:space-y-6">
           {/* SUMMARY */}
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-3 gap-3 md:gap-4">
             <SummaryCard title="Orders" value={staff.orders} />
             <SummaryCard title="Items Shown" value={orders.length} />
             <SummaryCard title="Total Qty" value={totalQty} />
           </div>
 
-          {/* ORDERS TABLE */}
-          <div className="border rounded-xl overflow-hidden">
+          {/* ORDERS TABLE - DESKTOP */}
+          <div className="hidden md:block border rounded-xl overflow-hidden">
             {loading ? (
               <p className="p-6 text-center text-gray-500">Loading...</p>
             ) : orders.length === 0 ? (
@@ -964,12 +1039,67 @@ const StaffPerformanceModal = ({ staff, orders, loading, onClose }) => {
             )}
           </div>
 
+          {/* ORDERS CARDS - MOBILE */}
+          <div className="md:hidden space-y-3">
+            {loading ? (
+              <p className="p-6 text-center text-gray-500">Loading...</p>
+            ) : orders.length === 0 ? (
+              <p className="p-6 text-center text-gray-500">No orders found</p>
+            ) : (
+              orders.slice(0, 5).map((o) => {
+                const isDelayed =
+                  (Date.now() - new Date(o.createdAt)) /
+                    (1000 * 60 * 60 * 24) >
+                    3 && o.progress !== "DISPATCHED";
+
+                return (
+                  <div
+                    key={o._id}
+                    className={`p-4 rounded-lg border ${
+                      isDelayed ? "bg-red-50 border-red-200" : "bg-gray-50 border-gray-200"
+                    }`}
+                  >
+                    <div className="flex justify-between items-start mb-3">
+                      <div>
+                        <h3 className="font-semibold text-gray-900">{o.chairModel}</h3>
+                        <p className="text-xs text-gray-500 mt-1">
+                          {new Date(o.createdAt).toLocaleDateString()}
+                        </p>
+                      </div>
+                      <span
+                        className={`px-2 py-1 rounded-full text-xs font-medium ${
+                          o.progress === "DISPATCHED"
+                            ? "bg-green-100 text-green-800"
+                            : isDelayed
+                              ? "bg-red-100 text-red-800"
+                              : "bg-gray-100 text-gray-700"
+                        }`}
+                      >
+                        {o.progress}
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3 text-sm">
+                      <div>
+                        <span className="text-gray-500 text-xs">Quantity</span>
+                        <p className="font-semibold text-gray-900">{o.quantity}</p>
+                      </div>
+                      <div>
+                        <span className="text-gray-500 text-xs">Client</span>
+                        <p className="font-semibold text-gray-900">{o.dispatchedTo?.name || "—"}</p>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
+
           {/* FOOTER ACTION */}
           <button
             onClick={() =>
               router.push(`/superadmin/order?staffId=${staff._id}`)
             }
-            className="w-full bg-[#c62d23] text-white py-3 rounded-xl font-medium hover:opacity-90"
+            className="w-full bg-[#c62d23] text-white py-3 rounded-xl font-medium hover:opacity-90 text-sm md:text-base"
           >
             View All Orders
           </button>
@@ -980,8 +1110,8 @@ const StaffPerformanceModal = ({ staff, orders, loading, onClose }) => {
 };
 
 const SummaryCard = ({ title, value }) => (
-  <div className="bg-gray-50 p-4 rounded-xl text-center">
-    <p className="text-sm text-gray-500">{title}</p>
-    <p className="text-2xl font-bold">{value}</p>
+  <div className="bg-gray-50 p-3 md:p-4 rounded-xl text-center">
+    <p className="text-xs md:text-sm text-gray-500">{title}</p>
+    <p className="text-xl md:text-2xl font-bold">{value}</p>
   </div>
 );

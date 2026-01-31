@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useMemo, useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
 import { useRef } from "react";
 
 import {
@@ -15,6 +15,11 @@ import {
   MapPin,
   Building2,
   ArrowLeftRight,
+  Menu,
+  X,
+  UserCircle,
+  LogOut,
+  Package,
 } from "lucide-react";
 import axios from "axios";
 import InventorySidebar from "./sidebar";
@@ -23,15 +28,19 @@ import InventorySidebar from "./sidebar";
 export default function SparePartsInventory() {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const router = useRouter();
+  
   const role =
     typeof window !== "undefined"
       ? JSON.parse(localStorage.getItem("user"))?.role
       : null;
-const searchParams = useSearchParams();
-const highlightId = searchParams.get("highlight");
+      
+  const searchParams = useSearchParams();
+  const highlightId = searchParams.get("highlight");
 
-const rowRefs = useRef({});
-const [activeHighlight, setActiveHighlight] = useState(null);
+  const rowRefs = useRef({});
+  const [activeHighlight, setActiveHighlight] = useState(null);
 
   /* FORM */
   const [showForm, setShowForm] = useState(false);
@@ -78,31 +87,32 @@ const [activeHighlight, setActiveHighlight] = useState(null);
   useEffect(() => {
     fetchParts();
   }, []);
-useEffect(() => {
-  if (!highlightId || !items.length) return;
+  
+  useEffect(() => {
+    if (!highlightId || !items.length) return;
 
-  const exists = items.find((i) => i._id === highlightId);
-  if (!exists) return;
+    const exists = items.find((i) => i._id === highlightId);
+    if (!exists) return;
 
-  const timer = setTimeout(() => {
-    const row = rowRefs.current[highlightId];
+    const timer = setTimeout(() => {
+      const row = rowRefs.current[highlightId];
 
-    if (row) {
-      row.scrollIntoView({
-        behavior: "smooth",
-        block: "center",
-      });
+      if (row) {
+        row.scrollIntoView({
+          behavior: "smooth",
+          block: "center",
+        });
 
-      setActiveHighlight(highlightId);
+        setActiveHighlight(highlightId);
 
-      setTimeout(() => {
-        setActiveHighlight(null);
-      }, 5000);
-    }
-  }, 300);
+        setTimeout(() => {
+          setActiveHighlight(null);
+        }, 5000);
+      }
+    }, 300);
 
-  return () => clearTimeout(timer);
-}, [highlightId, items]);
+    return () => clearTimeout(timer);
+  }, [highlightId, items]);
 
   /* ================= SAVE ================= */
   const submitPart = async () => {
@@ -188,6 +198,7 @@ useEffect(() => {
       alert(err?.response?.data?.message || "Transfer failed");
     }
   };
+  
   const formatRole = (role) =>
     role ? role.charAt(0).toUpperCase() + role.slice(1) : "—";
 
@@ -203,6 +214,7 @@ useEffect(() => {
       status: i.status,
     }));
   }, [items]);
+  
   const filteredData = useMemo(() => {
     if (statusFilter === "ALL") return data;
 
@@ -227,87 +239,151 @@ useEffect(() => {
 
   /* ================= STATS ================= */
   const totalParts = data.length;
-const totalQty = data.reduce((s, i) => s + i.quantity, 0);
-const lowStock = data.filter(
-  (i) => i.status === "Low Stock" || i.status === "Critical"
-).length;
-const overStock = data.filter((i) => i.status === "Overstocked").length;
+  const totalQty = data.reduce((s, i) => s + i.quantity, 0);
+  const lowStock = data.filter(
+    (i) => i.status === "Low Stock" || i.status === "Critical"
+  ).length;
+  const overStock = data.filter((i) => i.status === "Overstocked").length;
 
   /* ================= UI ================= */
   return (
     <div className="flex h-screen bg-gray-50 text-gray-900">
-      <InventorySidebar />
+      {/* DESKTOP SIDEBAR */}
+      <div className="hidden lg:block">
+        <InventorySidebar />
+      </div>
+
+      {/* MOBILE SIDEBAR OVERLAY */}
+      {mobileMenuOpen && (
+        <>
+          {/* Backdrop */}
+          <div
+            className="lg:hidden fixed inset-0 bg-black/50 backdrop-blur-sm z-40 animate-fadeIn"
+            onClick={() => setMobileMenuOpen(false)}
+          />
+          
+          {/* Sidebar - Slides in from left */}
+          <div className="lg:hidden fixed inset-y-0 left-0 z-50 transform transition-transform duration-300 ease-in-out">
+            <div className="animate-slideInLeft">
+              <InventorySidebar onClose={() => setMobileMenuOpen(false)} />
+            </div>
+          </div>
+        </>
+      )}
 
       {/* MAIN */}
       <div className="flex-1 overflow-y-auto overflow-x-hidden">
         {/* HEADER */}
-        <div className="sticky top-0 z-10 bg-white/80 backdrop-blur border-b border-gray-200 p-6 shadow-sm flex justify-between items-center">
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900">
-              Spare Parts Inventory
-            </h1>
-            <p className="text-gray-600 mt-2">
-              Manage your spare parts stock levels and details
-            </p>
-          </div>
+        <div className="sticky top-0 z-10 bg-white/80 backdrop-blur border-b border-gray-200 shadow-sm">
+          <div className="p-4 md:p-6">
+            <div className="flex items-center justify-between gap-3">
+              {/* LEFT - TITLE */}
+              <div className="flex-1 min-w-0">
+                <h1 className="text-lg sm:text-2xl md:text-3xl font-bold text-gray-900 flex items-center gap-2">
+                  <Package size={24} className="text-[#c62d23] flex-shrink-0 sm:w-8 sm:h-8" />
+                  <span className="truncate">Spare Parts</span>
+                </h1>
+                <p className="text-xs sm:text-sm text-gray-600 mt-1 hidden sm:block">
+                  Manage your spare parts stock levels and details
+                </p>
+              </div>
 
-          <button
-            onClick={() => setShowForm(true)}
-            className="bg-[#c62d23] hover:bg-[#a8241c] text-white px-5 py-3 rounded-xl font-medium flex items-center gap-2 transition-all duration-200 shadow-sm hover:shadow-md"
-          >
-            <Plus size={18} /> Add Inventory
-          </button>
+              {/* DESKTOP ACTIONS */}
+              <div className="hidden md:flex items-center gap-4">
+                <button
+                  onClick={() => setShowForm(true)}
+                  className="bg-[#c62d23] hover:bg-[#a8241c] text-white px-5 py-3 rounded-xl font-medium flex items-center gap-2 transition-all duration-200 shadow-sm hover:shadow-md"
+                >
+                  <Plus size={18} /> Add Inventory
+                </button>
+
+                <button
+                  onClick={() => router.push("/profile")}
+                  title="My Profile"
+                  className="text-gray-600 hover:text-[#c62d23] transition"
+                >
+                  <UserCircle size={34} />
+                </button>
+                <button
+                  onClick={() => {
+                    localStorage.removeItem("token");
+                    window.location.href = "/login";
+                  }}
+                  title="Logout"
+                  className="text-gray-600 hover:text-[#c62d23] transition"
+                >
+                  <LogOut size={30} />
+                </button>
+              </div>
+
+              {/* MOBILE MENU BUTTON */}
+              <button
+                onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+                className="lg:hidden text-gray-600 hover:text-[#c62d23] transition p-2"
+              >
+                {mobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
+              </button>
+            </div>
+          </div>
         </div>
 
         {/* CONTENT */}
-        <div className="p-8 space-y-8">
-          {/* STATS */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+        <div className="p-4 md:p-8 space-y-6 md:space-y-8">
+          {/* STATS - RESPONSIVE GRID */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-6">
             <KpiCard
-  title="Total Parts"
-  value={totalParts}
-  icon={<Boxes className="text-[#c62d23]" />}
-  active={statusFilter === "ALL"}
-  onClick={() => setStatusFilter("ALL")}
-/>
+              title="Total Parts"
+              value={totalParts}
+              icon={<Boxes className="text-[#c62d23]" />}
+              active={statusFilter === "ALL"}
+              onClick={() => setStatusFilter("ALL")}
+            />
 
             <KpiCard
               title="Total Quantity"
               value={totalQty}
               icon={<Warehouse className="text-[#c62d23]" />}
             />
-           <KpiCard
-  title="Low / Critical"
-  value={lowStock}
-  icon={<TrendingDown className="text-[#c62d23]" />}
-  danger
-  active={statusFilter === "LOW"}
-  onClick={() => setStatusFilter("LOW")}
-/>
+            
+            <KpiCard
+              title="Low / Critical"
+              value={lowStock}
+              icon={<TrendingDown className="text-[#c62d23]" />}
+              danger
+              active={statusFilter === "LOW"}
+              onClick={() => setStatusFilter("LOW")}
+            />
 
             <KpiCard
-  title="Overstocked"
-  value={overStock}
-  icon={<Boxes className="text-blue-600" />}
-  info
-  active={statusFilter === "OVERSTOCK"}
-  onClick={() => setStatusFilter("OVERSTOCK")}
-/>
-
+              title="Overstocked"
+              value={overStock}
+              icon={<Boxes className="text-blue-600" />}
+              info
+              active={statusFilter === "OVERSTOCK"}
+              onClick={() => setStatusFilter("OVERSTOCK")}
+            />
           </div>
+
+          {/* MOBILE ADD BUTTON */}
+          <button
+            onClick={() => setShowForm(true)}
+            className="md:hidden w-full bg-[#c62d23] hover:bg-[#a8241c] text-white px-5 py-3 rounded-xl font-medium flex items-center justify-center gap-2 transition-all duration-200 shadow-sm hover:shadow-md"
+          >
+            <Plus size={18} /> Add Inventory
+          </button>
 
           {/* ALERT */}
           {lowStock > 0 && (
-            <div className="bg-red-50 border border-red-200 rounded-2xl p-4 flex gap-3 items-center">
-              <AlertCircle className="text-red-500" />
-              <span className="text-red-700 font-medium">
+            <div className="bg-red-50 border border-red-200 rounded-xl md:rounded-2xl p-3 md:p-4 flex gap-3 items-center">
+              <AlertCircle className="text-red-500 flex-shrink-0" size={20} />
+              <span className="text-xs md:text-sm text-red-700 font-medium">
                 {lowStock} spare parts need restocking
               </span>
             </div>
           )}
 
-          {/* TABLE */}
-          <div className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm">
+          {/* TABLE - DESKTOP */}
+          <div className="hidden md:block bg-white border border-gray-200 rounded-2xl p-6 shadow-sm">
             <h2 className="font-bold text-lg text-gray-900 mb-6">
               Spare Parts Overview
             </h2>
@@ -343,38 +419,38 @@ const overStock = data.filter((i) => i.status === "Overstocked").length;
                 <tbody>
                   {loading ? (
                     <tr>
-                      <td colSpan="6" className="p-8 text-center text-gray-500">
+                      <td colSpan="7" className="p-8 text-center text-gray-500">
                         Loading...
                       </td>
                     </tr>
                   ) : data.length === 0 ? (
                     <tr>
-                      <td colSpan="6" className="p-8 text-center text-gray-500">
+                      <td colSpan="7" className="p-8 text-center text-gray-500">
                         No spare parts available
                       </td>
                     </tr>
                   ) : (
                     filteredData.map((i, index) => (
-
                       <tr
-  key={i.id}
-  ref={(el) => (rowRefs.current[i.id] = el)}
-  className={`border-b transition-all duration-500 ${
-    activeHighlight === i.id
-      ? "bg-yellow-100 ring-2 ring-yellow-400"
-      : index % 2 === 0
-      ? "bg-white hover:bg-gray-50"
-      : "bg-gray-50 hover:bg-gray-100"
-  }`}
->
-
+                        key={i.id}
+                        ref={(el) => (rowRefs.current[i.id] = el)}
+                        className={`transition-all duration-500 ${
+                          activeHighlight === i.id
+                            ? "bg-yellow-100 ring-2 ring-yellow-400"
+                            : index % 2 === 0
+                            ? "bg-white hover:bg-gray-50"
+                            : "bg-gray-50 hover:bg-gray-100"
+                        }`}
+                      >
                         <td className="p-4 font-medium text-gray-900">
                           {i.name}
                         </td>
 
-                        <td className="p-4 text-gray-700 flex items-center gap-2">
-                          <Building2 size={16} className="text-gray-400" />
-                          {i.source}
+                        <td className="p-4 text-gray-700">
+                          <div className="flex items-center gap-2">
+                            <Building2 size={16} className="text-gray-400" />
+                            {i.source}
+                          </div>
                         </td>
 
                         <td className="p-4 font-semibold text-gray-900">
@@ -384,64 +460,68 @@ const overStock = data.filter((i) => i.status === "Overstocked").length;
                           {i.maxQuantity ?? "—"}
                         </td>
 
-                        <td className="p-4 text-gray-700 flex items-center gap-2">
-                          <MapPin size={16} className="text-gray-400" />
-                          {i.location}
+                        <td className="p-4 text-gray-700">
+                          <div className="flex items-center gap-2">
+                            <MapPin size={16} className="text-gray-400" />
+                            {i.location}
+                          </div>
                         </td>
 
                         <td className="p-4">
                           <StatusBadge status={i.status} />
                         </td>
 
-                        <td className="p-4 flex gap-3">
-                          {/* EDIT */}
-                          <button
-                            onClick={() => {
-                              setEditId(i.id);
-                              setForm({
-                                partName: i.name,
-                                location: i.location,
-                                quantity: i.quantity,
-                                maxQuantity: i.maxQuantity ?? "",
-                              });
+                        <td className="p-4">
+                          <div className="flex gap-3">
+                            {/* EDIT */}
+                            <button
+                              onClick={() => {
+                                setEditId(i.id);
+                                setForm({
+                                  partName: i.name,
+                                  location: i.location,
+                                  quantity: i.quantity,
+                                  maxQuantity: i.maxQuantity ?? "",
+                                });
 
-                              setShowForm(true);
-                            }}
-                            className="p-2 rounded-lg hover:bg-gray-100 transition-colors"
-                            title="Edit"
-                          >
-                            <Pencil
-                              size={16}
-                              className="text-gray-600 hover:text-[#c62d23]"
-                            />
-                          </button>
+                                setShowForm(true);
+                              }}
+                              className="p-2 rounded-lg hover:bg-gray-100 transition-colors"
+                              title="Edit"
+                            >
+                              <Pencil
+                                size={16}
+                                className="text-gray-600 hover:text-[#c62d23]"
+                              />
+                            </button>
 
-                          {/* TRANSFER */}
-                          <button
-                            onClick={() => {
-                              setTransferItem(i);
-                              setShowTransfer(true);
-                            }}
-                            className="p-2 rounded-lg hover:bg-gray-100 transition-colors"
-                            title="Transfer Location"
-                          >
-                            <ArrowLeftRight
-                              size={16}
-                              className="text-gray-600 hover:text-[#c62d23]"
-                            />
-                          </button>
+                            {/* TRANSFER */}
+                            <button
+                              onClick={() => {
+                                setTransferItem(i);
+                                setShowTransfer(true);
+                              }}
+                              className="p-2 rounded-lg hover:bg-gray-100 transition-colors"
+                              title="Transfer Location"
+                            >
+                              <ArrowLeftRight
+                                size={16}
+                                className="text-gray-600 hover:text-[#c62d23]"
+                              />
+                            </button>
 
-                          {/* DELETE */}
-                          <button
-                            onClick={() => deletePart(i.id)}
-                            className="p-2 rounded-lg hover:bg-gray-100 transition-colors"
-                            title="Delete"
-                          >
-                            <Trash2
-                              size={16}
-                              className="text-gray-600 hover:text-red-600"
-                            />
-                          </button>
+                            {/* DELETE */}
+                            <button
+                              onClick={() => deletePart(i.id)}
+                              className="p-2 rounded-lg hover:bg-gray-100 transition-colors"
+                              title="Delete"
+                            >
+                              <Trash2
+                                size={16}
+                                className="text-gray-600 hover:text-red-600"
+                              />
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     ))
@@ -450,14 +530,109 @@ const overStock = data.filter((i) => i.status === "Overstocked").length;
               </table>
             </div>
           </div>
+
+          {/* MOBILE CARDS */}
+          <div className="md:hidden space-y-3">
+            {loading ? (
+              <div className="p-8 text-center bg-white rounded-xl border border-gray-200">
+                <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-[#c62d23]"></div>
+                <p className="mt-2 text-gray-500 text-sm">Loading...</p>
+              </div>
+            ) : filteredData.length === 0 ? (
+              <div className="p-8 text-center bg-white rounded-xl border border-gray-200">
+                <Package size={48} className="mx-auto mb-3 text-gray-300" />
+                <p className="text-gray-500">No spare parts available</p>
+              </div>
+            ) : (
+              filteredData.map((i) => (
+                <div
+                  key={i.id}
+                  ref={(el) => (rowRefs.current[i.id] = el)}
+                  className={`rounded-xl p-4 border shadow-sm transition-all duration-500 ${
+                    activeHighlight === i.id
+                      ? "bg-yellow-100 ring-2 ring-yellow-400 border-yellow-400"
+                      : "bg-white border-gray-200"
+                  }`}
+                >
+                  <div className="flex justify-between items-start mb-3">
+                    <div className="flex-1 min-w-0">
+                      <h3 className="font-semibold text-gray-900 truncate">
+                        {i.name}
+                      </h3>
+                      <div className="flex items-center gap-2 text-gray-600 mt-1 text-xs">
+                        <Building2 size={12} className="text-gray-400 flex-shrink-0" />
+                        <span className="truncate">{i.source}</span>
+                      </div>
+                    </div>
+                    <StatusBadge status={i.status} />
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-3 mb-3 text-sm">
+                    <div>
+                      <span className="text-xs text-gray-500">Qty</span>
+                      <p className="font-bold text-gray-900">{i.quantity}</p>
+                    </div>
+                    <div>
+                      <span className="text-xs text-gray-500">Max</span>
+                      <p className="font-semibold text-gray-900">{i.maxQuantity ?? "—"}</p>
+                    </div>
+                    <div>
+                      <span className="text-xs text-gray-500">Location</span>
+                      <p className="font-semibold text-gray-900 flex items-center gap-1">
+                        <MapPin size={12} className="text-gray-400" />
+                        {i.location}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex gap-2 pt-3 border-t border-gray-100">
+                    <button
+                      onClick={() => {
+                        setEditId(i.id);
+                        setForm({
+                          partName: i.name,
+                          location: i.location,
+                          quantity: i.quantity,
+                          maxQuantity: i.maxQuantity ?? "",
+                        });
+                        setShowForm(true);
+                      }}
+                      className="flex-1 p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors flex items-center justify-center gap-1 text-sm font-medium"
+                    >
+                      <Pencil size={16} />
+                      Edit
+                    </button>
+
+                    <button
+                      onClick={() => {
+                        setTransferItem(i);
+                        setShowTransfer(true);
+                      }}
+                      className="flex-1 p-2 text-purple-600 hover:bg-purple-50 rounded-lg transition-colors flex items-center justify-center gap-1 text-sm font-medium"
+                    >
+                      <ArrowLeftRight size={16} />
+                      Transfer
+                    </button>
+
+                    <button
+                      onClick={() => deletePart(i.id)}
+                      className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                    >
+                      <Trash2 size={18} />
+                    </button>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
         </div>
       </div>
 
-      {/* ADD / EDIT MODAL */}
+      {/* ADD / EDIT MODAL - RESPONSIVE */}
       {showForm && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
-          <div className="bg-white p-6 rounded-2xl w-full max-w-md border border-gray-200 shadow-lg">
-            <h2 className="font-bold text-xl text-gray-900 mb-6">
+          <div className="bg-white p-4 md:p-6 rounded-2xl w-full max-w-md border border-gray-200 shadow-lg max-h-[90vh] overflow-y-auto">
+            <h2 className="font-bold text-lg md:text-xl text-gray-900 mb-4 md:mb-6">
               {editId ? "Update Spare Part" : "Add Spare Part"}
             </h2>
 
@@ -482,6 +657,7 @@ const overStock = data.filter((i) => i.status === "Overstocked").length;
               onChange={(v) => setForm({ ...form, quantity: v })}
               placeholder="Enter quantity"
             />
+            
             {role === "admin" && (
               <Input
                 label="Max Quantity"
@@ -492,7 +668,7 @@ const overStock = data.filter((i) => i.status === "Overstocked").length;
               />
             )}
 
-            <div className="flex justify-end gap-3 mt-8 pt-6 border-t border-gray-200">
+            <div className="flex flex-col-reverse sm:flex-row justify-end gap-3 mt-6 md:mt-8 pt-4 md:pt-6 border-t border-gray-200">
               <button
                 onClick={() => {
                   setShowForm(false);
@@ -514,11 +690,11 @@ const overStock = data.filter((i) => i.status === "Overstocked").length;
         </div>
       )}
 
-      {/* TRANSFER MODAL */}
+      {/* TRANSFER MODAL - RESPONSIVE */}
       {showTransfer && transferItem && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
-          <div className="bg-white p-6 rounded-2xl w-full max-w-md border border-gray-200 shadow-lg">
-            <h2 className="font-bold text-xl text-gray-900 mb-6">
+          <div className="bg-white p-4 md:p-6 rounded-2xl w-full max-w-md border border-gray-200 shadow-lg max-h-[90vh] overflow-y-auto">
+            <h2 className="font-bold text-lg md:text-xl text-gray-900 mb-4 md:mb-6">
               Transfer Location
             </h2>
 
@@ -541,7 +717,7 @@ const overStock = data.filter((i) => i.status === "Overstocked").length;
                   onChange={(e) =>
                     setTransfer({ ...transfer, toLocation: e.target.value })
                   }
-                  className="w-full p-3 bg-white rounded-xl border border-gray-300 focus:border-[#c62d23] focus:ring-2 focus:ring-[#c62d23]/20 outline-none transition-all"
+                  className="w-full p-3 bg-white rounded-xl border border-gray-300 focus:border-[#c62d23] focus:ring-2 focus:ring-[#c62d23]/20 outline-none transition-all text-sm md:text-base"
                 >
                   <option value="">Select Location</option>
                   {locations
@@ -563,7 +739,7 @@ const overStock = data.filter((i) => i.status === "Overstocked").length;
               />
             </div>
 
-            <div className="flex justify-end gap-3 mt-8 pt-6 border-t border-gray-200">
+            <div className="flex flex-col-reverse sm:flex-row justify-end gap-3 mt-6 md:mt-8 pt-4 md:pt-6 border-t border-gray-200">
               <button
                 onClick={() => {
                   setShowTransfer(false);
@@ -601,18 +777,18 @@ const KpiCard = ({
 }) => (
   <div
     onClick={onClick}
-    className={`cursor-pointer bg-white border rounded-2xl p-6 transition-all duration-200 shadow-sm hover:shadow-md flex flex-col justify-between h-full
+    className={`cursor-pointer bg-white border rounded-xl md:rounded-2xl p-4 md:p-6 transition-all duration-200 shadow-sm hover:shadow-md flex flex-col justify-between h-full
       ${active ? "ring-2 ring-[#c62d23]" : "border-gray-200"}
     `}
     style={{ borderLeft: "4px solid #c62d23" }}
   >
-    <div className="flex justify-between items-start mb-4">
-      <p className="text-sm text-gray-600 font-medium">{title}</p>
-      {React.cloneElement(icon, { size: 24 })}
+    <div className="flex justify-between items-start mb-3 md:mb-4">
+      <p className="text-xs md:text-sm text-gray-600 font-medium">{title}</p>
+      {React.cloneElement(icon, { size: 20, className: "md:w-6 md:h-6" })}
     </div>
 
     <p
-      className={`text-3xl font-bold mb-1 ${
+      className={`text-2xl md:text-3xl font-bold mb-1 ${
         danger
           ? "text-red-600"
           : info
@@ -625,17 +801,17 @@ const KpiCard = ({
   </div>
 );
 
-
 const StatusBadge = ({ status }) => {
   const map = {
     Healthy: "bg-green-100 text-green-800",
     "Low Stock": "bg-amber-100 text-amber-800",
     Critical: "bg-red-100 text-red-800",
+    Overstocked: "bg-blue-100 text-blue-800",
   };
 
   return (
     <span
-      className={`px-3 py-1.5 rounded-full text-xs font-medium ${map[status] || "bg-gray-100 text-gray-800"}`}
+      className={`px-2 md:px-3 py-1 md:py-1.5 rounded-full text-xs font-medium whitespace-nowrap ${map[status] || "bg-gray-100 text-gray-800"}`}
     >
       {status}
     </span>
@@ -652,7 +828,7 @@ const Input = ({ label, value, onChange, type = "text", placeholder = "" }) => (
       value={value}
       onChange={(e) => onChange(e.target.value)}
       placeholder={placeholder}
-      className="w-full p-3 bg-white rounded-xl border border-gray-300 focus:border-[#c62d23] focus:ring-2 focus:ring-[#c62d23]/20 outline-none transition-all"
+      className="w-full p-3 bg-white rounded-xl border border-gray-300 focus:border-[#c62d23] focus:ring-2 focus:ring-[#c62d23]/20 outline-none transition-all text-sm md:text-base"
     />
   </div>
 );
