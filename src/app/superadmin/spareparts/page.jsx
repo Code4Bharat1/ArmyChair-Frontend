@@ -1,11 +1,12 @@
+import { Suspense } from "react";
 import SparePartsAdmin from "@/components/Superadmin/spareparts";
-import React from "react";
 
 const Page = () => {
-    return (
-        <div>
-            <SparePartsAdmin/>
-        </div>
-    )
-}
+  return (
+    <Suspense fallback={<div className="p-8">Loading spare parts...</div>}>
+      <SparePartsAdmin />
+    </Suspense>
+  );
+};
+
 export default Page;

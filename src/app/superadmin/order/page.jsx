@@ -1,9 +1,10 @@
-
+import { Suspense } from "react";
 import SalesOrders from "@/components/Superadmin/order";
-import React from "react";
 
-export default function page() {
+export default function Page() {
   return (
-    <SalesOrders />
+    <Suspense fallback={<div className="p-8">Loading orders...</div>}>
+      <SalesOrders />
+    </Suspense>
   );
 }
