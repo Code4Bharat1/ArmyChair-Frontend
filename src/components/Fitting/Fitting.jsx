@@ -1,6 +1,5 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import React, { useEffect, useMemo, useState } from "react";
 import {
   Wrench,
@@ -9,13 +8,11 @@ import {
   Clock,
   TrendingUp,
   Search,
-  UserCircle,
 } from "lucide-react";
 import axios from "axios";
 import FittingSidebar from "@/components/Fitting/sidebar";
 
 export default function Fitting() {
-  const router = useRouter();
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -141,14 +138,6 @@ export default function Fitting() {
                 Assemble products after warehouse material collection
               </p>
             </div>
-
-            <button
-              onClick={() => router.push("/profile")}
-              title="My Profile"
-              className="text-gray-600 hover:text-[#c62d23] transition"
-            >
-              <UserCircle size={34} />
-            </button>
           </div>
         </div>
 

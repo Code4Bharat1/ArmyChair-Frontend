@@ -3,12 +3,23 @@ import React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import NotificationBell from "@/components/notifications/NotificationBell";
+import {
+  LayoutDashboard,
+  Armchair,
+  Wrench,
+  ShoppingCart,
+  RotateCcw,
+  Users,
+  ClipboardCheck,
+  Activity,
+  LogOut,
+} from "lucide-react";
 
 export default function Sidebar() {
   const pathname = usePathname();
+const menuItem = (href) =>
 
-  const menuItem = (href) =>
-    `w-full block px-6 py-3 text-sm font-medium transition-all duration-200
+    `w-full flex items-center gap-3 px-6 py-3 text-sm font-medium transition-all duration-200
      ${
        pathname === href
          ? "bg-[#fef2f2] text-[#991b1b] border-l-4 border-[#c62d23] shadow-sm"
@@ -28,36 +39,64 @@ export default function Sidebar() {
 
       {/* Navigation */}
       <nav className="p-4 space-y-1 overflow-y-auto pb-24">
-        <div className="space-y-1">
-          <Link href="/superadmin/dashboard" className={menuItem("/superadmin/dashboard")}>Dashboard</Link>
-          <Link href="/superadmin/inventory" className={menuItem("/superadmin/inventory")}>Chair Inventory</Link>
-          <Link href="/superadmin/spareparts" className={menuItem("/superadmin/spareparts")}>Parts Inventory</Link>
-          <Link href="/superadmin/order" className={menuItem("/superadmin/order")}>Orders</Link>
-          <Link href="/superadmin/return" className={menuItem("/superadmin/return")}>Returns</Link>
-          <Link href="/superadmin/staff" className={menuItem("/superadmin/staff")}>Staff</Link>
-          <Link href="/superadmin/task" className={menuItem("/superadmin/task")}>Assign tasks</Link>
-          <Link href="/superadmin/activity" className={menuItem("/superadmin/activity")}>Activity</Link>
-        </div>
+        <Link href="/superadmin/dashboard" className={menuItem("/superadmin/dashboard")}>
+          <LayoutDashboard size={18} />
+          Dashboard
+        </Link>
+
+        <Link href="/superadmin/inventory" className={menuItem("/superadmin/inventory")}>
+          <Armchair size={18} />
+          Chair Inventory
+        </Link>
+
+        <Link href="/superadmin/spareparts" className={menuItem("/superadmin/spareparts")}>
+          <Wrench size={18} />
+          Parts Inventory
+        </Link>
+
+        <Link href="/superadmin/order" className={menuItem("/superadmin/order")}>
+          <ShoppingCart size={18} />
+          Orders
+        </Link>
+
+        <Link href="/superadmin/return" className={menuItem("/superadmin/return")}>
+          <RotateCcw size={18} />
+          Returns
+        </Link>
+
+        <Link href="/superadmin/staff" className={menuItem("/superadmin/staff")}>
+          <Users size={18} />
+          Staff
+        </Link>
+
+        <Link href="/superadmin/task" className={menuItem("/superadmin/task")}>
+          <ClipboardCheck size={18} />
+          Assign Tasks
+        </Link>
+
+        <Link href="/superadmin/activity" className={menuItem("/superadmin/activity")}>
+          <Activity size={18} />
+          Activity
+        </Link>
       </nav>
 
-      {/* 🔔 NOTIFICATION BELL (FLOATING IN SIDEBAR) */}
+      {/* 🔔 NOTIFICATION BELL */}
       <div className="absolute top-4 right-3">
         <NotificationBell />
       </div>
 
       {/* Footer */}
       <div className="absolute bottom-0 w-full border-t border-gray-200 bg-gray-50">
-       
         <button
-  onClick={() => {
-    localStorage.removeItem("token");
-    window.location.href = "/login";
-  }}
-  className="w-full text-left px-6 py-3 text-sm text-gray-600 hover:bg-gray-100 hover:text-gray-900 transition-colors border-t border-gray-200"
->
-  Logout
-</button>
-
+          onClick={() => {
+            localStorage.removeItem("token");
+            window.location.href = "/login";
+          }}
+          className="w-full flex items-center gap-3 text-left px-6 py-3 text-sm text-gray-600 hover:bg-gray-100 hover:text-gray-900 transition-colors border-t border-gray-200"
+        >
+          <LogOut size={18} />
+          Logout
+        </button>
       </div>
     </div>
   );

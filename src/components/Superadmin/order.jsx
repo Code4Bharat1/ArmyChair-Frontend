@@ -628,7 +628,7 @@ useEffect(() => {
                         ref={(el) => (rowRefs.current[o._id] = el)}
 
                           onClick={() => handleRowClick(o._id)}
-                          className={`border-b transition-all duration-500 cursor-pointer ${
+                          className={`transition-all duration-500 cursor-pointer ${
                             activeHighlight === o._id
 
                               ? "bg-yellow-100 ring-2 ring-yellow-400"
