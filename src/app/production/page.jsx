@@ -2,7 +2,7 @@
 import React from "react"
 import { useEffect, useState } from "react";
 import axios from "axios";
-import { Plus, Package, Clock, CheckCircle } from "lucide-react";
+import { Plus, Package, Clock, CheckCircle, UserCircle } from "lucide-react";
 import { useRouter } from "next/navigation";
 
 export default function ProductionPage() {
@@ -112,7 +112,7 @@ export default function ProductionPage() {
   return (
     <div className="min-h-screen bg-gray-50">
       {/* HEADER */}
-      <div className="bg-white/80 backdrop-blur border-b border-gray-200 px-8 py-6 shadow-sm">
+      {/* <div className="bg-white/80 backdrop-blur border-b border-gray-200 px-8 py-6 shadow-sm">
         <div className="flex justify-between items-center">
           <div>
             <h1 className="text-2xl font-bold text-gray-900">
@@ -131,8 +131,40 @@ export default function ProductionPage() {
             Add Inventory
           </button>
         </div>
-      </div>
+      </div> */}
+ <div className="sticky top-0 z-10 bg-white/80 backdrop-blur border-b border-gray-200 p-6 shadow-sm">
+          <div className="flex items-center justify-between">
+            {/* LEFT SIDE */}
+            <div>
+              <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-2">
+                <Package size={32} className="text-[#c62d23]" />
+                <span>Production – Inward Inventory</span>
+              </h1>
+              <p className="text-sm text-gray-600 mt-1">
+               Create and track inward materials
+              </p>
+            </div>
 
+            {/* RIGHT SIDE */}
+            <div className="flex items-center gap-4">
+              <button
+            onClick={() => setShowForm(true)}
+            className="flex items-center gap-2 px-5 py-2.5 bg-[#c62d23] text-white rounded-xl shadow-sm hover:shadow-md transition-all duration-200 font-medium text-sm hover:bg-[#a82419]"
+          >
+            <Plus size={16} />
+            Add Inventory
+          </button>
+
+              <button
+                onClick={() => router.push("/profile")}
+                title="My Profile"
+                className="text-gray-600 hover:text-[#c62d23] transition"
+              >
+                <UserCircle size={34} />
+              </button>
+            </div>
+          </div>
+        </div>
       <div className="p-8 space-y-6">
         {/* STATS - CLICKABLE */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">

@@ -55,7 +55,7 @@ export default function Dashboard() {
   const [staff, setStaff] = useState([]);
   const [products, setProducts] = useState([]);
   const [productType, setProductType] = useState("ALL"); // ALL | FULL | SPARE
-const [allOrders, setAllOrders] = useState([]);
+  const [allOrders, setAllOrders] = useState([]);
   const [token, setToken] = useState(null);
   const [selectedDate, setSelectedDate] = useState(
     new Date().toISOString().split("T")[0],
@@ -140,9 +140,9 @@ const [allOrders, setAllOrders] = useState([]);
       });
 
       const o = await axios.get(`${API}/orders`, {
-  headers: { Authorization: `Bearer ${token}` },
-  params: { from, to }, // remove progress filter
-});
+        headers: { Authorization: `Bearer ${token}` },
+        params: { from, to }, // remove progress filter
+      });
 
       const inventory = i.data.inventory || [];
 
@@ -151,15 +151,12 @@ const [allOrders, setAllOrders] = useState([]);
 
       setStaff(s.data || []);
       setProducts(p.data || []);
-const ordersData = o.data.orders || [];
+      const ordersData = o.data.orders || [];
 
-setAllOrders(ordersData); // 👈 THIS was missing
+      setAllOrders(ordersData); // 👈 THIS was missing
 
-// outward = only dispatched
-setOutward(
-  ordersData.filter((ord) => ord.progress === "DISPATCHED")
-);
-
+      // outward = only dispatched
+      setOutward(ordersData.filter((ord) => ord.progress === "DISPATCHED"));
     } catch (err) {
       console.error("Dashboard API Error:", err);
     } finally {
@@ -201,7 +198,7 @@ setOutward(
   const totalOrders = allOrders.length;
 
   const topStaff = staff[0]?.name || "—";
-  const topProduct = products[0]?.name || "—";
+  const topProduct = filteredProducts[0]?.name || "—";
 
   return (
     <div className="flex h-screen bg-gray-50 text-gray-900">
@@ -535,7 +532,7 @@ const TableView = ({
                 <th className="text-left p-4 font-semibold text-gray-700">
                   Chair
                 </th>
-                
+
                 <th className="text-left p-4 font-semibold text-gray-700">
                   Qty
                 </th>
@@ -603,7 +600,7 @@ const TableView = ({
                   <td className="p-4 text-gray-900 font-medium">
                     {r.chairType}
                   </td>
-                  
+
                   <td className="p-4 text-gray-900 font-semibold">
                     <CountUp end={r.quantity} duration={1} separator="," />
                   </td>

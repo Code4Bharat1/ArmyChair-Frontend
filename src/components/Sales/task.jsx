@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import { CheckCircle, Clock, ClipboardList } from "lucide-react";
+import { CheckCircle, Clock, ClipboardList , ClipboardCheck} from "lucide-react";
 import axios from "axios";
 
 export default function WarehouseTasks() {
@@ -130,6 +130,7 @@ export default function WarehouseTasks() {
               onClick={() => setShowCurrentTask(true)}
               className="bg-[#c62d23] hover:bg-[#a82419] text-white px-5 py-2.5 rounded-xl font-semibold shadow-sm transition-all"
             >
+              <ClipboardCheck size={18} className="inline mr-2" />
               Current Task
             </button>
           </div>
