@@ -253,16 +253,6 @@ export default function InventoryPage() {
                 >
                   <UserCircle size={34} />
                 </button>
-                <button
-                  onClick={() => {
-                    localStorage.removeItem("token");
-                    window.location.href = "/login";
-                  }}
-                  title="Logout"
-                  className="text-gray-600 hover:text-[#c62d23] transition"
-                >
-                  <LogOut size={30} />
-                </button>
               </div>
 
               {/* MOBILE MENU BUTTON */}
