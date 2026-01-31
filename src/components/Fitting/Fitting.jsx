@@ -10,9 +10,11 @@ import {
   Search,
 } from "lucide-react";
 import axios from "axios";
+import useAuthGuard from "@/hooks/useAuthGuard";
 import FittingSidebar from "@/components/Fitting/sidebar";
 
 export default function Fitting() {
+  useAuthGuard(["fitting"]);
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
