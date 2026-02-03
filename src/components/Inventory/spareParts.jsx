@@ -15,6 +15,10 @@ import {
   Menu,
   X,
   UserCircle,
+  ChevronDown,
+  ChevronRight,
+  Package,
+  Search,
 } from "lucide-react";
 import axios from "axios";
 import InventorySidebar from "./sidebar";
@@ -26,7 +30,14 @@ export default function SparePartsInventory() {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  
+  const [search, setSearch] = useState("");
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const LIMIT = 25;
+
+  // Track which parts are expanded (show location details)
+  const [expandedParts, setExpandedParts] = useState(new Set());
+
   const role =
     typeof window !== "undefined"
       ? JSON.parse(localStorage.getItem("user"))?.role
@@ -36,20 +47,17 @@ export default function SparePartsInventory() {
   const [showForm, setShowForm] = useState(false);
   const [editId, setEditId] = useState(null);
   const [form, setForm] = useState({
-    partName: "", // Spare Part Name
+    partName: "",
     location: "",
     quantity: "",
     maxQuantity: "",
   });
-
-  const VENDORS = ["Ramesh", "Suresh", "Mahesh", "Akash", "Vikram", "Amit"];
 
   const LOCATIONS = ["A", "B", "C", "D", "E", "F", "G", "H"];
 
   /* TRANSFER */
   const [showTransfer, setShowTransfer] = useState(false);
   const [statusFilter, setStatusFilter] = useState("ALL");
-
   const [transferItem, setTransferItem] = useState(null);
   const [transfer, setTransfer] = useState({
     toLocation: "",
@@ -65,8 +73,19 @@ export default function SparePartsInventory() {
   /* ================= FETCH ================= */
   const fetchParts = async () => {
     try {
-      const res = await axios.get(`${API}/inventory/spare-parts`, { headers });
-      setItems(res.data.inventory || res.data);
+      setLoading(true);
+
+      const res = await axios.get(`${API}/inventory/spare-parts`, {
+        params: {
+          page,
+          limit: LIMIT,
+          status: statusFilter === "ALL" ? undefined : statusFilter,
+        },
+        headers,
+      });
+
+      setItems(res.data.inventory || []);
+      setTotalPages(res.data.totalPages || 1);
     } catch (err) {
       console.error("Fetch failed", err);
     } finally {
@@ -76,7 +95,7 @@ export default function SparePartsInventory() {
 
   useEffect(() => {
     fetchParts();
-  }, []);
+  }, [page, statusFilter]);
 
   /* ================= SAVE ================= */
   const submitPart = async () => {
@@ -99,7 +118,7 @@ export default function SparePartsInventory() {
         await axios.patch(
           `${API}/inventory/spare-parts/update/${editId}`,
           payload,
-          { headers },
+          { headers }
         );
       } else {
         await axios.post(`${API}/inventory/spare-parts`, payload, { headers });
@@ -146,7 +165,7 @@ export default function SparePartsInventory() {
         return alert("Not enough stock in source location");
 
       const payload = {
-        sourceId: transferItem.id, // ✅ ID-based transfer
+        sourceId: transferItem.id,
         toLocation: transfer.toLocation,
         quantity: qty,
       };
@@ -162,50 +181,114 @@ export default function SparePartsInventory() {
       alert(err?.response?.data?.message || "Transfer failed");
     }
   };
+
   const formatRole = (role) =>
     role ? role.charAt(0).toUpperCase() + role.slice(1) : "—";
 
-  /* ================= DATA ================= */
-  const data = useMemo(() => {
-    return items.map((i) => ({
-      id: i._id,
-      name: i.partName,
-      source: `${formatRole(i.createdByRole)} - ${i.createdBy?.name || "—"}`,
-      location: i.location,
-      quantity: i.quantity,
-      maxQuantity: i.maxQuantity,
-      status: i.status,
-    }));
-  }, [items]);
-  const filteredData = useMemo(() => {
-    if (statusFilter === "ALL") return data;
+  /* ================= GROUP DATA BY PART NAME ================= */
+  const groupedParts = useMemo(() => {
+    const grouped = new Map();
 
-    if (statusFilter === "LOW") {
-      return data.filter(
-        (i) => i.status === "Low Stock" || i.status === "Critical",
+    items.forEach((item) => {
+      const partName = item.partName;
+
+      if (!grouped.has(partName)) {
+        grouped.set(partName, {
+          partName,
+          locations: [],
+          totalQuantity: 0,
+          totalMaxQuantity: 0,
+          worstStatus: "Healthy",
+          locationCount: 0,
+        });
+      }
+
+      const group = grouped.get(partName);
+
+      // Add location entry
+      group.locations.push({
+        id: item._id,
+        location: item.location,
+        quantity: item.quantity,
+        maxQuantity: item.maxQuantity,
+        status: item.status,
+        source: `${formatRole(item.createdByRole)} - ${item.createdBy?.name || "—"}`,
+      });
+
+      // Update aggregates
+      group.totalQuantity += item.quantity;
+      group.totalMaxQuantity += item.maxQuantity || 0;
+      group.locationCount = group.locations.length;
+
+      // Determine worst status (Critical > Low Stock > Overstocked > Healthy)
+      const statusPriority = {
+        Critical: 4,
+        "Low Stock": 3,
+        Overstocked: 2,
+        Healthy: 1,
+      };
+
+      if (
+        statusPriority[item.status] >
+        statusPriority[group.worstStatus]
+      ) {
+        group.worstStatus = item.status;
+      }
+    });
+
+    return Array.from(grouped.values());
+  }, [items]);
+
+  /* ================= FILTERED DATA ================= */
+  const filteredGroupedParts = useMemo(() => {
+    let filtered = groupedParts;
+
+    // Apply search filter (frontend)
+    if (search.trim()) {
+      const searchLower = search.toLowerCase().trim();
+      filtered = filtered.filter((part) =>
+        part.partName.toLowerCase().includes(searchLower)
       );
     }
 
-    if (statusFilter === "OVERSTOCK") {
-      return data.filter((i) => i.status === "Overstocked");
+    // Apply status filter
+    if (statusFilter === "LOW") {
+      filtered = filtered.filter(
+        (p) => p.worstStatus === "Low Stock" || p.worstStatus === "Critical"
+      );
+    } else if (statusFilter === "OVERSTOCK") {
+      filtered = filtered.filter((p) => p.worstStatus === "Overstocked");
     }
 
-    return data;
-  }, [data, statusFilter]);
+    return filtered;
+  }, [groupedParts, statusFilter, search]);
+
+  /* ================= TOGGLE EXPAND ================= */
+  const toggleExpand = (partName) => {
+    const newExpanded = new Set(expandedParts);
+    if (newExpanded.has(partName)) {
+      newExpanded.delete(partName);
+    } else {
+      newExpanded.add(partName);
+    }
+    setExpandedParts(newExpanded);
+  };
+
+  /* ================= STATS ================= */
+  const totalParts = groupedParts.length;
+  const totalQty = groupedParts.reduce((s, p) => s + p.totalQuantity, 0);
+  const lowStock = groupedParts.filter(
+    (p) => p.worstStatus === "Low Stock" || p.worstStatus === "Critical"
+  ).length;
+  const overStock = groupedParts.filter(
+    (p) => p.worstStatus === "Overstocked"
+  ).length;
 
   /* ================= LOCATIONS (FOR DROPDOWN) ================= */
   const locations = useMemo(() => {
     const set = new Set(items.map((i) => i.location));
     return Array.from(set);
   }, [items]);
-
-  /* ================= STATS ================= */
-  const totalParts = data.length;
-  const totalQty = data.reduce((s, i) => s + i.quantity, 0);
-  const lowStock = data.filter(
-    (i) => i.status === "Low Stock" || i.status === "Critical"
-  ).length;
-  const overStock = data.filter((i) => i.status === "Overstocked").length;
 
   /* ================= UI ================= */
   return (
@@ -277,18 +360,19 @@ export default function SparePartsInventory() {
           {/* STATS */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 md:gap-6">
             <KpiCard
-              title="Total Parts"
+              title="Unique Parts"
               value={totalParts}
-              icon={<Boxes className="text-[#c62d23]" />}
+              icon={<Package className="text-[#c62d23]" />}
               active={statusFilter === "ALL"}
               onClick={() => setStatusFilter("ALL")}
             />
 
             <KpiCard
-              title="Total Quantity"
+              title="Total Stock"
               value={totalQty}
               icon={<Warehouse className="text-[#c62d23]" />}
             />
+
             <KpiCard
               title="Low / Critical"
               value={lowStock}
@@ -313,239 +397,397 @@ export default function SparePartsInventory() {
             <div className="bg-red-50 border border-red-200 rounded-xl sm:rounded-2xl p-3 sm:p-4 flex gap-2 sm:gap-3 items-center">
               <AlertCircle className="text-red-500 flex-shrink-0" size={18} />
               <span className="text-red-700 font-medium text-xs sm:text-sm">
-                {lowStock} spare parts need restocking
+                {lowStock} parts need restocking
               </span>
             </div>
           )}
 
-          {/* TABLE - Desktop */}
-          <div className="hidden md:block bg-white border border-gray-200 rounded-xl lg:rounded-2xl p-4 sm:p-6 shadow-sm">
-            <h2 className="font-bold text-base sm:text-lg text-gray-900 mb-4 sm:mb-6">
-              Spare Parts Overview
-            </h2>
+          {/* DESKTOP TABLE - GROUPED */}
+          <div className="hidden md:block bg-white border border-gray-200 rounded-2xl shadow-sm">
+            {/* Search Bar */}
+            <div className="flex justify-between items-center p-4 border-b border-gray-100">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+                <input
+                  type="text"
+                  placeholder="Search part name..."
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  className="w-72 pl-10 pr-10 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#c62d23]/20 focus:border-[#c62d23] outline-none"
+                />
+                {search && (
+                  <button
+                    onClick={() => setSearch("")}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                  >
+                    <X size={16} />
+                  </button>
+                )}
+              </div>
+              
+              <div className="text-sm text-gray-600">
+                {filteredGroupedParts.length} parts • {items.length} locations
+              </div>
+            </div>
 
-            <div className="overflow-auto rounded-lg border border-gray-200">
+            <div className="overflow-x-auto">
               <table className="w-full text-sm">
-                <thead>
-                  <tr className="bg-gray-50">
-                    <th className="text-left p-3 lg:p-4 font-semibold text-gray-700 text-xs lg:text-sm">
-                      Part
-                    </th>
-                    <th className="text-left p-3 lg:p-4 font-semibold text-gray-700 text-xs lg:text-sm">
-                      Source
-                    </th>
-                    <th className="text-left p-3 lg:p-4 font-semibold text-gray-700 text-xs lg:text-sm">
-                      Qty
-                    </th>
-                    <th className="text-left p-3 lg:p-4 font-semibold text-gray-700 text-xs lg:text-sm">
-                      Max Qty
-                    </th>
-                    <th className="text-left p-3 lg:p-4 font-semibold text-gray-700 text-xs lg:text-sm">
-                      Location
-                    </th>
-                    <th className="text-left p-3 lg:p-4 font-semibold text-gray-700 text-xs lg:text-sm">
-                      Status
-                    </th>
-                    <th className="text-left p-3 lg:p-4 font-semibold text-gray-700 text-xs lg:text-sm">
-                      Actions
-                    </th>
+                <thead className="bg-gray-50 text-gray-600 sticky top-0">
+                  <tr>
+                    <th className="text-left p-4 w-8"></th>
+                    <th className="text-left p-4">Part Name</th>
+                    <th className="text-left p-4">Locations</th>
+                    <th className="text-left p-4">Total Stock</th>
+                    <th className="text-left p-4">Total Max</th>
+                    <th className="text-left p-4">Status</th>
                   </tr>
                 </thead>
 
                 <tbody>
                   {loading ? (
                     <tr>
-                      <td colSpan="7" className="p-8 text-center text-gray-500">
-                        <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-[#c62d23]"></div>
-                        <p className="mt-2">Loading...</p>
+                      <td colSpan="6" className="p-8 text-center">
+                        Loading...
                       </td>
                     </tr>
-                  ) : filteredData.length === 0 ? (
+                  ) : filteredGroupedParts.length === 0 ? (
                     <tr>
-                      <td colSpan="7" className="p-8 text-center text-gray-500">
-                        No spare parts available
+                      <td colSpan="6" className="p-8 text-center">
+                        No parts found
                       </td>
                     </tr>
                   ) : (
-                    filteredData.map((i, index) => (
-                      <tr
-                        key={i.id}
-                        className={`border-b border-gray-100 hover:bg-gray-50 transition-colors ${
-                          index % 2 === 0 ? "bg-white" : "bg-gray-50"
-                        }`}
-                      >
-                        <td className="p-3 lg:p-4 font-medium text-gray-900 text-xs lg:text-sm">
-                          {i.name}
-                        </td>
+                    filteredGroupedParts.map((part) => (
+                      <React.Fragment key={part.partName}>
+                        {/* MASTER ROW */}
+                        <tr
+                          className="border-t border-gray-100 hover:bg-gray-50 cursor-pointer"
+                          onClick={() => toggleExpand(part.partName)}
+                        >
+                          <td className="p-4">
+                            {expandedParts.has(part.partName) ? (
+                              <ChevronDown size={16} className="text-gray-500" />
+                            ) : (
+                              <ChevronRight size={16} className="text-gray-500" />
+                            )}
+                          </td>
+                          <td className="p-4 font-semibold text-gray-900">
+                            {part.partName}
+                          </td>
+                          <td className="p-4">
+                            <span className="inline-flex items-center gap-1.5 px-2 py-1 bg-gray-100 text-gray-700 rounded-md text-xs font-medium">
+                              <MapPin size={12} />
+                              {part.locationCount}
+                            </span>
+                          </td>
+                          <td className="p-4 font-bold text-gray-900">
+                            {part.totalQuantity}
+                          </td>
+                          <td className="p-4 text-gray-600">
+                            {part.totalMaxQuantity || "—"}
+                          </td>
+                          <td className="p-4">
+                            <StatusBadge status={part.worstStatus} />
+                          </td>
+                        </tr>
 
-                        <td className="p-3 lg:p-4 text-gray-700 text-xs lg:text-sm">
-                          <div className="flex items-center gap-2">
-                            <Building2 size={14} className="text-gray-400 lg:w-4 lg:h-4" />
-                            <span className="truncate">{i.source}</span>
-                          </div>
-                        </td>
-
-                        <td className="p-3 lg:p-4 font-semibold text-gray-900 text-xs lg:text-sm">
-                          {i.quantity}
-                        </td>
-                        <td className="p-3 lg:p-4 text-gray-700 text-xs lg:text-sm">
-                          {i.maxQuantity ?? "—"}
-                        </td>
-
-                        <td className="p-3 lg:p-4 text-gray-700 text-xs lg:text-sm">
-                          <div className="flex items-center gap-2">
-                            <MapPin size={14} className="text-gray-400 lg:w-4 lg:h-4" />
-                            {i.location}
-                          </div>
-                        </td>
-
-                        <td className="p-3 lg:p-4">
-                          <StatusBadge status={i.status} />
-                        </td>
-
-                        <td className="p-3 lg:p-4">
-                          <div className="flex gap-2">
-                            {/* EDIT */}
-                            <button
-                              onClick={() => {
-                                setEditId(i.id);
-                                setForm({
-                                  partName: i.name,
-                                  location: i.location,
-                                  quantity: i.quantity,
-                                  maxQuantity: i.maxQuantity ?? "",
-                                });
-                                setShowForm(true);
-                              }}
-                              className="p-2 rounded-lg hover:bg-gray-100 transition-colors"
-                              title="Edit"
+                        {/* LOCATION DETAIL ROWS */}
+                        {expandedParts.has(part.partName) &&
+                          part.locations.map((loc, idx) => (
+                            <tr
+                              key={loc.id}
+                              className={`bg-gray-50/50 border-t border-gray-100 ${
+                                idx === part.locations.length - 1
+                                  ? "border-b-2 border-gray-200"
+                                  : ""
+                              }`}
                             >
-                              <Pencil
-                                size={14}
-                                className="text-gray-600 hover:text-[#c62d23] lg:w-4 lg:h-4"
-                              />
-                            </button>
+                              <td className="p-4"></td>
+                              <td className="p-4 pl-12">
+                                <div className="flex items-center gap-2 text-xs text-gray-600">
+                                  <Building2 size={12} />
+                                  {loc.source}
+                                </div>
+                              </td>
+                              <td className="p-4">
+                                <span className="inline-flex items-center gap-1 text-sm font-medium text-gray-700">
+                                  <MapPin size={14} className="text-[#c62d23]" />
+                                  {loc.location}
+                                </span>
+                              </td>
+                              <td className="p-4 font-semibold">{loc.quantity}</td>
+                              <td className="p-4">{loc.maxQuantity ?? "—"}</td>
+                              <td className="p-4">
+                                <StatusBadge status={loc.status} size="sm" />
+                              </td>
+                              <td className="p-4">
+                                <div className="flex gap-2">
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      const item = items.find(
+                                        (i) => i._id === loc.id
+                                      );
+                                      setEditId(loc.id);
+                                      setForm({
+                                        partName: part.partName,
+                                        location: loc.location,
+                                        quantity: loc.quantity,
+                                        maxQuantity: loc.maxQuantity ?? "",
+                                      });
+                                      setShowForm(true);
+                                    }}
+                                    className="p-1.5 hover:bg-blue-100 rounded transition"
+                                    title="Edit"
+                                  >
+                                    <Pencil
+                                      size={14}
+                                      className="text-gray-500 hover:text-blue-600"
+                                    />
+                                  </button>
 
-                            {/* TRANSFER */}
-                            <button
-                              onClick={() => {
-                                setTransferItem(i);
-                                setShowTransfer(true);
-                              }}
-                              className="p-2 rounded-lg hover:bg-gray-100 transition-colors"
-                              title="Transfer Location"
-                            >
-                              <ArrowLeftRight
-                                size={14}
-                                className="text-gray-600 hover:text-[#c62d23] lg:w-4 lg:h-4"
-                              />
-                            </button>
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setTransferItem({
+                                        id: loc.id,
+                                        name: part.partName,
+                                        location: loc.location,
+                                        quantity: loc.quantity,
+                                      });
+                                      setShowTransfer(true);
+                                    }}
+                                    className="p-1.5 hover:bg-green-100 rounded transition"
+                                    title="Transfer"
+                                  >
+                                    <ArrowLeftRight
+                                      size={14}
+                                      className="text-gray-500 hover:text-green-600"
+                                    />
+                                  </button>
 
-                            {/* DELETE */}
-                            <button
-                              onClick={() => deletePart(i.id)}
-                              className="p-2 rounded-lg hover:bg-gray-100 transition-colors"
-                              title="Delete"
-                            >
-                              <Trash2
-                                size={14}
-                                className="text-gray-600 hover:text-red-600 lg:w-4 lg:h-4"
-                              />
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      deletePart(loc.id);
+                                    }}
+                                    className="p-1.5 hover:bg-red-100 rounded transition"
+                                    title="Delete"
+                                  >
+                                    <Trash2
+                                      size={14}
+                                      className="text-gray-500 hover:text-red-600"
+                                    />
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          ))}
+                      </React.Fragment>
                     ))
                   )}
                 </tbody>
               </table>
             </div>
+
+            {/* Pagination */}
+            <div className="flex justify-between items-center p-4 border-t border-gray-100 text-sm">
+              <div>
+                Page {page} of {totalPages}
+              </div>
+
+              <div className="flex gap-2">
+                <button
+                  disabled={page === 1}
+                  onClick={() => setPage((p) => p - 1)}
+                  className="px-3 py-1 border rounded disabled:opacity-40"
+                >
+                  Prev
+                </button>
+
+                <button
+                  disabled={page === totalPages}
+                  onClick={() => setPage((p) => p + 1)}
+                  className="px-3 py-1 border rounded disabled:opacity-40"
+                >
+                  Next
+                </button>
+              </div>
+            </div>
           </div>
 
-          {/* CARDS - Mobile/Tablet */}
+          {/* MOBILE CARDS - GROUPED */}
           <div className="md:hidden space-y-3">
+            {/* Mobile Search Bar */}
+            <div className="bg-white rounded-xl border border-gray-200 p-3 shadow-sm">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
+                <input
+                  type="text"
+                  placeholder="Search part name..."
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  className="w-full pl-9 pr-9 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#c62d23]/20 focus:border-[#c62d23] outline-none text-sm"
+                />
+                {search && (
+                  <button
+                    onClick={() => setSearch("")}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                  >
+                    <X size={14} />
+                  </button>
+                )}
+              </div>
+            </div>
+
             {loading ? (
               <div className="bg-white rounded-xl p-8 text-center border border-gray-200">
                 <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-[#c62d23]"></div>
                 <p className="mt-2 text-gray-500 text-sm">Loading...</p>
               </div>
-            ) : filteredData.length === 0 ? (
+            ) : filteredGroupedParts.length === 0 ? (
               <div className="bg-white rounded-xl p-8 text-center text-gray-500 border border-gray-200 text-sm">
                 No spare parts available
               </div>
             ) : (
-              filteredData.map((i) => (
+              filteredGroupedParts.map((part) => (
                 <div
-                  key={i.id}
-                  className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm"
+                  key={part.partName}
+                  className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden"
                 >
-                  <div className="flex items-start justify-between mb-3">
-                    <div className="flex-1 min-w-0">
-                      <h3 className="font-semibold text-gray-900 text-sm mb-1 truncate">
-                        {i.name}
-                      </h3>
-                      <div className="flex items-center gap-1.5 text-gray-600 text-xs mb-2">
-                        <Building2 size={12} className="text-gray-400 flex-shrink-0" />
-                        <span className="truncate">{i.source}</span>
+                  {/* MASTER CARD */}
+                  <div
+                    className="p-4 cursor-pointer"
+                    onClick={() => toggleExpand(part.partName)}
+                  >
+                    <div className="flex items-start justify-between mb-3">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-2">
+                          {expandedParts.has(part.partName) ? (
+                            <ChevronDown size={16} className="text-gray-500 flex-shrink-0" />
+                          ) : (
+                            <ChevronRight size={16} className="text-gray-500 flex-shrink-0" />
+                          )}
+                          <h3 className="font-semibold text-gray-900 text-sm truncate">
+                            {part.partName}
+                          </h3>
+                        </div>
+                        <div className="flex items-center gap-1.5 text-gray-600 text-xs">
+                          <MapPin size={12} className="text-gray-400" />
+                          <span>{part.locationCount} locations</span>
+                        </div>
                       </div>
-                      <div className="flex items-center gap-1.5 text-gray-600 text-xs">
-                        <MapPin size={12} className="text-gray-400 flex-shrink-0" />
-                        <span>{i.location}</span>
+                      <StatusBadge status={part.worstStatus} />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3 text-xs">
+                      <div>
+                        <p className="text-gray-500 mb-0.5">Total Stock</p>
+                        <p className="font-bold text-gray-900 text-lg">
+                          {part.totalQuantity}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-gray-500 mb-0.5">Total Max</p>
+                        <p className="font-semibold text-gray-900">
+                          {part.totalMaxQuantity || "—"}
+                        </p>
                       </div>
                     </div>
-                    <StatusBadge status={i.status} />
                   </div>
 
-                  <div className="grid grid-cols-2 gap-3 mb-3 text-xs">
-                    <div>
-                      <p className="text-gray-500 mb-0.5">Quantity</p>
-                      <p className="font-bold text-gray-900 text-lg">{i.quantity}</p>
+                  {/* LOCATION DETAILS */}
+                  {expandedParts.has(part.partName) && (
+                    <div className="border-t border-gray-200 bg-gray-50/50">
+                      {part.locations.map((loc, idx) => (
+                        <div
+                          key={loc.id}
+                          className={`p-4 ${
+                            idx !== part.locations.length - 1
+                              ? "border-b border-gray-200"
+                              : ""
+                          }`}
+                        >
+                          <div className="flex items-center justify-between mb-3">
+                            <div className="flex items-center gap-2">
+                              <MapPin size={14} className="text-[#c62d23]" />
+                              <span className="font-medium text-sm">
+                                {loc.location}
+                              </span>
+                            </div>
+                            <StatusBadge status={loc.status} size="sm" />
+                          </div>
+
+                          <div className="grid grid-cols-2 gap-3 mb-3 text-xs">
+                            <div>
+                              <p className="text-gray-500 mb-0.5">Quantity</p>
+                              <p className="font-bold text-gray-900">
+                                {loc.quantity}
+                              </p>
+                            </div>
+                            <div>
+                              <p className="text-gray-500 mb-0.5">Max Qty</p>
+                              <p className="font-semibold text-gray-900">
+                                {loc.maxQuantity ?? "—"}
+                              </p>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-1.5 text-xs text-gray-600 mb-3">
+                            <Building2 size={12} />
+                            <span>{loc.source}</span>
+                          </div>
+
+                          <div className="flex gap-2">
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setEditId(loc.id);
+                                setForm({
+                                  partName: part.partName,
+                                  location: loc.location,
+                                  quantity: loc.quantity,
+                                  maxQuantity: loc.maxQuantity ?? "",
+                                });
+                                setShowForm(true);
+                              }}
+                              className="flex-1 bg-blue-50 hover:bg-blue-100 text-blue-700 py-2 px-3 rounded-lg transition-colors flex items-center justify-center gap-1.5 text-xs font-medium"
+                            >
+                              <Pencil size={14} />
+                              Edit
+                            </button>
+
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setTransferItem({
+                                  id: loc.id,
+                                  name: part.partName,
+                                  location: loc.location,
+                                  quantity: loc.quantity,
+                                });
+                                setShowTransfer(true);
+                              }}
+                              className="flex-1 bg-green-50 hover:bg-green-100 text-green-700 py-2 px-3 rounded-lg transition-colors flex items-center justify-center gap-1.5 text-xs font-medium"
+                            >
+                              <ArrowLeftRight size={14} />
+                              Transfer
+                            </button>
+
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                deletePart(loc.id);
+                              }}
+                              className="bg-red-50 hover:bg-red-100 text-red-700 py-2 px-3 rounded-lg transition-colors flex items-center justify-center"
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          </div>
+                        </div>
+                      ))}
                     </div>
-                    <div>
-                      <p className="text-gray-500 mb-0.5">Max Qty</p>
-                      <p className="font-semibold text-gray-900">{i.maxQuantity ?? "—"}</p>
-                    </div>
-                  </div>
-
-                  <div className="flex gap-2 pt-3 border-t border-gray-100">
-                    <button
-                      onClick={() => {
-                        setEditId(i.id);
-                        setForm({
-                          partName: i.name,
-                          location: i.location,
-                          quantity: i.quantity,
-                          maxQuantity: i.maxQuantity ?? "",
-                        });
-                        setShowForm(true);
-                      }}
-                      className="flex-1 bg-blue-50 hover:bg-blue-100 text-blue-700 py-2 px-3 rounded-lg transition-colors flex items-center justify-center gap-1.5 text-xs font-medium"
-                      title="Edit"
-                    >
-                      <Pencil size={14} />
-                      Edit
-                    </button>
-
-                    <button
-                      onClick={() => {
-                        setTransferItem(i);
-                        setShowTransfer(true);
-                      }}
-                      className="flex-1 bg-green-50 hover:bg-green-100 text-green-700 py-2 px-3 rounded-lg transition-colors flex items-center justify-center gap-1.5 text-xs font-medium"
-                      title="Transfer"
-                    >
-                      <ArrowLeftRight size={14} />
-                      Transfer
-                    </button>
-
-                    <button
-                      onClick={() => deletePart(i.id)}
-                      className="bg-red-50 hover:bg-red-100 text-red-700 py-2 px-3 rounded-lg transition-colors flex items-center justify-center"
-                      title="Delete"
-                    >
-                      <Trash2 size={14} />
-                    </button>
-                  </div>
+                  )}
                 </div>
               ))
             )}
@@ -565,7 +807,12 @@ export default function SparePartsInventory() {
                 onClick={() => {
                   setShowForm(false);
                   setEditId(null);
-                  setForm({ partName: "", location: "", quantity: "", maxQuantity: "" });
+                  setForm({
+                    partName: "",
+                    location: "",
+                    quantity: "",
+                    maxQuantity: "",
+                  });
                 }}
                 className="text-gray-400 hover:text-gray-600 p-1"
               >
@@ -594,6 +841,7 @@ export default function SparePartsInventory() {
               onChange={(v) => setForm({ ...form, quantity: v })}
               placeholder="Enter quantity"
             />
+
             {role === "admin" && (
               <Input
                 label="Max Quantity"
@@ -609,7 +857,12 @@ export default function SparePartsInventory() {
                 onClick={() => {
                   setShowForm(false);
                   setEditId(null);
-                  setForm({ partName: "", location: "", quantity: "", maxQuantity: "" });
+                  setForm({
+                    partName: "",
+                    location: "",
+                    quantity: "",
+                    maxQuantity: "",
+                  });
                 }}
                 className="w-full sm:w-auto px-4 sm:px-5 py-2.5 text-gray-700 font-medium rounded-lg sm:rounded-xl border border-gray-300 hover:bg-gray-50 transition-colors text-sm sm:text-base"
               >
@@ -648,8 +901,12 @@ export default function SparePartsInventory() {
 
             <div className="mb-4 p-3 sm:p-4 bg-gray-50 rounded-lg sm:rounded-xl">
               <p className="text-xs sm:text-sm text-gray-600">Part</p>
-              <p className="font-medium text-gray-900 text-sm sm:text-base">{transferItem.name}</p>
-              <p className="text-xs sm:text-sm text-gray-600 mt-2">Current Location</p>
+              <p className="font-medium text-gray-900 text-sm sm:text-base">
+                {transferItem.name}
+              </p>
+              <p className="text-xs sm:text-sm text-gray-600 mt-2">
+                Current Location
+              </p>
               <p className="font-medium text-gray-900 text-sm sm:text-base">
                 {transferItem.location}
               </p>
@@ -732,16 +989,15 @@ const KpiCard = ({
   >
     <div className="flex justify-between items-start mb-3 sm:mb-4">
       <p className="text-xs sm:text-sm text-gray-600 font-medium">{title}</p>
-      {React.cloneElement(icon, { size: 20, className: `sm:w-6 sm:h-6 ${icon.props.className}` })}
+      {React.cloneElement(icon, {
+        size: 20,
+        className: `sm:w-6 sm:h-6 ${icon.props.className}`,
+      })}
     </div>
 
     <p
       className={`text-2xl sm:text-3xl font-bold mb-1 ${
-        danger
-          ? "text-red-600"
-          : info
-          ? "text-blue-600"
-          : "text-gray-900"
+        danger ? "text-red-600" : info ? "text-blue-600" : "text-gray-900"
       }`}
     >
       {value}
@@ -749,7 +1005,7 @@ const KpiCard = ({
   </div>
 );
 
-const StatusBadge = ({ status }) => {
+const StatusBadge = ({ status, size = "default" }) => {
   const map = {
     Healthy: "bg-green-100 text-green-800",
     "Low Stock": "bg-amber-100 text-amber-800",
@@ -757,9 +1013,16 @@ const StatusBadge = ({ status }) => {
     Overstocked: "bg-blue-100 text-blue-800",
   };
 
+  const sizeClasses =
+    size === "sm"
+      ? "px-2 py-0.5 text-[10px]"
+      : "px-2 sm:px-3 py-0.5 sm:py-1.5 text-[10px] sm:text-xs";
+
   return (
     <span
-      className={`px-2 sm:px-3 py-0.5 sm:py-1.5 rounded-full text-[10px] sm:text-xs font-medium whitespace-nowrap ${map[status] || "bg-gray-100 text-gray-800"}`}
+      className={`${sizeClasses} rounded-full font-medium whitespace-nowrap ${
+        map[status] || "bg-gray-100 text-gray-800"
+      }`}
     >
       {status}
     </span>

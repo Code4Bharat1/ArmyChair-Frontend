@@ -277,28 +277,46 @@ export default function Orders() {
   ).length;
 
   /* ================= ORDER STEPS ================= */
-  const ORDER_STEPS = [
-    { key: "ORDER_PLACED", label: "Order Placed" },
-    { key: "WAREHOUSE_COLLECTED", label: "Warehouse Collected" },
-    { key: "FITTING_IN_PROGRESS", label: "Fitting In Progress" },
-    { key: "FITTING_COMPLETED", label: "Fitting Completed" },
-    { key: "READY_FOR_DISPATCH", label: "Ready For Dispatch" },
-    { key: "DISPATCHED", label: "Dispatched" },
-  ];
+ const FULL_ORDER_STEPS = [
+  { key: "PRODUCTION_PENDING", label: "Production Pending" },
+  { key: "PRODUCTION_IN_PROGRESS", label: "Production In Progress" },
+  { key: "PRODUCTION_COMPLETED", label: "Production Completed" },
+  { key: "WAREHOUSE_COLLECTED", label: "Warehouse Collected" },
+  { key: "FITTING_IN_PROGRESS", label: "Fitting In Progress" },
+  { key: "FITTING_COMPLETED", label: "Fitting Completed" },
+  { key: "READY_FOR_DISPATCH", label: "Ready For Dispatch" },
+  { key: "DISPATCHED", label: "Dispatched" },
+];
 
-  const isOrderLocked = (progress) => {
-    return [
-      "WAREHOUSE_COLLECTED",
-      "FITTING_IN_PROGRESS",
-      "FITTING_COMPLETED",
-      "READY_FOR_DISPATCH",
-      "DISPATCHED",
-      "PARTIAL",
-    ].includes(progress);
-  };
+
+const SPARE_ORDER_STEPS = [
+  { key: "ORDER_PLACED", label: "Order Placed" },
+  { key: "WAREHOUSE_COLLECTED", label: "Warehouse Collected" },
+  { key: "READY_FOR_DISPATCH", label: "Ready For Dispatch" },
+  { key: "DISPATCHED", label: "Dispatched" },
+];
+const isOrderLocked = (progress) => {
+  return [
+    "PRODUCTION_PENDING",
+    "PRODUCTION_IN_PROGRESS",
+    "PRODUCTION_COMPLETED",
+    "WAREHOUSE_COLLECTED",
+    "FITTING_IN_PROGRESS",
+    "FITTING_COMPLETED",
+    "READY_FOR_DISPATCH",
+    "DISPATCHED",
+    "PARTIAL",
+  ].includes(progress);
+};
+
+
 
   /* ================= PROGRESS ================= */
-  const ProgressTracker = ({ progress }) => {
+  const ProgressTracker = ({ progress, orderType }) => {
+
+  const steps =
+    orderType === "FULL" ? FULL_ORDER_STEPS : SPARE_ORDER_STEPS;
+
     if (progress === "PARTIAL") {
       return (
         <span className="px-3 py-1 rounded-full text-xs font-medium bg-amber-50 text-amber-700 border border-amber-200">
@@ -307,9 +325,9 @@ export default function Orders() {
       );
     }
 
-    const currentIndex = ORDER_STEPS.findIndex((s) => s.key === progress);
+    const currentIndex = steps.findIndex((s) => s.key === progress);
     const safeIndex =
-      currentIndex === -1 ? ORDER_STEPS.length - 1 : currentIndex;
+      currentIndex === -1 ? steps.length - 1 : currentIndex;
 
     const isCompleted = progress === "DISPATCHED";
 
@@ -321,7 +339,8 @@ export default function Orders() {
             : "bg-blue-50 text-blue-700 border-blue-200"
         }`}
       >
-        {ORDER_STEPS[safeIndex]?.label}
+        {steps[safeIndex]?.label}
+
       </span>
     );
   };
@@ -641,8 +660,11 @@ export default function Orders() {
                             {o.quantity}
                           </td>
 
-                          <td className="p-4">
-                            <ProgressTracker progress={o.progress} />
+                          <td className="p-4"><ProgressTracker 
+  progress={o.progress} 
+  orderType={o.orderType}
+/>
+
                           </td>
 
                           {/* ORDER STATUS */}
@@ -715,89 +737,85 @@ export default function Orders() {
                             <tr className="bg-gray-50">
                               <td colSpan={9} className="p-6">
                                 {(() => {
-                                  const currentIndex = ORDER_STEPS.findIndex(
-                                    (s) => s.key === o.progress,
-                                  );
+  const steps =
+    o.orderType === "FULL"
+      ? FULL_ORDER_STEPS
+      : SPARE_ORDER_STEPS;
 
-                                  const safeIndex =
-                                    currentIndex === -1
-                                      ? ORDER_STEPS.length - 1
-                                      : currentIndex;
+  const currentIndex = steps.findIndex(
+    (s) => s.key === o.progress
+  );
 
-                                  const percent =
-                                    ((safeIndex + 1) / ORDER_STEPS.length) *
-                                    100;
+  const safeIndex =
+    currentIndex === -1
+      ? steps.length - 1
+      : currentIndex;
 
-                                  return (
-                                    <div className="w-full space-y-6">
-                                      <p className="text-sm text-gray-700 font-semibold">
-                                        Order Progress
-                                      </p>
+  const percent =
+    ((safeIndex + 1) / steps.length) * 100;
 
-                                      <div className="flex justify-between text-xs text-gray-600">
-                                        {ORDER_STEPS.map((step, index) => (
-                                          <span
-                                            key={step.key}
-                                            className={
-                                              index <= safeIndex
-                                                ? "text-gray-900 font-semibold"
-                                                : ""
-                                            }
-                                          >
-                                            {step.label}
-                                          </span>
-                                        ))}
-                                      </div>
+  return (
+    <div className="w-full space-y-6">
+      <p className="text-sm text-gray-700 font-semibold">
+        Order Progress
+      </p>
 
-                                      {/* TRACK */}
-                                      <div className="relative w-full h-10 flex items-center mt-6">
-                                        {/* BASE LINE */}
-                                        <div className="absolute left-0 right-0 h-[4px] bg-gray-300 rounded-full" />
+      <div className="flex justify-between text-xs text-gray-600">
+        {steps.map((step, index) => (
+          <span
+            key={step.key}
+            className={
+              index <= safeIndex
+                ? "text-gray-900 font-semibold"
+                : ""
+            }
+          >
+            {step.label}
+          </span>
+        ))}
+      </div>
 
-                                        {/* PROGRESS LINE */}
-                                        <div
-                                          className="absolute left-0 h-[4px] rounded-full transition-all duration-500"
-                                          style={{
-                                            width: `${percent}%`,
-                                            background:
-                                              percent === 100
-                                                ? "#22c55e"
-                                                : "linear-gradient(90deg,#22c55e,#c62d23)",
-                                          }}
-                                        />
+      <div className="relative w-full h-10 flex items-center mt-6">
+        <div className="absolute left-0 right-0 h-[4px] bg-gray-300 rounded-full" />
 
-                                        {/* MOVING NUMBER */}
-                                        <div
-                                          className="absolute w-7 h-7 rounded-full border-2 border-white shadow-md
-               flex items-center justify-center text-xs font-bold text-white"
-                                          style={{
-                                            left: `calc(${percent}% - 14px)`,
-                                            backgroundColor:
-                                              safeIndex ===
-                                              ORDER_STEPS.length - 1
-                                                ? "#22c55e"
-                                                : "#c62d23",
-                                          }}
-                                        >
-                                          {safeIndex + 1}
-                                        </div>
-                                      </div>
+        <div
+          className="absolute left-0 h-[4px] rounded-full transition-all duration-500"
+          style={{
+            width: `${percent}%`,
+            background:
+              percent === 100
+                ? "#22c55e"
+                : "linear-gradient(90deg,#22c55e,#c62d23)",
+          }}
+        />
 
-                                      <p className="text-sm">
-                                        <span className="text-gray-600">
-                                          Current Stage:
-                                        </span>{" "}
-                                        <span className="text-[#c62d23] font-semibold">
-                                          {
-                                            ORDER_STEPS.find(
-                                              (s) => s.key === o.progress,
-                                            )?.label
-                                          }
-                                        </span>
-                                      </p>
-                                    </div>
-                                  );
-                                })()}
+        <div
+          className="absolute w-7 h-7 rounded-full border-2 border-white shadow-md
+            flex items-center justify-center text-xs font-bold text-white"
+          style={{
+            left: `calc(${percent}% - 14px)`,
+            backgroundColor:
+              safeIndex === steps.length - 1
+                ? "#22c55e"
+                : "#c62d23",
+          }}
+        >
+          {safeIndex + 1}
+        </div>
+      </div>
+
+      <p className="text-sm">
+        <span className="text-gray-600">
+          Current Stage:
+        </span>{" "}
+        <span className="text-[#c62d23] font-semibold">
+          {steps.find((s) => s.key === o.progress)?.label}
+        </span>
+      </p>
+    </div>
+  );
+})()}
+
                               </td>
                             </tr>
                           )}
@@ -874,8 +892,6 @@ export default function Orders() {
                           {v.name}
                         </div>
                       ))}
-
-                    {/* ADD NEW VENDOR */}
                   </div>
                 )}
               </div>

@@ -73,18 +73,34 @@ export default function WarehouseOrders() {
     try {
       const res = await axios.get(`${API}/orders`, { headers });
 
-      const warehouseOrders = (res.data.orders || res.data).filter((o) =>
-        [
-          "ORDER_PLACED",
-          "WAREHOUSE_COLLECTED",
-          "FITTING_IN_PROGRESS",
-          "FITTING_COMPLETED",
-          "READY_FOR_DISPATCH",
-          "DISPATCHED",
-          "PARTIAL",
-          "COMPLETED",
-        ].includes(o.progress),
-      );
+     const warehouseOrders = (res.data.orders || res.data).filter((o) => {
+  // FULL chair orders should include PRODUCTION_COMPLETED
+  if (o.orderType === "FULL") {
+    return [
+      "PRODUCTION_COMPLETED",   // 👈 ADD THIS
+      "WAREHOUSE_COLLECTED",
+      "FITTING_IN_PROGRESS",
+      "FITTING_COMPLETED",
+      "READY_FOR_DISPATCH",
+      "DISPATCHED",
+      "PARTIAL",
+      "COMPLETED",
+    ].includes(o.progress);
+  }
+
+  // Spare orders keep existing logic
+  return [
+    "ORDER_PLACED",
+    "WAREHOUSE_COLLECTED",
+    "FITTING_IN_PROGRESS",
+    "FITTING_COMPLETED",
+    "READY_FOR_DISPATCH",
+    "DISPATCHED",
+    "PARTIAL",
+    "COMPLETED",
+  ].includes(o.progress);
+});
+
 
       setOrders(warehouseOrders);
     } catch (err) {
@@ -454,6 +470,36 @@ Please reduce picks to exactly ${order.quantity}.`,
   /* ================= ACTION BUTTON ================= */
   const renderAction = (o) => {
     const isLoading = processingId === o._id;
+
+    if (o.progress === "PRODUCTION_COMPLETED" && o.orderType === "FULL") {
+  return (
+    <div className="flex gap-2">
+      <button
+        disabled={processingId === o._id}
+        onClick={async () => {
+          if (!window.confirm("Confirm warehouse collected this order?")) return;
+
+          try {
+            setProcessingId(o._id);
+            await axios.patch(
+              `${API}/orders/${o._id}/progress`,
+              { progress: "WAREHOUSE_COLLECTED" },
+              { headers }
+            );
+            fetchOrders();
+          } catch (err) {
+            alert("Failed to collect order");
+          } finally {
+            setProcessingId(null);
+          }
+        }}
+        className="bg-blue-600 hover:bg-blue-700 text-white px-3 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-medium transition-all shadow-sm hover:shadow-md disabled:opacity-50"
+      >
+        {processingId === o._id ? "Processing..." : "Collect from Production"}
+      </button>
+    </div>
+  );
+}
 
     if (o.progress === "ORDER_PLACED") {
       return (

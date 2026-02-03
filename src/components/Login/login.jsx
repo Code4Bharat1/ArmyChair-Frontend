@@ -59,8 +59,9 @@ export default function Login() {
           case "fitting":
             router.push("/fitting");
             break;
+
           case "production":
-            router.push("/production");
+            router.push("/production/incomingorders");
             break;
 
           case "sales":
