@@ -80,7 +80,8 @@ export default function WarehousePendingInwardPage() {
         }
       );
 
-      alert("Stock accepted and inventory updated");
+      alert("Stock transferred to production successfully");
+
       fetchPending();
     } catch (err) {
       alert(err.response?.data?.message || "Accept failed");
@@ -136,10 +137,12 @@ export default function WarehousePendingInwardPage() {
               <div className="min-w-0 flex-1">
                 <h1 className="text-lg sm:text-2xl md:text-3xl font-bold text-gray-900 flex items-center gap-2 truncate">
                   <FileCheck size={20} className="text-[#c62d23] sm:w-6 sm:h-6 md:w-8 md:h-8 flex-shrink-0" />
-                  <span className="truncate">Pending Production Inward</span>
+                  <span className="truncate">Production Material Requests</span>
+
                 </h1>
                 <p className="text-xs sm:text-sm text-gray-600 mt-0.5 sm:mt-1 hidden sm:block">
-                  Review and accept incoming stock from production
+                  Review material requests from production and transfer stock
+
                 </p>
               </div>
             </div>
@@ -158,7 +161,8 @@ export default function WarehousePendingInwardPage() {
           {/* STATS */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 md:gap-6">
             <StatCard
-              title="Pending Approvals"
+            title="Pending Requests"
+
               value={totalPending}
               icon={<Clock className="text-[#c62d23]" />}
             />
@@ -175,7 +179,8 @@ export default function WarehousePendingInwardPage() {
               <AlertCircle className="text-amber-600 flex-shrink-0" size={18} />
               <div className="flex-1">
                 <span className="text-xs sm:text-sm text-amber-800 font-medium">
-                  You have {totalPending} pending inward approval{totalPending !== 1 ? 's' : ''} waiting for review
+                  You have {totalPending} material request(s) from production
+
                 </span>
               </div>
             </div>
@@ -244,7 +249,7 @@ export default function WarehousePendingInwardPage() {
                                 : "bg-green-600 hover:bg-green-700 text-white hover:shadow-md"
                             }`}
                           >
-                            {processingId === i._id ? "Processing..." : "Accept"}
+                            {processingId === i._id ? "Processing..." : "Transfer Stock"}
                           </button>
                         </td>
                       </tr>
@@ -304,7 +309,7 @@ export default function WarehousePendingInwardPage() {
                           : "bg-green-600 hover:bg-green-700 text-white hover:shadow-md"
                       }`}
                     >
-                      {processingId === i._id ? "Processing..." : "Accept Inward Stock"}
+                      {processingId === i._id ? "Processing..." : "Approve & Transfer"}
                     </button>
                   </div>
                 </div>

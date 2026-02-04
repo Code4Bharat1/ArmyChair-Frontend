@@ -7,6 +7,9 @@ export default function CompletedOrders() {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  const [dateFilter, setDateFilter] = useState("ALL");
+  const [activeTab, setActiveTab] = useState("FULL");
+  const [selectedDate, setSelectedDate] = useState("");
 
   /* ================= API ================= */
   const API = process.env.NEXT_PUBLIC_API_URL;
@@ -20,9 +23,8 @@ export default function CompletedOrders() {
     try {
       const res = await fetch(`${API}/orders`, { headers });
       const data = await res.json();
-
-      const completed = (data.orders || data).filter(
-        (o) => o.progress === "DISPATCHED"
+      const completed = (data.orders || data).filter((o) =>
+        ["DISPATCHED", "COMPLETED"].includes(o.progress),
       );
 
       setOrders(completed);
@@ -39,21 +41,68 @@ export default function CompletedOrders() {
 
   /* ================= FILTER ================= */
   const filteredOrders = useMemo(() => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const startOfLastWeek = new Date(today);
+    startOfLastWeek.setDate(today.getDate() - today.getDay() - 7);
+
+    const endOfLastWeek = new Date(startOfLastWeek);
+    endOfLastWeek.setDate(startOfLastWeek.getDate() + 6);
+
     return orders.filter((o) => {
       const q = search.toLowerCase();
+      const completedDate = new Date(o.updatedAt || o.createdAt);
+      completedDate.setHours(0, 0, 0, 0);
+
+      // ===== DATE FILTERS =====
+
+      if (dateFilter === "TODAY") {
+        if (completedDate.getTime() !== today.getTime()) return false;
+      }
+
+      if (dateFilter === "YESTERDAY") {
+        const yesterday = new Date(today);
+        yesterday.setDate(today.getDate() - 1);
+        if (completedDate.getTime() !== yesterday.getTime()) return false;
+      }
+
+      if (dateFilter === "LAST_7_DAYS") {
+        const sevenDaysAgo = new Date(today);
+        sevenDaysAgo.setDate(today.getDate() - 7);
+        if (completedDate < sevenDaysAgo) return false;
+      }
+
+      if (dateFilter === "LAST_30_DAYS") {
+        const thirtyDaysAgo = new Date(today);
+        thirtyDaysAgo.setDate(today.getDate() - 30);
+        if (completedDate < thirtyDaysAgo) return false;
+      }
+      if (dateFilter === "CUSTOM" && selectedDate) {
+        const pickedDate = new Date(selectedDate);
+        pickedDate.setHours(0, 0, 0, 0);
+
+        if (completedDate.getTime() !== pickedDate.getTime()) return false;
+      }
+
+      // ===== SEARCH =====
       return (
         o.orderId?.toLowerCase().includes(q) ||
         o.dispatchedTo?.name?.toLowerCase().includes(q) ||
         o.chairModel?.toLowerCase().includes(q)
       );
     });
-  }, [orders, search]);
+  }, [orders, search, dateFilter, selectedDate]);
+
+  const fullCompleted = filteredOrders.filter((o) => o.orderType === "FULL");
+
+  const spareCompleted = filteredOrders.filter((o) => o.orderType === "SPARE");
 
   /* ================= STATS ================= */
   const totalOrders = filteredOrders.length;
   const totalQuantity = filteredOrders.reduce(
     (sum, o) => sum + (o.quantity || 0),
-    0
+    0,
   );
   const uniqueModels = new Set(filteredOrders.map((o) => o.chairModel)).size;
 
@@ -143,8 +192,46 @@ export default function CompletedOrders() {
                 value={uniqueModels}
                 icon={<TrendingUp className="text-red-600" />}
               />
-            </div>
+            </div> 
+            <div className="flex flex-wrap items-center gap-3 mb-6">
+              {[
+                "ALL",
+                "TODAY",
+                "YESTERDAY",
+                "LAST_7_DAYS",
+                "LAST_30_DAYS",
+              ].map((type) => (
+                <button
+                  key={type}
+                  onClick={() => {
+                    setDateFilter(type);
+                    setSelectedDate("");
+                  }}
+                  className={`px-4 py-2 rounded-lg text-sm font-medium transition ${
+                    dateFilter === type
+                      ? "bg-[#c62d23] text-white"
+                      : "bg-white border border-gray-200 hover:bg-gray-50"
+                  }`}
+                >
+                  {type.replaceAll("_", " ")}
+                </button>
+              ))}
 
+              {/* Calendar as Filter Chip */}
+              <input
+                type="date"
+                value={selectedDate}
+                onChange={(e) => {
+                  setSelectedDate(e.target.value);
+                  setDateFilter("CUSTOM");
+                }}
+                className={`px-4 py-2 rounded-lg text-sm font-medium border transition ${
+                  dateFilter === "CUSTOM"
+                    ? "bg-white text-black border-[#c62d23]"
+                    : "bg-white border-gray-200"
+                }`}
+              />
+            </div>
             {/* SEARCH */}
             <div>
               <input
@@ -154,85 +241,51 @@ export default function CompletedOrders() {
                 className="w-full bg-white border border-gray-200 px-4 py-3 rounded-xl outline-none text-gray-900 placeholder-gray-400 focus:border-green-600 focus:ring-2 focus:ring-green-600/20 transition-all shadow-sm"
               />
             </div>
+            {/* FULL / SPARE TOGGLE */}
+            <div className="flex gap-4 mb-6 bg-white p-2 rounded-xl border border-gray-200 shadow-sm">
+              <button
+                onClick={() => setActiveTab("FULL")}
+                className={`flex-1 py-2 rounded-lg font-semibold transition ${
+                  activeTab === "FULL"
+                    ? "bg-[#c62d23] text-white"
+                    : "text-gray-600 hover:bg-gray-50"
+                }`}
+              >
+                Full Chair Orders ({fullCompleted.length})
+              </button>
 
-            {/* TABLE */}
-            <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
-              {loading ? (
-                <div className="p-8 text-center">
-                  <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-red-600"></div>
-                  <p className="mt-2 text-gray-500">Loading...</p>
-                </div>
-              ) : filteredOrders.length === 0 ? (
-                <div className="text-center text-gray-500 py-16">
-                  <Package size={48} className="mx-auto mb-4 text-gray-300" />
-                  <p className="text-lg font-medium">No completed orders found</p>
-                </div>
-              ) : (
-                <div className="overflow-x-auto">
-                  <table className="min-w-[900px] w-full text-sm">
-                    <thead>
-                      <tr className="bg-gray-50 border-b border-gray-200">
-                        {[
-                          "Order ID",
-                          "Dispatched To",
-                          "Chair",
-                          "Order Date",
-                          "Delivery Date",
-                          "Qty",
-                          "Completed On",
-                        ].map((h) => (
-                          <th
-                            key={h}
-                            className="p-4 text-left font-semibold text-gray-700 whitespace-nowrap"
-                          >
-                            {h}
-                          </th>
-                        ))}
-                      </tr>
-                    </thead>
-
-                    <tbody>
-                      {filteredOrders.map((o, index) => (
-                        <tr
-                          key={o._id}
-                          className={`border-b border-gray-100 hover:bg-gray-50 transition-colors ${
-                            index % 2 === 0 ? "bg-white" : "bg-gray-50"
-                          }`}
-                        >
-                          <td className="p-4 font-semibold text-gray-900 whitespace-nowrap">
-                            {o.orderId}
-                          </td>
-                          <td className="p-4 text-gray-700 whitespace-nowrap">
-                            {o.dispatchedTo?.name || "-"}
-                          </td>
-                          <td className="p-4 font-medium text-gray-900 whitespace-nowrap">
-                            {o.chairModel}
-                          </td>
-                          <td className="p-4 text-gray-700 whitespace-nowrap">
-                            {new Date(o.orderDate).toLocaleDateString()}
-                          </td>
-                          <td className="p-4 text-gray-700 whitespace-nowrap">
-                            {o.deliveryDate
-                              ? new Date(o.deliveryDate).toLocaleDateString()
-                              : "-"}
-                          </td>
-                          <td className="p-4 font-semibold text-gray-900 whitespace-nowrap">
-                            {o.quantity}
-                          </td>
-                          <td className="p-4 whitespace-nowrap">
-                            <span className="px-3 py-1 rounded-full text-xs font-medium bg-green-50 text-red-700 border border-red-200">
-                              {new Date(
-                                o.updatedAt || o.createdAt
-                              ).toLocaleDateString()}
-                            </span>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
+              <button
+                onClick={() => setActiveTab("SPARE")}
+                className={`flex-1 py-2 rounded-lg font-semibold transition ${
+                  activeTab === "SPARE"
+                    ? "bg-[#c62d23] text-white"
+                    : "text-gray-600 hover:bg-gray-50"
+                }`}
+              >
+                Spare Part Orders ({spareCompleted.length})
+              </button>
             </div>
+
+            {loading ? (
+              <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-8 text-center">
+                <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-red-600"></div>
+                <p className="mt-2 text-gray-500">Loading...</p>
+              </div>
+            ) : filteredOrders.length === 0 ? (
+              <div className="bg-white rounded-2xl border border-gray-200 shadow-sm text-center text-gray-500 py-16">
+                <Package size={48} className="mx-auto mb-4 text-gray-300" />
+                <p className="text-lg font-medium">No completed orders found</p>
+              </div>
+            ) : (
+              <CompletedTable
+                title={
+                  activeTab === "FULL"
+                    ? "Full Chair Orders"
+                    : "Spare Part Orders"
+                }
+                orders={activeTab === "FULL" ? fullCompleted : spareCompleted}
+              />
+            )}
           </div>
         </div>
       </div>
@@ -254,3 +307,101 @@ const StatCard = ({ title, value, icon }) => (
     <p className="text-3xl font-bold text-gray-900">{value}</p>
   </div>
 );
+
+const CompletedTable = ({ title, orders }) => {
+  if (!orders.length) return null;
+
+  const isLateCompleted = (o) => {
+    if (!o.deliveryDate) return false;
+
+    const delivery = new Date(o.deliveryDate);
+    const completedDate = new Date(o.updatedAt || o.createdAt);
+
+    delivery.setHours(0, 0, 0, 0);
+    completedDate.setHours(0, 0, 0, 0);
+
+    return completedDate > delivery;
+  };
+
+  return (
+    <div className="mb-10">
+      <h2 className="text-xl font-bold mb-4">
+        {title} ({orders.length})
+      </h2>
+
+      <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="min-w-[900px] w-full text-sm">
+            <thead>
+              <tr className="bg-gray-50 border-b border-gray-200">
+                {[
+                  "Order ID",
+                  "Client",
+                  "Chair",
+                  "Order Date",
+                  "Delivery Date",
+                  "Completed On",
+                  "Qty",
+                  "Status",
+                ].map((h) => (
+                  <th
+                    key={h}
+                    className="p-4 text-left font-semibold text-gray-700"
+                  >
+                    {h}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+
+            <tbody>
+              {orders.map((o, index) => (
+                <tr
+                  key={o._id}
+                  className={`border-b ${
+                    isLateCompleted(o)
+                      ? "bg-red-50 hover:bg-red-100"
+                      : index % 2 === 0
+                        ? "bg-white"
+                        : "bg-gray-50"
+                  }`}
+                >
+                  <td className="p-4 font-semibold">{o.orderId}</td>
+                  <td className="p-4">{o.dispatchedTo?.name || "-"}</td>
+                  <td className="p-4">{o.chairModel}</td>
+                  <td className="p-4">
+                    {new Date(o.orderDate).toLocaleDateString()}
+                  </td>
+                  <td className="p-4">
+                    {o.deliveryDate
+                      ? new Date(o.deliveryDate).toLocaleDateString()
+                      : "-"}
+                  </td>
+                  <td className="p-4">
+                    {new Date(o.updatedAt || o.createdAt).toLocaleDateString()}
+                  </td>
+
+                  <td className="p-4 font-semibold">{o.quantity}</td>
+
+                  <td className="p-4">
+                    <span
+                      className={`px-3 py-1 rounded-full text-xs font-medium border ${
+                        isLateCompleted(o)
+                          ? "bg-red-100 text-red-700 border-red-300"
+                          : "bg-green-50 text-green-700 border-green-200"
+                      }`}
+                    >
+                      {isLateCompleted(o)
+                        ? "Completed Late"
+                        : "Completed On Time"}
+                    </span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+};

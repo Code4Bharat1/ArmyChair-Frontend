@@ -104,6 +104,14 @@ export default function FittingSidebar() {
             </Link>
 
             <Link
+              href="/fitting/requestInventory"
+              onClick={() => setOpen(false)}
+              className={itemClass("/fitting/requestInventory")}
+            >
+              <RotateCcw size={18} className="flex-shrink-0" />
+              <span className="truncate">Request Inventory</span>
+            </Link>
+            <Link
               href="/fitting/Return-orders"
               onClick={() => setOpen(false)}
               className={itemClass("/fitting/Return-orders")}
