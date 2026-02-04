@@ -25,6 +25,8 @@ export default function Orders() {
   const [chairSearch, setChairSearch] = useState("");
   const [showChairDropdown, setShowChairDropdown] = useState(false);
   const [showVendorDropdown, setShowVendorDropdown] = useState(false);
+  const [orderTypeFilter, setOrderTypeFilter] = useState("ALL");
+
   const router = useRouter();
   const searchParams = useSearchParams();
   const highlightId = searchParams.get("highlight");
@@ -54,45 +56,52 @@ export default function Orders() {
 
   const today = new Date();
   today.setHours(0, 0, 0, 0);
-  const filteredOrders = useMemo(() => {
-    const q = search.toLowerCase();
+  
+ const filteredOrders = useMemo(() => {
+  const q = search.toLowerCase();
 
-    return orders.filter((o) => {
-      // 🔍 Search filter
-      const matchesSearch =
-  o.orderId?.toLowerCase().includes(q) ||
-  (
-    typeof o.dispatchedTo === "string"
-      ? o.dispatchedTo
-      : o.dispatchedTo?.name
-  )?.toLowerCase().includes(q) ||
-  o.chairModel?.toLowerCase().includes(q);
+  return orders.filter((o) => {
+    // 🔁 Order Type Filter
+    if (orderTypeFilter !== "ALL" && o.orderType !== orderTypeFilter) {
+      return false;
+    }
 
+    // 🔍 Search filter
+    const matchesSearch =
+      o.orderId?.toLowerCase().includes(q) ||
+      (
+        typeof o.dispatchedTo === "string"
+          ? o.dispatchedTo
+          : o.dispatchedTo?.name
+      )?.toLowerCase().includes(q) ||
+      o.chairModel?.toLowerCase().includes(q);
 
-      if (!matchesSearch) return false;
+    if (!matchesSearch) return false;
 
-      // 📊 Stat filter
-      switch (statusFilter) {
-        case "IN_PROGRESS":
-          return (
-            !["DISPATCHED", "PARTIAL"].includes(o.progress) && !isDelayed(o)
-          );
+    // 📊 Status filter
+    switch (statusFilter) {
+      case "IN_PROGRESS":
+        return (
+          !["DISPATCHED", "PARTIAL"].includes(o.progress) &&
+          !isDelayed(o)
+        );
 
-        case "DELAYED":
-          return isDelayed(o);
+      case "DELAYED":
+        return isDelayed(o);
 
-        case "READY":
-          return o.progress === "READY_FOR_DISPATCH";
+      case "READY":
+        return o.progress === "READY_FOR_DISPATCH";
 
-        case "COMPLETED":
-          return o.progress === "DISPATCHED";
+      case "COMPLETED":
+        return o.progress === "DISPATCHED";
 
-        case "ALL":
-        default:
-          return true;
-      }
-    });
-  }, [orders, search, statusFilter]);
+      case "ALL":
+      default:
+        return true;
+    }
+  });
+}, [orders, search, statusFilter, orderTypeFilter]);
+
 
   function isDelayed(order) {
     if (!order.deliveryDate) return false;
@@ -326,14 +335,24 @@ useEffect(() => {
   ).length;
 
   /* ================= ORDER STEPS ================= */
-  const ORDER_STEPS = [
-    { key: "ORDER_PLACED", label: "Order Placed" },
-    { key: "WAREHOUSE_COLLECTED", label: "Warehouse Collected" },
-    { key: "FITTING_IN_PROGRESS", label: "Fitting In Progress" },
-    { key: "FITTING_COMPLETED", label: "Fitting Completed" },
-    { key: "READY_FOR_DISPATCH", label: "Ready For Dispatch" },
-    { key: "DISPATCHED", label: "Dispatched" },
-  ];
+  const FULL_ORDER_STEPS = [
+  { key: "PRODUCTION_PENDING", label: "Production Pending" },
+  { key: "PRODUCTION_IN_PROGRESS", label: "Production In Progress" },
+  { key: "PRODUCTION_COMPLETED", label: "Production Completed" },
+  { key: "WAREHOUSE_COLLECTED", label: "Warehouse Collected" },
+  { key: "FITTING_IN_PROGRESS", label: "Fitting In Progress" },
+  { key: "FITTING_COMPLETED", label: "Fitting Completed" },
+  { key: "READY_FOR_DISPATCH", label: "Ready For Dispatch" },
+  { key: "DISPATCHED", label: "Dispatched" },
+];
+
+const SPARE_ORDER_STEPS = [
+  { key: "ORDER_PLACED", label: "Order Placed" },
+  { key: "WAREHOUSE_COLLECTED", label: "Warehouse Collected" },
+  { key: "READY_FOR_DISPATCH", label: "Ready For Dispatch" },
+  { key: "DISPATCHED", label: "Dispatched" },
+];
+
 
   const isOrderLocked = (progress) => {
     return [
@@ -347,31 +366,36 @@ useEffect(() => {
   };
 
   /* ================= PROGRESS ================= */
-  const ProgressTracker = ({ progress }) => {
-    if (progress === "PARTIAL") {
-      return (
-        <span className="text-sm font-medium text-amber-600">
-          Partial / On Hold
-        </span>
-      );
-    }
+ const ProgressTracker = ({ progress, orderType }) => {
+  const steps =
+    orderType === "FULL" ? FULL_ORDER_STEPS : SPARE_ORDER_STEPS;
 
-    const currentIndex = ORDER_STEPS.findIndex((s) => s.key === progress);
-    const safeIndex =
-      currentIndex === -1 ? ORDER_STEPS.length - 1 : currentIndex;
-
-    const isCompleted = progress === "DISPATCHED";
-
+  if (progress === "PARTIAL") {
     return (
-      <span
-        className={`text-sm font-medium ${
-          isCompleted ? "text-green-600" : "text-amber-600"
-        }`}
-      >
-        {ORDER_STEPS[safeIndex]?.label}
+      <span className="px-3 py-1 rounded-full text-xs font-medium bg-amber-50 text-amber-700 border border-amber-200">
+        Partial / On Hold
       </span>
     );
-  };
+  }
+
+  const currentIndex = steps.findIndex((s) => s.key === progress);
+  const safeIndex =
+    currentIndex === -1 ? steps.length - 1 : currentIndex;
+
+  const isCompleted = progress === "DISPATCHED";
+
+  return (
+    <span
+      className={`px-3 py-1 rounded-full text-xs font-medium border ${
+        isCompleted
+          ? "bg-green-50 text-green-700 border-green-200"
+          : "bg-blue-50 text-blue-700 border-blue-200"
+      }`}
+    >
+      {steps[safeIndex]?.label}
+    </span>
+  );
+};
 
   const handleRowClick = (orderId) => {
     setExpandedOrderId((prev) => (prev === orderId ? null : orderId));
@@ -592,6 +616,27 @@ useEffect(() => {
                 className="w-full p-3 bg-white rounded-xl border border-gray-300 focus:border-[#c62d23] focus:ring-2 focus:ring-[#c62d23]/20 outline-none transition-all"
               />
             </div>
+<div className="flex items-center gap-3 mb-6">
+  {["ALL", "FULL", "SPARE"].map((type) => (
+    <button
+      key={type}
+      onClick={() => setOrderTypeFilter(type)}
+      className={`px-4 py-2 rounded-xl text-sm font-medium transition-all
+        ${
+          orderTypeFilter === type
+            ? "bg-[#c62d23] text-white shadow"
+            : "bg-white border border-gray-300 text-gray-700 hover:bg-gray-100"
+        }
+      `}
+    >
+      {type === "ALL"
+        ? "All Orders"
+        : type === "FULL"
+        ? "Full Chairs"
+        : "Spare Parts"}
+    </button>
+  ))}
+</div>
 
             {/* TABLE */}
             <div className="overflow-auto rounded-lg border border-gray-200">
@@ -660,135 +705,123 @@ useEffect(() => {
                           <td className="p-4 font-semibold text-gray-900">
                             {o.quantity}
                           </td>
-                          <td className="p-4">
-                            <ProgressTracker progress={o.progress} />
-                          </td>
-                          <td className="p-4 flex gap-2">
-                            {/* EDIT BUTTON - Always visible but disabled when locked */}
-                            <button
-                              onClick={(e) => {
-                                if (isOrderLocked(o.progress)) return;
-                                e.stopPropagation();
-                                handleEditOrder(o);
-                              }}
-                              className={`p-2 rounded-lg transition-colors ${
-                                isOrderLocked(o.progress)
-                                  ? "cursor-not-allowed opacity-50"
-                                  : "hover:bg-gray-100"
-                              }`}
-                              title={
-                                isOrderLocked(o.progress)
-                                  ? "Cannot edit in current status"
-                                  : "Edit"
-                              }
-                              disabled={isOrderLocked(o.progress)}
-                            >
-                              <Pencil
-                                size={16}
-                                className={
-                                  isOrderLocked(o.progress)
-                                    ? "text-gray-400"
-                                    : "text-gray-600 hover:text-[#c62d23]"
-                                }
-                              />
-                            </button>
+                          <td className="p-4"><ProgressTracker 
+  progress={o.progress} 
+  orderType={o.orderType}
+/>
 
-                            {/* DELETE BUTTON */}
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleDeleteOrder(o._id);
-                              }}
-                              className="p-2 rounded-lg hover:bg-gray-100 transition-colors"
-                              title="Delete"
-                            >
-                              <Trash2
-                                size={16}
-                                className="text-gray-600 hover:text-red-600"
-                              />
-                            </button>
                           </td>
+                         <td
+  className="p-4 flex gap-2"
+  onClick={(e) => e.stopPropagation()}
+>
+  <button
+    onClick={() => handleEditOrder(o)}
+    className="p-2 rounded-lg hover:bg-gray-100 transition-colors"
+    title="Edit"
+  >
+    <Pencil size={16} className="text-gray-600 hover:text-[#c62d23]" />
+  </button>
+
+  <button
+    onClick={() => handleDeleteOrder(o._id)}
+    className="p-2 rounded-lg hover:bg-gray-100 transition-colors"
+    title="Delete"
+  >
+    <Trash2 size={16} className="text-gray-600 hover:text-red-600" />
+  </button>
+</td>
+
                         </tr>
 
                         {/* EXPANDED PROGRESS ROW */}
                         {expandedOrderId === o._id &&
-                          o.progress !== "PARTIAL" && (
-                            <tr className="bg-gray-50">
-                              <td colSpan={8} className="p-6">
-                                <div className="w-full space-y-6">
-                                  <p className="text-sm text-gray-700 font-medium">
-                                    Order Progress
-                                  </p>
+  o.progress !== "PARTIAL" && (
+    <tr className="bg-gray-50">
+      <td colSpan={8} className="p-6">
+        {(() => {
+          const steps =
+            o.orderType === "FULL"
+              ? FULL_ORDER_STEPS
+              : SPARE_ORDER_STEPS;
 
-                                  <div className="flex justify-between text-xs text-gray-500">
-                                    {ORDER_STEPS.map((step, index) => (
-                                      <span
-                                        key={step.key}
-                                        className={
-                                          index <=
-                                          ORDER_STEPS.findIndex(
-                                            (s) => s.key === o.progress,
-                                          )
-                                            ? "text-gray-900 font-medium"
-                                            : ""
-                                        }
-                                      >
-                                        {step.label}
-                                      </span>
-                                    ))}
-                                  </div>
+          const currentIndex = steps.findIndex(
+            (s) => s.key === o.progress
+          );
 
-                                  {/* PROGRESS TRACKER */}
-                                  <div className="relative w-full h-10 flex items-center mt-6">
-                                    {/* BASE LINE */}
-                                    <div className="absolute left-0 right-0 h-[4px] bg-gray-300 rounded-full" />
+          const safeIndex =
+            currentIndex === -1
+              ? steps.length - 1
+              : currentIndex;
 
-                                    {/* PROGRESS LINE */}
-                                    <div
-                                      className="absolute left-0 h-[4px] rounded-full transition-all duration-500"
-                                      style={{
-                                        width: `${((ORDER_STEPS.findIndex((s) => s.key === o.progress) + 1) / ORDER_STEPS.length) * 100}%`,
-                                        background:
-                                          o.progress === "DISPATCHED"
-                                            ? "#16a34a"
-                                            : "linear-gradient(90deg,#16a34a,#c62d23)",
-                                      }}
-                                    />
+          const percent =
+            ((safeIndex + 1) / steps.length) * 100;
 
-                                    {/* MOVING NUMBER */}
-                                    <div
-                                      className="absolute w-7 h-7 rounded-full border-2 border-white shadow
-                                        flex items-center justify-center text-xs font-bold text-white"
-                                      style={{
-                                        left: `calc(${((ORDER_STEPS.findIndex((s) => s.key === o.progress) + 1) / ORDER_STEPS.length) * 100}% - 14px)`,
-                                        backgroundColor:
-                                          o.progress === "DISPATCHED"
-                                            ? "#16a34a"
-                                            : "#c62d23",
-                                      }}
-                                    >
-                                      {ORDER_STEPS.findIndex(
-                                        (s) => s.key === o.progress,
-                                      ) + 1}
-                                    </div>
-                                  </div>
+          return (
+            <div className="w-full space-y-6">
+              <p className="text-sm text-gray-700 font-medium">
+                Order Progress
+              </p>
 
-                                  <p className="text-sm text-gray-700">
-                                    <span className="font-medium">
-                                      Current Stage:
-                                    </span>{" "}
-                                    <span className="text-[#c62d23] font-semibold">
-                                      {
-                                        ORDER_STEPS.find(
-                                          (s) => s.key === o.progress,
-                                        )?.label
-                                      }
-                                    </span>
-                                  </p>
-                                </div>
-                              </td>
-                            </tr>
-                          )}
+              <div className="flex justify-between text-xs text-gray-500">
+                {steps.map((step, index) => (
+                  <span
+                    key={step.key}
+                    className={
+                      index <= safeIndex
+                        ? "text-gray-900 font-medium"
+                        : ""
+                    }
+                  >
+                    {step.label}
+                  </span>
+                ))}
+              </div>
+
+              <div className="relative w-full h-10 flex items-center mt-6">
+                <div className="absolute left-0 right-0 h-[4px] bg-gray-300 rounded-full" />
+
+                <div
+                  className="absolute left-0 h-[4px] rounded-full transition-all duration-500"
+                  style={{
+                    width: `${percent}%`,
+                    background:
+                      percent === 100
+                        ? "#16a34a"
+                        : "linear-gradient(90deg,#16a34a,#c62d23)",
+                  }}
+                />
+
+                <div
+                  className="absolute w-7 h-7 rounded-full border-2 border-white shadow
+                  flex items-center justify-center text-xs font-bold text-white"
+                  style={{
+                    left: `calc(${percent}% - 14px)`,
+                    backgroundColor:
+                      percent === 100
+                        ? "#16a34a"
+                        : "#c62d23",
+                  }}
+                >
+                  {safeIndex + 1}
+                </div>
+              </div>
+
+              <p className="text-sm text-gray-700">
+                <span className="font-medium">
+                  Current Stage:
+                </span>{" "}
+                <span className="text-[#c62d23] font-semibold">
+                  {steps[safeIndex]?.label}
+                </span>
+              </p>
+            </div>
+          );
+        })()}
+      </td>
+    </tr>
+)}
+
                       </React.Fragment>
                     ))}
                   </tbody>
