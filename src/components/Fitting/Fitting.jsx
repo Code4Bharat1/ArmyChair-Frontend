@@ -28,12 +28,13 @@ export default function Fitting() {
     try {
       const res = await axios.get(`${API}/orders`, { headers });
       const fittingOrders = (res.data.orders || res.data).filter((o) =>
-        [
-          "WAREHOUSE_COLLECTED",
-          "FITTING_IN_PROGRESS",
-          "FITTING_COMPLETED",
-        ].includes(o.progress),
-      );
+  [
+    "PRODUCTION_COMPLETED",
+    "FITTING_IN_PROGRESS",
+    "FITTING_COMPLETED",
+  ].includes(o.progress),
+);
+
       setOrders(fittingOrders);
     } catch (err) {
       console.error(err);
@@ -85,7 +86,8 @@ export default function Fitting() {
 
   /* ================= BADGES ================= */
   const getWarehouseBadge = (progress) => {
-    if (progress === "WAREHOUSE_COLLECTED") {
+    if (progress === "PRODUCTION_COMPLETED")
+ {
       return (
         <span className="px-2 py-1 bg-emerald-50 text-emerald-700 rounded-full text-xs font-medium">
           Collected
@@ -240,19 +242,16 @@ export default function Fitting() {
                           </td>
                           <td className="p-4">{getFittingBadge(o.progress)}</td>
                           <td className="p-4">
-                            {o.progress === "WAREHOUSE_COLLECTED" && (
-                              <button
-                                onClick={() =>
-                                  updateProgress(o._id, "FITTING_IN_PROGRESS")
-                                }
-                                disabled={processingId === o._id}
-                                className="bg-[#c62d23] hover:bg-[#a82419] text-white px-4 py-2 rounded-lg font-medium transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
-                              >
-                                {processingId === o._id
-                                  ? "Processing..."
-                                  : "Start Fitting"}
-                              </button>
-                            )}
+                            {o.progress === "PRODUCTION_COMPLETED" && (
+  <button
+    onClick={() => updateProgress(o._id, "FITTING_IN_PROGRESS")}
+    disabled={processingId === o._id}
+    className="bg-[#c62d23] hover:bg-[#a82419] text-white px-4 py-2 rounded-lg font-medium transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+  >
+    {processingId === o._id ? "Processing..." : "Start Fitting"}
+  </button>
+)}
+
                             {o.progress === "FITTING_IN_PROGRESS" && (
                               <button
                                 onClick={() =>

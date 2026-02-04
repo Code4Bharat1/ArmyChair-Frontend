@@ -73,34 +73,18 @@ export default function WarehouseOrders() {
     try {
       const res = await axios.get(`${API}/orders`, { headers });
 
-     const warehouseOrders = (res.data.orders || res.data).filter((o) => {
-  // FULL chair orders should include PRODUCTION_COMPLETED
-  if (o.orderType === "FULL") {
-    return [
-      "PRODUCTION_COMPLETED",   // 👈 ADD THIS
-      "WAREHOUSE_COLLECTED",
-      "FITTING_IN_PROGRESS",
-      "FITTING_COMPLETED",
-      "READY_FOR_DISPATCH",
-      "DISPATCHED",
-      "PARTIAL",
-      "COMPLETED",
-    ].includes(o.progress);
-  }
-
-  // Spare orders keep existing logic
-  return [
-    "ORDER_PLACED",
-    "WAREHOUSE_COLLECTED",
-    "FITTING_IN_PROGRESS",
-    "FITTING_COMPLETED",
-    "READY_FOR_DISPATCH",
-    "DISPATCHED",
-    "PARTIAL",
-    "COMPLETED",
-  ].includes(o.progress);
-});
-
+      const warehouseOrders = (res.data.orders || res.data).filter((o) =>
+        [
+          "ORDER_PLACED",
+          "WAREHOUSE_COLLECTED",
+          "FITTING_IN_PROGRESS",
+          "FITTING_COMPLETED",
+          "READY_FOR_DISPATCH",
+          "DISPATCHED",
+          "PARTIAL",
+          "COMPLETED",
+        ].includes(o.progress),
+      );
 
       setOrders(warehouseOrders);
     } catch (err) {
@@ -232,6 +216,18 @@ export default function WarehouseOrders() {
   const filteredOrders = useMemo(() => {
     let data = [...orders];
 
+    if (activeFilter === "ALL") {
+  data = data.filter(
+    (o) => !["DISPATCHED", "COMPLETED"].includes(o.progress)
+  );
+}
+console.log(
+  orders.reduce((acc, o) => {
+    acc[o.progress] = (acc[o.progress] || 0) + 1;
+    return acc;
+  }, {})
+);
+
     if (activeFilter === "DELAYED") {
       data = data.filter((o) => isDelayed(o));
     }
@@ -239,6 +235,13 @@ export default function WarehouseOrders() {
     if (activeFilter === "READY") {
       data = data.filter((o) => o.progress === "READY_FOR_DISPATCH");
     }
+    if (activeFilter === "COMPLETED") {
+  data = data.filter((o) =>
+    ["DISPATCHED", "COMPLETED"].includes(o.progress)
+  );
+}
+
+
 
     const q = (search || "").toLowerCase();
     if (q) {
@@ -252,8 +255,17 @@ export default function WarehouseOrders() {
 
     return data;
   }, [orders, search, activeFilter]);
+const fullChairOrders = filteredOrders.filter(
+  (o) =>
+    o.orderType === "FULL" &&
+    [
+      "FITTING_COMPLETED",
+      "READY_FOR_DISPATCH",
+      "DISPATCHED",
+      "COMPLETED",
+    ].includes(o.progress)
+);
 
-  const fullChairOrders = filteredOrders.filter((o) => o.orderType === "FULL");
 
   const sparePartOrders = filteredOrders.filter((o) => o.orderType === "SPARE");
 
@@ -267,13 +279,19 @@ export default function WarehouseOrders() {
   );
 
   /* ================= STATS ================= */
-  const totalOrders = orders.length;
+  const totalOrders =
+  fullChairOrders.length + sparePartOrders.length;
 
   const delayedOrders = orders.filter((o) => isDelayed(o)).length;
 
   const readyForDispatch = orders.filter(
     (o) => o.progress === "READY_FOR_DISPATCH",
   ).length;
+  
+  const completedOrders = orders.filter(
+  (o) => ["DISPATCHED", "COMPLETED"].includes(o.progress)
+).length;
+
 
   /* ================= STATUS BADGE ================= */
   const getStatusBadge = (progress) => {
@@ -471,36 +489,6 @@ Please reduce picks to exactly ${order.quantity}.`,
   const renderAction = (o) => {
     const isLoading = processingId === o._id;
 
-    if (o.progress === "PRODUCTION_COMPLETED" && o.orderType === "FULL") {
-  return (
-    <div className="flex gap-2">
-      <button
-        disabled={processingId === o._id}
-        onClick={async () => {
-          if (!window.confirm("Confirm warehouse collected this order?")) return;
-
-          try {
-            setProcessingId(o._id);
-            await axios.patch(
-              `${API}/orders/${o._id}/progress`,
-              { progress: "WAREHOUSE_COLLECTED" },
-              { headers }
-            );
-            fetchOrders();
-          } catch (err) {
-            alert("Failed to collect order");
-          } finally {
-            setProcessingId(null);
-          }
-        }}
-        className="bg-blue-600 hover:bg-blue-700 text-white px-3 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-medium transition-all shadow-sm hover:shadow-md disabled:opacity-50"
-      >
-        {processingId === o._id ? "Processing..." : "Collect from Production"}
-      </button>
-    </div>
-  );
-}
-
     if (o.progress === "ORDER_PLACED") {
       return (
         <div className="flex gap-2">
@@ -666,7 +654,7 @@ Please reduce picks to exactly ${order.quantity}.`,
         </div>
 
         <div className="p-3 sm:p-4 md:p-6 lg:p-8 space-y-4 sm:space-y-6 md:space-y-8">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 md:gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 md:gap-6">
             <StatCard
               title="Total Orders"
               value={totalOrders}
@@ -694,6 +682,15 @@ Please reduce picks to exactly ${order.quantity}.`,
               active={activeFilter === "READY"}
               onClick={() => setActiveFilter("READY")}
             />
+            <StatCard
+  title="Completed Orders"
+  value={completedOrders}
+  icon={<CheckCircle className="text-[#c62d23]" />}
+  clickable={true}
+  active={activeFilter === "COMPLETED"}
+  onClick={() => setActiveFilter("COMPLETED")}
+/>
+
           </div>
 
           {/* FILTER BADGE */}

@@ -186,58 +186,58 @@ export default function SparePartsInventory() {
     role ? role.charAt(0).toUpperCase() + role.slice(1) : "—";
 
   /* ================= GROUP DATA BY PART NAME ================= */
-  const groupedParts = useMemo(() => {
-    const grouped = new Map();
+ const groupedParts = useMemo(() => {
+  const grouped = new Map();
 
-    items.forEach((item) => {
-      const partName = item.partName;
+  items.forEach((item) => {
+    const normalizedKey = item.partName.trim().toLowerCase();
 
-      if (!grouped.has(partName)) {
-        grouped.set(partName, {
-          partName,
-          locations: [],
-          totalQuantity: 0,
-          totalMaxQuantity: 0,
-          worstStatus: "Healthy",
-          locationCount: 0,
-        });
-      }
-
-      const group = grouped.get(partName);
-
-      // Add location entry
-      group.locations.push({
-        id: item._id,
-        location: item.location,
-        quantity: item.quantity,
-        maxQuantity: item.maxQuantity,
-        status: item.status,
-        source: `${formatRole(item.createdByRole)} - ${item.createdBy?.name || "—"}`,
+    if (!grouped.has(normalizedKey)) {
+      grouped.set(normalizedKey, {
+        partName: item.partName, // keep original casing for display
+        locations: [],
+        totalQuantity: 0,
+        totalMaxQuantity: 0,
+        worstStatus: "Healthy",
+        locationCount: 0,
       });
+    }
 
-      // Update aggregates
-      group.totalQuantity += item.quantity;
-      group.totalMaxQuantity += item.maxQuantity || 0;
-      group.locationCount = group.locations.length;
+    const group = grouped.get(normalizedKey);
 
-      // Determine worst status (Critical > Low Stock > Overstocked > Healthy)
-      const statusPriority = {
-        Critical: 4,
-        "Low Stock": 3,
-        Overstocked: 2,
-        Healthy: 1,
-      };
-
-      if (
-        statusPriority[item.status] >
-        statusPriority[group.worstStatus]
-      ) {
-        group.worstStatus = item.status;
-      }
+    group.locations.push({
+      id: item._id,
+      location: item.location,
+      quantity: item.quantity,
+      maxQuantity: item.maxQuantity,
+      status: item.status,
+      source: `${formatRole(item.createdByRole)} - ${
+        item.createdBy?.name || "—"
+      }`,
     });
 
-    return Array.from(grouped.values());
-  }, [items]);
+    group.totalQuantity += item.quantity;
+    group.totalMaxQuantity += item.maxQuantity || 0;
+    group.locationCount = group.locations.length;
+
+    const statusPriority = {
+      Critical: 4,
+      "Low Stock": 3,
+      Overstocked: 2,
+      Healthy: 1,
+    };
+
+    if (
+      statusPriority[item.status] >
+      statusPriority[group.worstStatus]
+    ) {
+      group.worstStatus = item.status;
+    }
+  });
+
+  return Array.from(grouped.values());
+}, [items]);
+
 
   /* ================= FILTERED DATA ================= */
   const filteredGroupedParts = useMemo(() => {
