@@ -1,5 +1,6 @@
 "use client";
 import React, { useEffect, useMemo, useState } from "react";
+import AmendOrderModal from "@/components/AmendOrder/AmendOrder.jsx";
 import {
   PackageCheck,
   CheckCircle,
@@ -29,6 +30,8 @@ import { useRouter } from "next/navigation";
 
 export default function WarehouseOrders() {
   const router = useRouter();
+
+  const [amendOrder, setAmendOrder] = useState(null);
 
   const [activeTab, setActiveTab] = useState("FULL");
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -245,7 +248,7 @@ export default function WarehouseOrders() {
       data = data.filter(
         (o) =>
           o.orderId?.toLowerCase().includes(q) ||
-          o.dispatchedTo?.toLowerCase().includes(q) ||
+          o.dispatchedTo?.name?.toLowerCase().includes(q) ||
           o.chairModel?.toLowerCase().includes(q),
       );
     }
@@ -559,19 +562,26 @@ Please reduce picks to exactly ${order.quantity}.`,
     }
 
     if (o.progress === "READY_FOR_DISPATCH") {
-      return (
-        <div className="flex gap-2">
-          <button
-            disabled={processingId === o._id}
-            onClick={() => handleDispatch(o._id)}
-            className="bg-green-600 hover:bg-green-700 text-white px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm font-medium transition-all shadow-sm hover:shadow-md disabled:opacity-50"
-          >
-            {processingId === o._id ? "Dispatching..." : <span className="hidden sm:inline">Dispatch Order</span>}
-            {processingId === o._id ? "" : <span className="sm:hidden">Dispatch</span>}
-          </button>
-        </div>
-      );
-    }
+  return (
+    <div className="flex gap-2">
+      <button
+        onClick={() => setAmendOrder(o)}
+        className="bg-amber-600 hover:bg-amber-700 text-white px-3 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-medium"
+      >
+        Amend Order
+      </button>
+
+      <button
+        disabled={processingId === o._id}
+        onClick={() => handleDispatch(o._id)}
+        className="bg-green-600 hover:bg-green-700 text-white px-3 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-medium disabled:opacity-50"
+      >
+        {processingId === o._id ? "Dispatching..." : "Dispatch"}
+      </button>
+    </div>
+  );
+}
+
 
     if (o.progress === "DISPATCHED" || o.progress === "COMPLETED") {
       return (
@@ -821,6 +831,14 @@ Please reduce picks to exactly ${order.quantity}.`,
           )}
         </div>
       </div>
+      {amendOrder && (
+  <AmendOrderModal
+    order={amendOrder}
+    onClose={() => setAmendOrder(null)}
+    onSuccess={fetchOrders}
+  />
+)}
+
     </div>
   );
 }
