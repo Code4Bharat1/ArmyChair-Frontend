@@ -1,7 +1,7 @@
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { Toaster } from "react-hot-toast";
-import WhatsAppFloat from "@/components/WhatsApp/Whatsapp.jsx";
+import WhatsAppFloat from "../components/Whatsapp/Whatsapp.jsx";
 import NotificationBell from "@/components/notifications/NotificationBell";
 
 /* Existing fonts (KEEP) */
