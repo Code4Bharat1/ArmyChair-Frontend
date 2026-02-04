@@ -1,8 +1,10 @@
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { Toaster } from "react-hot-toast";
+import WhatsAppFloat from "@/components/WhatsApp/Whatsapp.jsx";
 import NotificationBell from "@/components/notifications/NotificationBell";
 
+/* Existing fonts (KEEP) */
 const geistSans = Geist({
   variable: "--font-geist-sans",
   subsets: ["latin"],
@@ -22,13 +24,17 @@ export default function RootLayout({ children }) {
   return (
     <html lang="en">
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased bg-gray-50`}
+        className={`
+          ${geistSans.variable}
+          ${geistMono.variable}
+          font-sans
+          antialiased
+          bg-gray-50
+        `}
       >
         <Toaster position="top-right" toastOptions={{ duration: 4000 }} />
-
         {children}
-
-       
+        <WhatsAppFloat />
       </body>
     </html>
   );
