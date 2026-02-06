@@ -1,6 +1,6 @@
 "use client";
 import React, { useEffect, useMemo, useState } from "react";
-import { Search, Download, Plus, X, TrendingUp } from "lucide-react";
+import { Search, Download, Plus, X, TrendingUp, Menu } from "lucide-react";
 import Sidebar from "@/components/Superadmin/sidebar";
 import axios from "axios";
 
@@ -21,6 +21,7 @@ const Return = () => {
   const [returns, setReturns] = useState([]);
   const [loading, setLoading] = useState(false);
   const [openModal, setOpenModal] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [form, setForm] = useState({
     orderId: "",
     chairType: "",
@@ -217,50 +218,86 @@ const Return = () => {
 
   return (
     <div className="flex h-screen bg-gray-50 text-gray-900">
-      <Sidebar />
+      {/* Mobile Sidebar Overlay */}
+      {sidebarOpen && (
+        <div
+          className="fixed inset-0 bg-black/50 z-40 lg:hidden"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
+
+      {/* Sidebar */}
+      <div
+        className={`fixed lg:static inset-y-0 left-0 z-50 transform transition-transform duration-300 lg:transform-none ${
+          sidebarOpen ? "translate-x-0" : "-translate-x-full"
+        } lg:translate-x-0`}
+      >
+        <Sidebar />
+      </div>
 
       <div className="flex-1 overflow-auto">
-        {/* ================= HEADER ================= */}
-        <div className="sticky top-0 z-10 bg-white/80 backdrop-blur border-b border-gray-200 p-6 shadow-sm flex justify-between items-center">
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-2">
-              <span>Returns Management</span>
-            </h1>
-            <p className="text-gray-600 mt-2">
-              Track returned orders and route functional items to inventory and
-              non-functional items to defects.
-            </p>
-          </div>
+        {/* Mobile Header Bar */}
+        <div className="lg:hidden sticky top-0 z-30 bg-white border-b border-gray-200 px-4 py-3 flex items-center justify-between shadow-sm">
+          <button
+            onClick={() => setSidebarOpen(true)}
+            className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+          >
+            <Menu size={24} className="text-gray-700" />
+          </button>
+          <h1 className="text-lg font-bold text-gray-900 truncate">
+            Returns
+          </h1>
+          <button
+            onClick={() => setOpenModal(true)}
+            className="bg-[#c62d23] text-white p-2 rounded-lg transition-colors"
+          >
+            <Plus size={20} />
+          </button>
+        </div>
 
-          <div className="flex items-center gap-3">
-            <button
-              onClick={() => setOpenModal(true)}
-              className="bg-[#c62d23] text-white px-5 py-3 rounded-xl border-2 border-gray-200 shadow-sm hover:bg-[#a8241c] hover:shadow-md transition-all duration-200 cursor-pointer group flex items-center gap-2 font-medium"
-            >
-              <Plus
-                size={18}
-                className=" group-hover:scale-110 transition-transform"
-              />
-              Add Returns
-            </button>
+        {/* Desktop HEADER */}
+        <div className="hidden lg:block sticky top-0 z-10 bg-white/80 backdrop-blur border-b border-gray-200 p-6 shadow-sm">
+          <div className="flex justify-between items-center">
+            <div>
+              <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-2">
+                <span>Returns Management</span>
+              </h1>
+              <p className="text-gray-600 mt-2">
+                Track returned orders and route functional items to inventory and
+                non-functional items to defects.
+              </p>
+            </div>
 
-            <button
-              onClick={exportCSV}
-              className="bg-white px-5 py-3 rounded-xl border-2 border-gray-200 shadow-sm hover:border-[#c62d23] hover:shadow-md transition-all duration-200 cursor-pointer group flex items-center gap-2 font-medium"
-            >
-              <Download
-                size={18}
-                className="text-[#c62d23] group-hover:scale-110 transition-transform"
-              />
-              Export Report
-            </button>
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => setOpenModal(true)}
+                className="bg-[#c62d23] text-white px-5 py-3 rounded-xl border-2 border-gray-200 shadow-sm hover:bg-[#a8241c] hover:shadow-md transition-all duration-200 cursor-pointer group flex items-center gap-2 font-medium"
+              >
+                <Plus
+                  size={18}
+                  className="group-hover:scale-110 transition-transform"
+                />
+                Add Returns
+              </button>
+
+              <button
+                onClick={exportCSV}
+                className="bg-white px-5 py-3 rounded-xl border-2 border-gray-200 shadow-sm hover:border-[#c62d23] hover:shadow-md transition-all duration-200 cursor-pointer group flex items-center gap-2 font-medium"
+              >
+                <Download
+                  size={18}
+                  className="text-[#c62d23] group-hover:scale-110 transition-transform"
+                />
+                <span className="hidden xl:inline">Export Report</span>
+              </button>
+            </div>
           </div>
         </div>
 
         {/* ================= CONTENT ================= */}
-        <div className="p-8 space-y-8">
+        <div className="p-4 sm:p-6 lg:p-8 space-y-6 lg:space-y-8">
           {/* ================= STATS CARDS ================= */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4 lg:gap-6">
             <StatCard
               title="Total Returns"
               value={stats.totalReturns}
@@ -298,20 +335,20 @@ const Return = () => {
               active={selectedStatus === "Pending"}
             />
             {stats.mostReturnedProduct && (
-              <div className="bg-white border-2 border-gray-200 rounded-2xl p-6 shadow-sm hover:shadow-md transition-all">
+              <div className="bg-white border-2 border-gray-200 rounded-xl sm:rounded-2xl p-3 sm:p-4 lg:p-6 shadow-sm hover:shadow-md transition-all col-span-2 sm:col-span-1">
                 <div className="flex items-center gap-2 mb-2">
-                  <TrendingUp size={16} className="text-[#c62d23]" />
-                  <p className="text-sm text-gray-600 font-medium">
+                  <TrendingUp size={14} className="text-[#c62d23] sm:w-4 sm:h-4" />
+                  <p className="text-xs sm:text-sm text-gray-600 font-medium">
                     Most Returned
                   </p>
                 </div>
                 <p
-                  className="text-2xl font-bold text-gray-900 mb-1 truncate"
+                  className="text-lg sm:text-xl lg:text-2xl font-bold text-gray-900 mb-1 truncate"
                   title={stats.mostReturnedProduct.name}
                 >
                   {stats.mostReturnedProduct.name}
                 </p>
-                <p className="text-sm text-[#c62d23] font-semibold">
+                <p className="text-xs sm:text-sm text-[#c62d23] font-semibold">
                   {stats.mostReturnedProduct.count} return
                   {stats.mostReturnedProduct.count !== 1 ? "s" : ""}
                 </p>
@@ -320,28 +357,28 @@ const Return = () => {
           </div>
 
           {/* ================= FILTERS ================= */}
-          <div className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm hover:shadow-md transition-shadow">
-            <div className="flex flex-wrap items-end gap-6 mb-6">
-              <div className="flex-1 min-w-[280px]">
+          <div className="bg-white border border-gray-200 rounded-xl sm:rounded-2xl p-4 sm:p-6 shadow-sm hover:shadow-md transition-shadow">
+            <div className="flex flex-col sm:flex-row sm:flex-wrap items-stretch sm:items-end gap-3 sm:gap-4 lg:gap-6 mb-4 sm:mb-6">
+              <div className="flex-1 min-w-full sm:min-w-[280px]">
                 <div className="relative">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
                   <input
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
-                    placeholder="Search return by ID or product..."
-                    className="w-full p-3 pl-10 bg-white rounded-xl border-2 border-gray-200 focus:border-[#c62d23] focus:ring-2 focus:ring-[#c62d23]/20 outline-none transition-all"
+                    placeholder="Search returns..."
+                    className="w-full p-2.5 sm:p-3 pl-10 bg-white rounded-lg sm:rounded-xl border-2 border-gray-200 focus:border-[#c62d23] focus:ring-2 focus:ring-[#c62d23]/20 outline-none transition-all text-sm sm:text-base"
                   />
                 </div>
               </div>
 
-              <div className="flex flex-col min-w-[200px]">
-                <label className="mb-2 text-sm font-medium text-gray-700">
+              <div className="flex flex-col min-w-full sm:min-w-[150px] lg:min-w-[200px]">
+                <label className="mb-2 text-xs sm:text-sm font-medium text-gray-700">
                   Type
                 </label>
                 <select
                   value={selectedType}
                   onChange={(e) => setSelectedType(e.target.value)}
-                  className="p-3 bg-white rounded-xl border-2 border-gray-200 focus:border-[#c62d23] focus:ring-2 focus:ring-[#c62d23]/20 outline-none transition-all"
+                  className="p-2.5 sm:p-3 bg-white rounded-lg sm:rounded-xl border-2 border-gray-200 focus:border-[#c62d23] focus:ring-2 focus:ring-[#c62d23]/20 outline-none transition-all text-sm sm:text-base"
                 >
                   <option value="All">All</option>
                   <option value="Functional">Functional</option>
@@ -349,14 +386,14 @@ const Return = () => {
                 </select>
               </div>
 
-              <div className="flex flex-col min-w-[200px]">
-                <label className="mb-2 text-sm font-medium text-gray-700">
+              <div className="flex flex-col min-w-full sm:min-w-[150px] lg:min-w-[200px]">
+                <label className="mb-2 text-xs sm:text-sm font-medium text-gray-700">
                   Status
                 </label>
                 <select
                   value={selectedStatus}
                   onChange={(e) => setSelectedStatus(e.target.value)}
-                  className="p-3 bg-white rounded-xl border-2 border-gray-200 focus:border-[#c62d23] focus:ring-2 focus:ring-[#c62d23]/20 outline-none transition-all"
+                  className="p-2.5 sm:p-3 bg-white rounded-lg sm:rounded-xl border-2 border-gray-200 focus:border-[#c62d23] focus:ring-2 focus:ring-[#c62d23]/20 outline-none transition-all text-sm sm:text-base"
                 >
                   <option value="All">All</option>
                   <option value="Pending">Pending</option>
@@ -365,8 +402,8 @@ const Return = () => {
               </div>
             </div>
 
-            {/* ================= TABLE ================= */}
-            <div className="overflow-auto rounded-lg border border-gray-200">
+            {/* Desktop TABLE */}
+            <div className="hidden lg:block overflow-auto rounded-lg border border-gray-200">
               {loading ? (
                 <div className="p-8 text-center text-gray-500">Loading...</div>
               ) : filteredReturns.length === 0 ? (
@@ -466,6 +503,98 @@ const Return = () => {
                 </table>
               )}
             </div>
+
+            {/* Mobile CARD VIEW */}
+            <div className="lg:hidden space-y-3">
+              {loading ? (
+                <div className="p-8 text-center text-gray-500">Loading...</div>
+              ) : filteredReturns.length === 0 ? (
+                <div className="p-8 text-center text-gray-500">
+                  No returns found
+                </div>
+              ) : (
+                filteredReturns.map((r) => (
+                  <div
+                    key={r._id}
+                    className="border border-gray-200 rounded-lg p-3 sm:p-4 bg-white hover:border-[#c62d23] transition-colors"
+                  >
+                    <div className="flex justify-between items-start mb-3">
+                      <div className="flex-1">
+                        <p className="font-semibold text-gray-900 text-sm sm:text-base">
+                          {r.orderId}
+                        </p>
+                        <p className="text-xs sm:text-sm text-gray-600 mt-1">
+                          {r.returnedFrom}
+                        </p>
+                      </div>
+                      <div className="flex gap-2">
+                        <span
+                          className={`px-2.5 py-1 rounded-full text-xs font-medium ${
+                            r.category === "Functional"
+                              ? "bg-green-100 text-green-800"
+                              : "bg-red-100 text-red-800"
+                          }`}
+                        >
+                          {r.category}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="space-y-2 text-xs sm:text-sm">
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">Product:</span>
+                        <span className="font-medium text-gray-900">{r.chairType}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">Quantity:</span>
+                        <span className="font-semibold text-[#c62d23]">{r.quantity}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">Delivery Date:</span>
+                        <span className="text-gray-900">
+                          {new Date(r.deliveryDate).toLocaleDateString()}
+                        </span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">Return Date:</span>
+                        <span className="text-gray-900">
+                          {new Date(r.returnDate).toLocaleDateString()}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="mt-3 pt-3 border-t border-gray-200 flex justify-between items-center">
+                      <span
+                        className={`px-2.5 py-1 rounded-full text-xs font-medium ${
+                          r.status === "Pending"
+                            ? "bg-amber-100 text-amber-800"
+                            : r.status === "In-Fitting"
+                              ? "bg-blue-100 text-blue-800"
+                              : "bg-gray-100 text-gray-800"
+                        }`}
+                      >
+                        {r.status}
+                      </span>
+
+                      {r.status === "Pending" && (
+                        <button
+                          onClick={() => moveToFitting(r._id)}
+                          className="text-xs sm:text-sm text-blue-600 hover:text-blue-800 font-medium hover:underline cursor-pointer"
+                        >
+                          Move to Fitting
+                        </button>
+                      )}
+
+                      {r.status === "In-Fitting" && (
+                        <span className="text-xs sm:text-sm text-amber-600 font-medium">
+                          In Fitting
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
           </div>
         </div>
       </div>
@@ -473,10 +602,10 @@ const Return = () => {
       {/* ================= MODAL ================= */}
       {openModal && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl w-full max-w-md border border-gray-200 shadow-lg">
-            <div className="p-6 border-b border-gray-200">
+          <div className="bg-white rounded-2xl w-full max-w-md border border-gray-200 shadow-lg max-h-[85vh] flex flex-col">
+            <div className="p-4 sm:p-6 border-b border-gray-200">
               <div className="flex justify-between items-center">
-                <h2 className="text-xl font-bold text-gray-900">
+                <h2 className="text-lg sm:text-xl font-bold text-gray-900">
                   Add Return Order
                 </h2>
                 <button
@@ -488,9 +617,9 @@ const Return = () => {
               </div>
             </div>
 
-            <div className="space-y-4 p-6">
+            <div className="space-y-3 sm:space-y-4 p-4 sm:p-6 overflow-y-auto flex-1">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-2">
                   Order ID
                 </label>
                 <input
@@ -501,18 +630,18 @@ const Return = () => {
                     setForm({ ...form, orderId: value });
                     if (value.length >= 10) fetchOrderDetails(value);
                   }}
-                  className="w-full p-3 bg-white rounded-xl border-2 border-gray-200 focus:border-[#c62d23] focus:ring-2 focus:ring-[#c62d23]/20 outline-none transition-all"
+                  className="w-full p-2.5 sm:p-3 bg-white rounded-lg sm:rounded-xl border-2 border-gray-200 focus:border-[#c62d23] focus:ring-2 focus:ring-[#c62d23]/20 outline-none transition-all text-sm sm:text-base"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-2">
                   Return Reason
                 </label>
                 <select
                   value={form.reason}
                   onChange={(e) => setForm({ ...form, reason: e.target.value })}
-                  className="w-full p-3 bg-white rounded-xl border-2 border-gray-200 focus:border-[#c62d23] focus:ring-2 focus:ring-[#c62d23]/20 outline-none transition-all"
+                  className="w-full p-2.5 sm:p-3 bg-white rounded-lg sm:rounded-xl border-2 border-gray-200 focus:border-[#c62d23] focus:ring-2 focus:ring-[#c62d23]/20 outline-none transition-all text-sm sm:text-base"
                 >
                   <option value="">Select Return Reason</option>
                   <option>Damaged</option>
@@ -524,7 +653,7 @@ const Return = () => {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-2">
                   Return Date
                 </label>
                 <input
@@ -533,12 +662,12 @@ const Return = () => {
                   onChange={(e) =>
                     setForm({ ...form, returnDate: e.target.value })
                   }
-                  className="w-full p-3 bg-white rounded-xl border-2 border-gray-200 focus:border-[#c62d23] focus:ring-2 focus:ring-[#c62d23]/20 outline-none transition-all"
+                  className="w-full p-2.5 sm:p-3 bg-white rounded-lg sm:rounded-xl border-2 border-gray-200 focus:border-[#c62d23] focus:ring-2 focus:ring-[#c62d23]/20 outline-none transition-all text-sm sm:text-base"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-2">
                   Category
                 </label>
                 <select
@@ -546,27 +675,27 @@ const Return = () => {
                   onChange={(e) =>
                     setForm({ ...form, category: e.target.value })
                   }
-                  className="w-full p-3 bg-white rounded-xl border-2 border-gray-200 focus:border-[#c62d23] focus:ring-2 focus:ring-[#c62d23]/20 outline-none transition-all"
+                  className="w-full p-2.5 sm:p-3 bg-white rounded-lg sm:rounded-xl border-2 border-gray-200 focus:border-[#c62d23] focus:ring-2 focus:ring-[#c62d23]/20 outline-none transition-all text-sm sm:text-base"
                 >
                   <option>Functional</option>
                   <option>Non-Functional</option>
                 </select>
               </div>
+            </div>
 
-              <div className="flex justify-end gap-3 pt-6 border-t border-gray-200">
-                <button
-                  onClick={() => setOpenModal(false)}
-                  className="px-5 py-2.5 text-gray-700 font-medium rounded-xl border-2 border-gray-200 hover:bg-gray-50 transition-all duration-200 cursor-pointer"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={submitReturn}
-                  className="bg-[#c62d23] hover:bg-[#a8241c] text-white px-5 py-2.5 font-medium rounded-xl transition-all duration-200 shadow-sm hover:shadow-md cursor-pointer"
-                >
-                  Add Return
-                </button>
-              </div>
+            <div className="flex justify-end gap-2 sm:gap-3 p-4 sm:p-6 border-t border-gray-200">
+              <button
+                onClick={() => setOpenModal(false)}
+                className="px-4 sm:px-5 py-2 sm:py-2.5 text-gray-700 font-medium rounded-lg sm:rounded-xl border-2 border-gray-200 hover:bg-gray-50 transition-all duration-200 cursor-pointer text-sm sm:text-base"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={submitReturn}
+                className="bg-[#c62d23] hover:bg-[#a8241c] text-white px-4 sm:px-5 py-2 sm:py-2.5 font-medium rounded-lg sm:rounded-xl transition-all duration-200 shadow-sm hover:shadow-md cursor-pointer text-sm sm:text-base"
+              >
+                Add Return
+              </button>
             </div>
           </div>
         </div>
@@ -579,15 +708,15 @@ const StatCard = ({ title, value, onClick, active }) => {
   return (
     <div
       onClick={onClick}
-      className={`cursor-pointer bg-white border-2 rounded-2xl p-6 transition-all shadow-sm hover:shadow-md hover:scale-[1.02] ${
+      className={`cursor-pointer bg-white border-2 rounded-xl sm:rounded-2xl p-3 sm:p-4 lg:p-6 transition-all shadow-sm hover:shadow-md hover:scale-[1.02] ${
         active
           ? "border-[#c62d23] bg-red-50 ring-2 ring-[#c62d23]"
           : "border-gray-200 hover:border-gray-300"
       }`}
     >
-      <p className="text-sm text-gray-600 font-medium mb-2">{title}</p>
+      <p className="text-xs sm:text-sm text-gray-600 font-medium mb-2">{title}</p>
       <p
-        className={`text-3xl font-bold transition-colors ${
+        className={`text-xl sm:text-2xl lg:text-3xl font-bold transition-colors ${
           active ? "text-[#c62d23]" : "text-gray-900"
         }`}
       >

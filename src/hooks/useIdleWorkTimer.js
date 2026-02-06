@@ -14,15 +14,20 @@ export default function useIdleWorkTimer() {
 
     const headers = { Authorization: `Bearer ${token}` };
 
-    const start = async () => {
-      await axios.post(`${API}/work/start`, {}, { headers });
+ const start = async () => {
+  await axios.post(
+    `${API}/work/start`,
+    {},
+    { headers }
+  );
 
-      if (!tickRef.current) {
-        tickRef.current = setInterval(() => {
-          axios.post(`${API}/work/tick`, {}, { headers });
-        }, 30000);
-      }
-    };
+  if (!tickRef.current) {
+    tickRef.current = setInterval(() => {
+      axios.post(`${API}/work/tick`, {}, { headers });
+    }, 30000);
+  }
+};
+
 
     const pause = async () => {
       await axios.post(`${API}/work/pause`, {}, { headers });

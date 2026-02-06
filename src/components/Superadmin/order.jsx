@@ -1,6 +1,6 @@
 "use client";
 import React, { useEffect, useMemo, useState, useRef } from "react";
-import { Upload, Download } from "lucide-react";
+import { Upload, Download, Menu } from "lucide-react";
 import {
   Pencil,
   Trash2,
@@ -26,6 +26,7 @@ export default function Orders() {
   const [showChairDropdown, setShowChairDropdown] = useState(false);
   const [showVendorDropdown, setShowVendorDropdown] = useState(false);
   const [orderTypeFilter, setOrderTypeFilter] = useState("ALL");
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -480,7 +481,23 @@ const SPARE_ORDER_STEPS = [
 
   return (
     <div className="flex h-screen bg-gray-50 text-gray-900">
-      <SalesSidebar />
+      {/* Mobile Sidebar Overlay */}
+      {sidebarOpen && (
+        <div
+          className="fixed inset-0 bg-black/50 z-40 lg:hidden"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
+
+      {/* Sidebar */}
+      <div
+        className={`fixed lg:static inset-y-0 left-0 z-50 transform transition-transform duration-300 lg:transform-none ${
+          sidebarOpen ? "translate-x-0" : "-translate-x-full"
+        } lg:translate-x-0`}
+      >
+        <SalesSidebar />
+      </div>
+
       <div className="flex-1 overflow-y-auto overflow-x-hidden">
         {/* ================= HIDDEN UPLOAD INPUT ================= */}
         <input
@@ -493,67 +510,93 @@ const SPARE_ORDER_STEPS = [
           onChange={(e) => handleUploadOrders(e.target.files)}
         />
 
-        {/* HEADER */}
-        <div className="sticky top-0 z-10 bg-white/80 backdrop-blur border-b border-gray-200 p-6 shadow-sm flex justify-between items-center">
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900">
-              Orders Management
-            </h1>
-            <p className="text-gray-600 mt-2">
-              Create, track and manage all orders
-            </p>
-          </div>
+        {/* Mobile Header Bar */}
+        <div className="lg:hidden sticky top-0 z-30 bg-white border-b border-gray-200 px-4 py-3 flex items-center justify-between shadow-sm">
+          <button
+            onClick={() => setSidebarOpen(true)}
+            className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+          >
+            <Menu size={24} className="text-gray-700" />
+          </button>
+          <h1 className="text-lg font-bold text-gray-900 truncate">
+            Orders
+          </h1>
+          <button
+            onClick={() => {
+              setVendorSearch("");
+              setFormData(initialFormData);
+              setEditingOrderId(null);
+              setShowForm(true);
+            }}
+            className="bg-[#c62d23] hover:bg-[#a8241c] text-white p-2 rounded-lg transition-colors"
+          >
+            <Plus size={20} />
+          </button>
+        </div>
 
-          <div className="flex items-center gap-3">
-            {/* UPLOAD ORDERS */}
-            <button
-              onClick={() =>
-                document.getElementById("orderUploadInput").click()
-              }
-              className="bg-gray-100 hover:bg-gray-200 text-gray-800 px-4 py-2.5 rounded-xl font-medium flex items-center gap-2 transition-all duration-200 border border-gray-300"
-            >
-              <Upload size={18} />
-              {uploading ? "Uploading..." : "Upload Orders"}
-            </button>
+        {/* Desktop HEADER */}
+        <div className="hidden lg:block sticky top-0 z-10 bg-white/80 backdrop-blur border-b border-gray-200 p-6 shadow-sm">
+          <div className="flex justify-between items-center">
+            <div>
+              <h1 className="text-3xl font-bold text-gray-900">
+                Orders Management
+              </h1>
+              <p className="text-gray-600 mt-2">
+                Create, track and manage all orders
+              </p>
+            </div>
 
-            {/* ADD ORDER */}
-            <button
-              onClick={() => {
-                setVendorSearch("");
-                setFormData(initialFormData);
-                setEditingOrderId(null);
-                setShowForm(true);
-              }}
-              className="bg-[#c62d23] hover:bg-[#a8241c] text-white px-5 py-2.5 rounded-xl font-medium flex items-center gap-2 transition-all duration-200 shadow-sm hover:shadow-md"
-            >
-              <Plus size={18} />
-              Add Order
-            </button>
+            <div className="flex items-center gap-3">
+              {/* UPLOAD ORDERS */}
+              <button
+                onClick={() =>
+                  document.getElementById("orderUploadInput").click()
+                }
+                className="bg-gray-100 hover:bg-gray-200 text-gray-800 px-4 py-2.5 rounded-xl font-medium flex items-center gap-2 transition-all duration-200 border border-gray-300"
+              >
+                <Upload size={18} />
+                <span className="hidden xl:inline">{uploading ? "Uploading..." : "Upload Orders"}</span>
+              </button>
 
-            {/* EXPORT CSV */}
-            <button
-              onClick={handleExportCSV}
-              className="bg-green-600 hover:bg-green-700 text-white px-4 py-2.5 rounded-xl flex items-center gap-2 shadow-sm font-medium transition-all"
-            >
-              <Download size={18} />
-              Export CSV
-            </button>
+              {/* ADD ORDER */}
+              <button
+                onClick={() => {
+                  setVendorSearch("");
+                  setFormData(initialFormData);
+                  setEditingOrderId(null);
+                  setShowForm(true);
+                }}
+                className="bg-[#c62d23] hover:bg-[#a8241c] text-white px-5 py-2.5 rounded-xl font-medium flex items-center gap-2 transition-all duration-200 shadow-sm hover:shadow-md"
+              >
+                <Plus size={18} />
+                <span className="hidden sm:inline">Add Order</span>
+              </button>
 
-            {/* PROFILE */}
-            <button
-              onClick={() => router.push("/profile")}
-              title="My Profile"
-              className="p-2 rounded-xl hover:bg-gray-100 transition-colors"
-            >
-              <UserCircle size={32} className="text-gray-600" />
-            </button>
+              {/* EXPORT CSV */}
+              <button
+                onClick={handleExportCSV}
+                className="bg-green-600 hover:bg-green-700 text-white px-4 py-2.5 rounded-xl flex items-center gap-2 shadow-sm font-medium transition-all"
+              >
+                <Download size={18} />
+                <span className="hidden xl:inline">Export CSV</span>
+              </button>
+
+              {/* PROFILE */}
+              <button
+                onClick={() => router.push("/profile")}
+                title="My Profile"
+                className="p-2 rounded-xl hover:bg-gray-100 transition-colors"
+              >
+                <UserCircle size={32} className="text-gray-600" />
+              </button>
+            </div>
           </div>
         </div>
 
         {/* CONTENT */}
-        <div className="p-8 space-y-8">
+        <div className="p-4 sm:p-6 lg:p-8 space-y-6 lg:space-y-8">
           {/* STATS */}
-          <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4 lg:gap-6">
             <KpiCard
               title="Total Orders"
               value={totalOrders}
@@ -598,48 +641,49 @@ const SPARE_ORDER_STEPS = [
 
           {/* DELAYED ALERT */}
           {delayed > 0 && (
-            <div className="bg-red-50 border border-red-200 rounded-2xl p-4 flex gap-3 items-center">
-              <AlertCircle className="text-red-500" />
-              <span className="text-red-700 font-medium">
+            <div className="bg-red-50 border border-red-200 rounded-xl sm:rounded-2xl p-3 sm:p-4 flex gap-2 sm:gap-3 items-center">
+              <AlertCircle className="text-red-500 flex-shrink-0" size={20} />
+              <span className="text-red-700 font-medium text-sm sm:text-base">
                 {delayed} {delayed > 1 ? "orders are" : "order is"} delayed
               </span>
             </div>
           )}
 
           {/* SEARCH */}
-          <div className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm">
+          <div className="bg-white border border-gray-200 rounded-xl sm:rounded-2xl p-4 sm:p-6 shadow-sm">
             <div className="mb-4">
               <input
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search orders by ID, customer, or product..."
-                className="w-full p-3 bg-white rounded-xl border border-gray-300 focus:border-[#c62d23] focus:ring-2 focus:ring-[#c62d23]/20 outline-none transition-all"
+                placeholder="Search orders..."
+                className="w-full p-2.5 sm:p-3 bg-white rounded-lg sm:rounded-xl border border-gray-300 focus:border-[#c62d23] focus:ring-2 focus:ring-[#c62d23]/20 outline-none transition-all text-sm sm:text-base"
               />
             </div>
-<div className="flex items-center gap-3 mb-6">
-  {["ALL", "FULL", "SPARE"].map((type) => (
-    <button
-      key={type}
-      onClick={() => setOrderTypeFilter(type)}
-      className={`px-4 py-2 rounded-xl text-sm font-medium transition-all
-        ${
-          orderTypeFilter === type
-            ? "bg-[#c62d23] text-white shadow"
-            : "bg-white border border-gray-300 text-gray-700 hover:bg-gray-100"
-        }
-      `}
-    >
-      {type === "ALL"
-        ? "All Orders"
-        : type === "FULL"
-        ? "Full Chairs"
-        : "Spare Parts"}
-    </button>
-  ))}
-</div>
 
-            {/* TABLE */}
-            <div className="overflow-auto rounded-lg border border-gray-200">
+            <div className="flex flex-wrap items-center gap-2 sm:gap-3 mb-4 sm:mb-6">
+              {["ALL", "FULL", "SPARE"].map((type) => (
+                <button
+                  key={type}
+                  onClick={() => setOrderTypeFilter(type)}
+                  className={`px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg sm:rounded-xl text-xs sm:text-sm font-medium transition-all
+                    ${
+                      orderTypeFilter === type
+                        ? "bg-[#c62d23] text-white shadow"
+                        : "bg-white border border-gray-300 text-gray-700 hover:bg-gray-100"
+                    }
+                  `}
+                >
+                  {type === "ALL"
+                    ? "All"
+                    : type === "FULL"
+                    ? "Full Chairs"
+                    : "Spare Parts"}
+                </button>
+              ))}
+            </div>
+
+            {/* Desktop TABLE */}
+            <div className="hidden lg:block overflow-auto rounded-lg border border-gray-200">
               {loading ? (
                 <div className="p-8 text-center text-gray-500">Loading...</div>
               ) : filteredOrders.length === 0 ? (
@@ -828,6 +872,139 @@ const SPARE_ORDER_STEPS = [
                 </table>
               )}
             </div>
+
+            {/* Mobile CARD VIEW */}
+            <div className="lg:hidden space-y-3">
+              {loading ? (
+                <div className="p-8 text-center text-gray-500">Loading...</div>
+              ) : filteredOrders.length === 0 ? (
+                <div className="p-8 text-center text-gray-500">
+                  No orders found
+                </div>
+              ) : (
+                filteredOrders.map((o) => (
+                  <div
+                    key={o._id}
+                    ref={(el) => (rowRefs.current[o._id] = el)}
+                    className={`border rounded-lg p-3 sm:p-4 transition-all ${
+                      activeHighlight === o._id
+                        ? "bg-yellow-100 ring-2 ring-yellow-400"
+                        : "border-gray-200 hover:border-[#c62d23] bg-white"
+                    }`}
+                  >
+                    <div className="flex justify-between items-start mb-3">
+                      <div className="flex-1">
+                        <p className="font-semibold text-gray-900 text-sm sm:text-base">
+                          {o.orderId}
+                        </p>
+                        <p className="text-xs sm:text-sm text-gray-600 mt-1">
+                          {o.dispatchedTo?.name || o.dispatchedTo}
+                        </p>
+                      </div>
+                      <div className="flex gap-1 sm:gap-2">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleEditOrder(o);
+                          }}
+                          className="p-1.5 sm:p-2 rounded-lg hover:bg-gray-100 transition-colors"
+                        >
+                          <Pencil size={14} className="sm:w-4 sm:h-4 text-gray-600" />
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeleteOrder(o._id);
+                          }}
+                          className="p-1.5 sm:p-2 rounded-lg hover:bg-gray-100 transition-colors"
+                        >
+                          <Trash2 size={14} className="sm:w-4 sm:h-4 text-red-600" />
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="space-y-2 text-xs sm:text-sm">
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">Product:</span>
+                        <span className="font-medium text-gray-900">{o.chairModel}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">Quantity:</span>
+                        <span className="font-semibold text-[#c62d23]">{o.quantity}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">Order Date:</span>
+                        <span className="text-gray-900">{new Date(o.orderDate).toLocaleDateString()}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">Delivery:</span>
+                        <span className="text-gray-900">
+                          {o.deliveryDate ? new Date(o.deliveryDate).toLocaleDateString() : "-"}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="mt-3 pt-3 border-t border-gray-200">
+                      <ProgressTracker progress={o.progress} orderType={o.orderType} />
+                    </div>
+
+                    {/* Mobile Progress Detail */}
+                    <button
+                      onClick={() => handleRowClick(o._id)}
+                      className="w-full mt-3 text-xs sm:text-sm text-[#c62d23] hover:text-[#a8241c] font-medium"
+                    >
+                      {expandedOrderId === o._id ? "Hide Details ▲" : "View Progress ▼"}
+                    </button>
+
+                    {/* Expanded Progress */}
+                    {expandedOrderId === o._id && o.progress !== "PARTIAL" && (
+                      <div className="mt-4 pt-4 border-t border-gray-200">
+                        {(() => {
+                          const steps = o.orderType === "FULL" ? FULL_ORDER_STEPS : SPARE_ORDER_STEPS;
+                          const currentIndex = steps.findIndex((s) => s.key === o.progress);
+                          const safeIndex = currentIndex === -1 ? steps.length - 1 : currentIndex;
+                          const percent = ((safeIndex + 1) / steps.length) * 100;
+
+                          return (
+                            <div className="space-y-4">
+                              <div className="space-y-2">
+                                {steps.map((step, index) => (
+                                  <div
+                                    key={step.key}
+                                    className={`text-xs sm:text-sm ${
+                                      index <= safeIndex ? "text-gray-900 font-medium" : "text-gray-400"
+                                    }`}
+                                  >
+                                    {index + 1}. {step.label}
+                                  </div>
+                                ))}
+                              </div>
+
+                              <div className="relative w-full h-2 bg-gray-200 rounded-full overflow-hidden">
+                                <div
+                                  className="absolute left-0 top-0 h-full transition-all duration-500"
+                                  style={{
+                                    width: `${percent}%`,
+                                    background: percent === 100 ? "#16a34a" : "#c62d23",
+                                  }}
+                                />
+                              </div>
+
+                              <p className="text-xs sm:text-sm text-gray-700">
+                                <span className="font-medium">Current:</span>{" "}
+                                <span className="text-[#c62d23] font-semibold">
+                                  {steps[safeIndex]?.label}
+                                </span>
+                              </p>
+                            </div>
+                          );
+                        })()}
+                      </div>
+                    )}
+                  </div>
+                ))
+              )}
+            </div>
           </div>
         </div>
       </div>
@@ -836,15 +1013,15 @@ const SPARE_ORDER_STEPS = [
       {showForm && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl w-full max-w-[520px] border border-gray-200 shadow-lg max-h-[85vh] flex flex-col">
-            <div className="p-6 border-b border-gray-200">
-              <h2 className="text-2xl font-bold text-gray-900">
+            <div className="p-4 sm:p-6 border-b border-gray-200">
+              <h2 className="text-xl sm:text-2xl font-bold text-gray-900">
                 {editingOrderId ? "Update Order" : "Create Order"}
               </h2>
             </div>
 
-            <div className="space-y-4 overflow-y-auto px-6 py-4 flex-1">
+            <div className="space-y-3 sm:space-y-4 overflow-y-auto px-4 sm:px-6 py-3 sm:py-4 flex-1">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-2">
                   Dispatched To
                 </label>
 
@@ -858,11 +1035,11 @@ const SPARE_ORDER_STEPS = [
                   onChange={(e) => {
                     setVendorSearch(e.target.value);
                   }}
-                  className="w-full p-3 bg-white rounded-xl border border-gray-300 focus:border-[#c62d23] focus:ring-2 focus:ring-[#c62d23]/20 outline-none transition-all"
+                  className="w-full p-2.5 sm:p-3 bg-white rounded-lg sm:rounded-xl border border-gray-300 focus:border-[#c62d23] focus:ring-2 focus:ring-[#c62d23]/20 outline-none transition-all text-sm sm:text-base"
                 />
 
                 {showVendorDropdown && (
-                  <div className="bg-white border border-gray-200 mt-1 rounded-xl shadow-lg max-h-48 overflow-auto">
+                  <div className="bg-white border border-gray-200 mt-1 rounded-lg sm:rounded-xl shadow-lg max-h-48 overflow-auto">
                     {vendors
                       // .filter((v) =>
                       //   v.name
@@ -877,7 +1054,7 @@ const SPARE_ORDER_STEPS = [
                             setVendorSearch(v.name);
                             setShowVendorDropdown(false);
                           }}
-                          className="px-4 py-3 hover:bg-gray-50 cursor-pointer border-b border-gray-100 last:border-0"
+                          className="px-3 sm:px-4 py-2 sm:py-3 hover:bg-gray-50 cursor-pointer border-b border-gray-100 last:border-0 text-sm sm:text-base"
                         >
                           {v.name}
                         </div>
@@ -897,7 +1074,7 @@ const SPARE_ORDER_STEPS = [
                             setVendorSearch(vendorSearch.trim());
                             setShowVendorDropdown(false);
                           }}
-                          className="px-4 py-3 bg-gray-50 hover:bg-green-50 cursor-pointer border-b border-gray-100 last:border-0 text-green-700 font-medium"
+                          className="px-3 sm:px-4 py-2 sm:py-3 bg-gray-50 hover:bg-green-50 cursor-pointer border-b border-gray-100 last:border-0 text-green-700 font-medium text-sm sm:text-base"
                         >
                           ➕ Add "{vendorSearch}" as new vendor
                         </div>
@@ -908,7 +1085,7 @@ const SPARE_ORDER_STEPS = [
 
               {user?.role === "admin" && (
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-2">
                     Assign Sales Person
                   </label>
 
@@ -917,7 +1094,7 @@ const SPARE_ORDER_STEPS = [
                     onChange={(e) =>
                       setFormData({ ...formData, salesPerson: e.target.value })
                     }
-                    className="w-full p-3 bg-white rounded-xl border border-gray-300 focus:border-[#c62d23] focus:ring-2 focus:ring-[#c62d23]/20 outline-none transition-all"
+                    className="w-full p-2.5 sm:p-3 bg-white rounded-lg sm:rounded-xl border border-gray-300 focus:border-[#c62d23] focus:ring-2 focus:ring-[#c62d23]/20 outline-none transition-all text-sm sm:text-base"
                   >
                     <option value="">Select Sales Person</option>
                     {salesUsers.map((u) => (
@@ -930,7 +1107,7 @@ const SPARE_ORDER_STEPS = [
               )}
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-2">
                   Order Type
                 </label>
 
@@ -943,7 +1120,7 @@ const SPARE_ORDER_STEPS = [
                       chairModel: "",
                     })
                   }
-                  className="w-full p-3 bg-white rounded-xl border border-gray-300 focus:border-[#c62d23] focus:ring-2 focus:ring-[#c62d23]/20 outline-none transition-all"
+                  className="w-full p-2.5 sm:p-3 bg-white rounded-lg sm:rounded-xl border border-gray-300 focus:border-[#c62d23] focus:ring-2 focus:ring-[#c62d23]/20 outline-none transition-all text-sm sm:text-base"
                 >
                   <option value="FULL">Full Chair</option>
                   <option value="SPARE">Spare Part</option>
@@ -953,7 +1130,7 @@ const SPARE_ORDER_STEPS = [
               {/* FULL CHAIR */}
               {formData.orderType === "FULL" && (
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-2">
                     Chair Model
                   </label>
 
@@ -962,7 +1139,7 @@ const SPARE_ORDER_STEPS = [
                     onChange={(e) =>
                       setFormData({ ...formData, chairModel: e.target.value })
                     }
-                    className="w-full p-3 bg-white rounded-xl border border-gray-300 focus:border-[#c62d23] focus:ring-2 focus:ring-[#c62d23]/20 outline-none transition-all"
+                    className="w-full p-2.5 sm:p-3 bg-white rounded-lg sm:rounded-xl border border-gray-300 focus:border-[#c62d23] focus:ring-2 focus:ring-[#c62d23]/20 outline-none transition-all text-sm sm:text-base"
                     required
                   >
                     <option value="">Select Chair Model</option>
@@ -978,7 +1155,7 @@ const SPARE_ORDER_STEPS = [
               {/* SPARE PART */}
               {formData.orderType === "SPARE" && (
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-2">
                     Spare Part
                   </label>
 
@@ -987,7 +1164,7 @@ const SPARE_ORDER_STEPS = [
                     onChange={(e) =>
                       setFormData({ ...formData, partname: e.target.value })
                     }
-                    className="w-full p-3 bg-white rounded-xl border border-gray-300 focus:border-[#c62d23] focus:ring-2 focus:ring-[#c62d23]/20 outline-none transition-all"
+                    className="w-full p-2.5 sm:p-3 bg-white rounded-lg sm:rounded-xl border border-gray-300 focus:border-[#c62d23] focus:ring-2 focus:ring-[#c62d23]/20 outline-none transition-all text-sm sm:text-base"
                     required
                   >
                     <option value="">Select Spare Part</option>
@@ -1001,11 +1178,11 @@ const SPARE_ORDER_STEPS = [
               )}
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-2">
                   Order Date
                 </label>
 
-                <div className="w-full p-3 bg-gray-50 rounded-xl border border-gray-300 text-gray-700">
+                <div className="w-full p-2.5 sm:p-3 bg-gray-50 rounded-lg sm:rounded-xl border border-gray-300 text-gray-700 text-sm sm:text-base">
                   {formData.orderDate || new Date().toISOString().split("T")[0]}
                 </div>
               </div>
@@ -1027,7 +1204,7 @@ const SPARE_ORDER_STEPS = [
               />
             </div>
 
-            <div className="flex justify-end gap-3 px-6 py-4 border-t border-gray-200 bg-gray-50 rounded-b-2xl">
+            <div className="flex justify-end gap-2 sm:gap-3 px-4 sm:px-6 py-3 sm:py-4 border-t border-gray-200 bg-gray-50 rounded-b-2xl">
               <button
                 type="button"
                 onClick={() => {
@@ -1035,14 +1212,14 @@ const SPARE_ORDER_STEPS = [
                   setEditingOrderId(null);
                   setFormData(initialFormData);
                 }}
-                className="px-5 py-2.5 text-gray-700 font-medium rounded-xl border border-gray-300 hover:bg-gray-100 transition-colors"
+                className="px-4 sm:px-5 py-2 sm:py-2.5 text-gray-700 font-medium rounded-lg sm:rounded-xl border border-gray-300 hover:bg-gray-100 transition-colors text-sm sm:text-base"
               >
                 Cancel
               </button>
 
               <button
                 onClick={handleCreateOrder}
-                className="bg-[#c62d23] hover:bg-[#a8241c] text-white px-5 py-2.5 font-medium rounded-xl transition-all duration-200 shadow-sm hover:shadow-md"
+                className="bg-[#c62d23] hover:bg-[#a8241c] text-white px-4 sm:px-5 py-2 sm:py-2.5 font-medium rounded-lg sm:rounded-xl transition-all duration-200 shadow-sm hover:shadow-md text-sm sm:text-base"
               >
                 {editingOrderId ? "Update" : "Create"}
               </button>
@@ -1059,19 +1236,19 @@ const SPARE_ORDER_STEPS = [
 const KpiCard = ({ title, value, icon, danger = false, onClick, active }) => (
   <div
     onClick={onClick}
-    className={`bg-white border border-gray-200 rounded-2xl p-6 transition-all duration-200 shadow-sm hover:shadow-md flex flex-col justify-between h-full cursor-pointer ${
+    className={`bg-white border border-gray-200 rounded-xl sm:rounded-2xl p-3 sm:p-4 lg:p-6 transition-all duration-200 shadow-sm hover:shadow-md flex flex-col justify-between h-full cursor-pointer ${
       active ? "border-[#c62d23] ring-2 ring-[#c62d23]/20" : ""
     }`}
     style={{
       borderLeft: "4px solid #c62d23",
     }}
   >
-    <div className="flex justify-between items-start mb-4">
-      <p className="text-sm text-gray-600 font-medium">{title}</p>
-      {React.cloneElement(icon, { size: 24 })}
+    <div className="flex justify-between items-start mb-2 sm:mb-3 lg:mb-4">
+      <p className="text-xs sm:text-sm text-gray-600 font-medium">{title}</p>
+      {React.cloneElement(icon, { size: 18, className: "sm:w-5 sm:h-5 lg:w-6 lg:h-6" })}
     </div>
     <p
-      className={`text-3xl font-bold mb-1 ${danger ? "text-red-600" : "text-gray-900"}`}
+      className={`text-xl sm:text-2xl lg:text-3xl font-bold mb-1 ${danger ? "text-red-600" : "text-gray-900"}`}
     >
       {value}
     </p>
@@ -1080,7 +1257,7 @@ const KpiCard = ({ title, value, icon, danger = false, onClick, active }) => (
 
 const Input = ({ label, name, value, onChange, type = "text" }) => (
   <div>
-    <label className="block text-sm font-medium text-gray-700 mb-2">
+    <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-2">
       {label}
     </label>
     <input
@@ -1088,7 +1265,7 @@ const Input = ({ label, name, value, onChange, type = "text" }) => (
       name={name}
       value={value}
       onChange={onChange}
-      className="w-full p-3 bg-white rounded-xl border border-gray-300 focus:border-[#c62d23] focus:ring-2 focus:ring-[#c62d23]/20 outline-none transition-all"
+      className="w-full p-2.5 sm:p-3 bg-white rounded-lg sm:rounded-xl border border-gray-300 focus:border-[#c62d23] focus:ring-2 focus:ring-[#c62d23]/20 outline-none transition-all text-sm sm:text-base"
     />
   </div>
 );

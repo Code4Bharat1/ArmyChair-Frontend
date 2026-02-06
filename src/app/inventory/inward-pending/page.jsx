@@ -64,31 +64,32 @@ export default function WarehousePendingInwardPage() {
   }, [mounted]);
 
   /* ================= ACCEPT ================= */
-  const acceptInward = async (id) => {
-    if (!confirm("Accept this inward stock?")) return;
+  const acceptInward = async (item) => {
+  if (!confirm(`Transfer this stock to ${item.createdBy?.name}?`)) return;
 
-    try {
-      setProcessingId(id);
+  try {
+    setProcessingId(item._id);
 
-      await axios.put(
-        `${API}/warehouse/production/inward/${id}/accept`,
-        {},
-        {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
-          },
-        }
-      );
+    await axios.put(
+      `${API}/warehouse/production/inward/${item._id}/accept`,
+      {},
+      {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+      }
+    );
 
-      alert("Stock transferred to production successfully");
+    alert("Stock transferred to production successfully");
+    fetchPending();
 
-      fetchPending();
-    } catch (err) {
-      alert(err.response?.data?.message || "Accept failed");
-    } finally {
-      setProcessingId(null);
-    }
-  };
+  } catch (err) {
+    alert(err.response?.data?.message || "Accept failed");
+  } finally {
+    setProcessingId(null);
+  }
+};
+
 
   /* ================= DATE FORMAT ================= */
   const formatDate = (date) => {
@@ -242,7 +243,8 @@ export default function WarehousePendingInwardPage() {
                         <td className="p-3 lg:p-4">
                           <button
                             disabled={processingId === i._id}
-                            onClick={() => acceptInward(i._id)}
+                            onClick={() => acceptInward(i)}
+
                             className={`px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm font-medium transition-all shadow-sm ${
                               processingId === i._id
                                 ? "bg-gray-300 text-gray-500 cursor-not-allowed"

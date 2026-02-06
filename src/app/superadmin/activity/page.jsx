@@ -4,7 +4,7 @@ import axios from "axios";
 import ProtectedRoute from "@/components/ProtectedRoutes/ProtectedRoutes";
 import toast from "react-hot-toast";
 import Sidebar from "@/components/Superadmin/sidebar";
-import { Download, RefreshCw, Calendar, ChevronDown } from "lucide-react";
+import { Download, RefreshCw, Calendar, ChevronDown, Menu, Filter } from "lucide-react";
 
 export default function ActivityLogPage() {
   const [mode, setMode] = useState("logs");
@@ -18,6 +18,10 @@ export default function ActivityLogPage() {
   const [showCalendar, setShowCalendar] = useState(false);
   const calendarRef = useRef(null);
   const [token, setToken] = useState(null);
+
+  // Mobile states
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [showActions, setShowActions] = useState(false);
 
   const API = process.env.NEXT_PUBLIC_API_URL;
 
@@ -34,7 +38,7 @@ export default function ActivityLogPage() {
     const res = await axios.get(`${API.replace("/api", "")}/activity`, {
       headers: { Authorization: `Bearer ${authToken}` },
     });
-    setLogs(res.data.logs || []);
+    setLogs(res.data.data || []);
 
     const exportsRes = await axios.get(`${API}/activity/files`, {
       headers: { Authorization: `Bearer ${authToken}` },
@@ -65,14 +69,12 @@ export default function ActivityLogPage() {
   // 1️⃣ Export CSV (current table)
   const exportCSV = () => {
     if (!filteredLogs.length) {
-
       toast.error("No logs available to export");
       return;
     }
 
     const headers = ["Time", "User", "Role", "Action", "Module", "Description"];
     const rows = filteredLogs.map((l) => [
-
       new Date(l.createdAt).toLocaleString(),
       l.user?.name || "",
       l.user?.role || "",
@@ -134,6 +136,7 @@ export default function ActivityLogPage() {
   const downloadFile = (file) => {
     window.open(`${API}/activity/files/${file}?token=${token}`, "_blank");
   };
+
   const formatDuration = (seconds) => {
     if (!seconds) return "0h 0m";
     const hrs = Math.floor(seconds / 3600);
@@ -141,20 +144,49 @@ export default function ActivityLogPage() {
     return `${hrs}h ${mins}m`;
   };
 
-  const filteredLogs = logs.filter(
-  (l) => l.action !== "WORK_TIME"
-);
+  const filteredLogs = logs.filter((l) => l.action !== "WORK_TIME");
 
   return (
     <ProtectedRoute allowedRoles={["admin"]}>
       <div className="flex h-screen bg-gray-50 text-gray-900">
-        {/* SIDEBAR */}
-        <Sidebar />
+        {/* Mobile Sidebar Overlay */}
+        {sidebarOpen && (
+          <div
+            className="fixed inset-0 bg-black/50 z-40 lg:hidden"
+            onClick={() => setSidebarOpen(false)}
+          />
+        )}
+
+        {/* Sidebar */}
+        <div
+          className={`fixed lg:static inset-y-0 left-0 z-50 transform transition-transform duration-300 lg:transform-none ${
+            sidebarOpen ? "translate-x-0" : "-translate-x-full"
+          } lg:translate-x-0`}
+        >
+          <Sidebar />
+        </div>
 
         {/* MAIN CONTENT */}
         <div className="flex-1 overflow-y-auto overflow-x-hidden">
-          {/* HEADER */}
-          <div className="sticky top-0 z-10 bg-white/80 backdrop-blur border-b border-gray-200 p-6 shadow-sm">
+          {/* Mobile Header Bar */}
+          <div className="lg:hidden sticky top-0 z-30 bg-white border-b border-gray-200 px-4 py-3 flex items-center justify-between shadow-sm">
+            <button
+              onClick={() => setSidebarOpen(true)}
+              className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+            >
+              <Menu size={24} className="text-gray-700" />
+            </button>
+            <h1 className="text-lg font-bold text-gray-900">Activity Log</h1>
+            <button
+              onClick={() => setShowActions(!showActions)}
+              className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+            >
+              <Filter size={20} className="text-gray-700" />
+            </button>
+          </div>
+
+          {/* Desktop HEADER */}
+          <div className="hidden lg:block sticky top-0 z-10 bg-white/80 backdrop-blur border-b border-gray-200 p-6 shadow-sm">
             <div>
               <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-2">
                 <span>Activity Log</span>
@@ -165,9 +197,9 @@ export default function ActivityLogPage() {
             </div>
           </div>
 
-          <div className="p-8 space-y-8">
-            {/* BUTTON BAR */}
-            <div className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm hover:shadow-md transition-shadow">
+          <div className="p-4 sm:p-6 lg:p-8 space-y-6 lg:space-y-8">
+            {/* BUTTON BAR - Desktop */}
+            <div className="hidden lg:block bg-white border border-gray-200 rounded-2xl p-6 shadow-sm hover:shadow-md transition-shadow">
               <div className="flex flex-wrap items-center gap-4">
                 <button
                   onClick={exportCSV}
@@ -180,7 +212,7 @@ export default function ActivityLogPage() {
                   Export CSV (Current View)
                 </button>
 
-                {/* DATE PICKER - Keep it in the button bar */}
+                {/* DATE PICKER */}
                 <div className="relative" ref={calendarRef}>
                   <div
                     onClick={() => setShowCalendar(!showCalendar)}
@@ -242,6 +274,7 @@ export default function ActivityLogPage() {
                   />
                   Refresh Logs
                 </button>
+
                 <button
                   onClick={async () => {
                     if (!token) return toast.error("Session expired");
@@ -270,16 +303,123 @@ export default function ActivityLogPage() {
               </div>
             </div>
 
-            {/* TABLE */}
-            {/* TABLE */}
-            <div className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm hover:shadow-md transition-shadow">
-              <h2 className="text-xl font-bold text-gray-900 mb-6">
+            {/* MOBILE ACTION PANEL */}
+            {showActions && (
+              <div className="lg:hidden bg-white border border-gray-200 rounded-xl p-4 shadow-sm space-y-3">
+                <button
+                  onClick={() => {
+                    exportCSV();
+                    setShowActions(false);
+                  }}
+                  className="w-full bg-white px-4 py-3 rounded-lg border-2 border-gray-200 shadow-sm hover:border-[#c62d23] transition-all cursor-pointer flex items-center gap-2 font-medium text-sm"
+                >
+                  <Download size={16} className="text-[#c62d23]" />
+                  Export CSV
+                </button>
+
+                {/* Mobile Date Picker */}
+                <div className="relative" ref={calendarRef}>
+                  <div
+                    onClick={() => setShowCalendar(!showCalendar)}
+                    className="w-full flex items-center gap-2 bg-white px-4 py-3 rounded-lg border-2 border-gray-200 shadow-sm hover:border-[#c62d23] transition-all cursor-pointer"
+                  >
+                    <Calendar size={16} className="text-[#c62d23]" />
+                    <span className="text-sm font-medium text-gray-900 flex-1">
+                      {new Date(selectedDate).toLocaleDateString("en-US", {
+                        year: "numeric",
+                        month: "short",
+                        day: "numeric",
+                      })}
+                    </span>
+                    <ChevronDown
+                      size={16}
+                      className={`text-gray-500 transition-transform ${showCalendar ? "rotate-180" : ""}`}
+                    />
+                  </div>
+
+                  {showCalendar && (
+                    <div className="absolute top-full mt-2 left-0 right-0 z-50 bg-white border border-gray-200 rounded-xl shadow-lg p-4">
+                      <CalendarComponent
+                        selectedDate={selectedDate}
+                        onDateSelect={(date) => {
+                          setSelectedDate(date);
+                          setShowCalendar(false);
+                        }}
+                        maxDate={new Date().toISOString().split("T")[0]}
+                      />
+                    </div>
+                  )}
+                </div>
+
+                <button
+                  onClick={() => {
+                    downloadByDate();
+                    setShowActions(false);
+                  }}
+                  className="w-full bg-[#c62d23] hover:bg-[#a8241c] text-white px-4 py-3 rounded-lg font-medium flex items-center justify-center gap-2 transition-all shadow-sm text-sm"
+                >
+                  <Download size={16} />
+                  Download Excel
+                </button>
+
+                <button
+                  onClick={() => {
+                    if (!token) {
+                      toast.error("Session expired. Please re-login.");
+                      return;
+                    }
+                    loadData(token);
+                    toast.success("Logs refreshed");
+                    setShowActions(false);
+                  }}
+                  className="w-full bg-white px-4 py-3 rounded-lg border-2 border-gray-200 shadow-sm hover:border-[#c62d23] transition-all cursor-pointer flex items-center gap-2 font-medium text-sm"
+                >
+                  <RefreshCw size={16} className="text-[#c62d23]" />
+                  Refresh Logs
+                </button>
+
+                <button
+                  onClick={async () => {
+                    if (!token) return toast.error("Session expired");
+
+                    const res = await axios.get(
+                      `${API}/work/daily?date=${selectedDate}`,
+                      { headers: { Authorization: `Bearer ${token}` } },
+                    );
+
+                    setDailyData(res.data.data);
+                    setMode("daily");
+                    setShowActions(false);
+                  }}
+                  className="w-full bg-white px-4 py-3 rounded-lg border-2 border-gray-200 shadow-sm hover:border-[#c62d23] text-sm font-medium"
+                >
+                  Daily Login Time
+                </button>
+
+                {mode === "daily" && (
+                  <button
+                    onClick={() => {
+                      setMode("logs");
+                      setShowActions(false);
+                    }}
+                    className="w-full bg-white px-4 py-3 rounded-lg border-2 border-gray-200 shadow-sm hover:border-[#c62d23] text-sm font-medium"
+                  >
+                    Back to Activity Logs
+                  </button>
+                )}
+              </div>
+            )}
+
+            {/* TABLE/CARD VIEW */}
+            <div className="bg-white border border-gray-200 rounded-xl sm:rounded-2xl p-4 sm:p-6 shadow-sm hover:shadow-md transition-shadow">
+              <h2 className="text-lg sm:text-xl font-bold text-gray-900 mb-4 sm:mb-6">
                 {mode === "logs"
                   ? "Activity Logs"
                   : `Daily Login Summary (${selectedDate})`}
               </h2>
 
-              <div className="overflow-auto rounded-lg border border-gray-200">
+              {/* Desktop Table */}
+              <div className="hidden lg:block overflow-auto rounded-lg border border-gray-200">
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="bg-gray-50">
@@ -307,28 +447,28 @@ export default function ActivityLogPage() {
                   <tbody>
                     {mode === "logs" &&
                       filteredLogs.map((l, index) => (
-                          <tr
-                            key={l._id}
-                            className={`border-b border-gray-100 hover:bg-gray-50 ${
-                              index % 2 === 0 ? "bg-white" : "bg-gray-50"
-                            }`}
-                          >
-                            <td className="p-4 font-semibold text-gray-700">
-                              {new Date(l.createdAt).toLocaleString([], {
-                                year: "numeric",
-                                month: "short",
-                                day: "2-digit",
-                                hour: "2-digit",
-                                minute: "2-digit",
-                              })}
-                            </td>
-                            <td className="p-4">{l.user?.name}</td>
-                            <td className="p-4">{l.user?.role}</td>
-                            <td className="p-4">{l.action}</td>
-                            <td className="p-4">{l.module}</td>
-                            <td className="p-4">{l.description}</td>
-                          </tr>
-                        ))}
+                        <tr
+                          key={l._id}
+                          className={`border-b border-gray-100 hover:bg-gray-50 ${
+                            index % 2 === 0 ? "bg-white" : "bg-gray-50"
+                          }`}
+                        >
+                          <td className="p-4 font-semibold text-gray-700">
+                            {new Date(l.createdAt).toLocaleString([], {
+                              year: "numeric",
+                              month: "short",
+                              day: "2-digit",
+                              hour: "2-digit",
+                              minute: "2-digit",
+                            })}
+                          </td>
+                          <td className="p-4">{l.user?.name}</td>
+                          <td className="p-4">{l.user?.role}</td>
+                          <td className="p-4">{l.action}</td>
+                          <td className="p-4">{l.module}</td>
+                          <td className="p-4">{l.description}</td>
+                        </tr>
+                      ))}
 
                     {mode === "daily" &&
                       dailyData.map((d, index) => (
@@ -350,40 +490,121 @@ export default function ActivityLogPage() {
                 </table>
               </div>
 
+              {/* Mobile Card View */}
+              <div className="lg:hidden space-y-3">
+                {mode === "logs" &&
+                  filteredLogs.map((l) => (
+                    <div
+                      key={l._id}
+                      className="border border-gray-200 rounded-lg p-3 bg-white hover:border-[#c62d23] transition-colors"
+                    >
+                      <div className="flex items-start justify-between mb-2">
+                        <div className="flex-1 min-w-0">
+                          <div className="font-semibold text-gray-900 text-sm mb-1">
+                            {l.user?.name}
+                          </div>
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="text-xs bg-gray-100 px-2 py-0.5 rounded text-gray-700">
+                              {l.user?.role}
+                            </span>
+                            <span className="text-xs bg-blue-50 px-2 py-0.5 rounded text-blue-700">
+                              {l.module}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="space-y-1.5 text-xs">
+                        <div className="flex justify-between">
+                          <span className="text-gray-600">Action:</span>
+                          <span className="font-medium text-gray-900">{l.action}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-gray-600">Time:</span>
+                          <span className="font-medium text-gray-900">
+                            {new Date(l.createdAt).toLocaleString([], {
+                              month: "short",
+                              day: "2-digit",
+                              hour: "2-digit",
+                              minute: "2-digit",
+                            })}
+                          </span>
+                        </div>
+                        {l.description && (
+                          <div className="pt-1 border-t border-gray-100">
+                            <span className="text-gray-600">Description:</span>
+                            <p className="text-gray-900 mt-0.5">{l.description}</p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+
+                {mode === "daily" &&
+                  dailyData.map((d, index) => (
+                    <div
+                      key={index}
+                      className="border border-gray-200 rounded-lg p-3 bg-white hover:border-[#c62d23] transition-colors"
+                    >
+                      <div className="flex items-start justify-between mb-2">
+                        <div className="flex-1 min-w-0">
+                          <div className="font-semibold text-gray-900 text-sm mb-1">
+                            {d.user?.name}
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs bg-gray-100 px-2 py-0.5 rounded text-gray-700">
+                              {d.user?.role}
+                            </span>
+                            <span className="text-xs bg-blue-50 px-2 py-0.5 rounded text-blue-700">
+                              {d.module}
+                            </span>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <div className="text-xs text-gray-600 mb-1">Total Time</div>
+                          <div className="text-lg font-bold text-[#c62d23]">
+                            {formatDuration(d.totalSeconds)}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+              </div>
+
               {mode === "logs" && logs.length === 0 && (
-                <div className="p-8 text-center text-gray-500">
+                <div className="p-8 text-center text-gray-500 text-sm">
                   No activity logs found
                 </div>
               )}
 
               {mode === "daily" && dailyData.length === 0 && (
-                <div className="p-8 text-center text-gray-500">
+                <div className="p-8 text-center text-gray-500 text-sm">
                   No work data found for selected date
                 </div>
               )}
             </div>
 
             {/* DAILY ARCHIVES */}
-            <div className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm hover:shadow-md transition-shadow">
-              <h2 className="text-xl font-bold text-gray-900 mb-6">
+            <div className="bg-white border border-gray-200 rounded-xl sm:rounded-2xl p-4 sm:p-6 shadow-sm hover:shadow-md transition-shadow">
+              <h2 className="text-lg sm:text-xl font-bold text-gray-900 mb-4 sm:mb-6">
                 Daily Archives
               </h2>
-              <div className="flex flex-wrap gap-3">
+              <div className="flex flex-wrap gap-2 sm:gap-3">
                 {files.map((f) => (
                   <button
                     key={f}
                     onClick={() => downloadFile(f)}
-                    className="bg-white px-5 py-3 rounded-xl border-2 border-gray-200 shadow-sm hover:border-[#c62d23] hover:shadow-md transition-all duration-200 cursor-pointer group flex items-center gap-2 font-medium"
+                    className="bg-white px-3 sm:px-5 py-2 sm:py-3 rounded-lg sm:rounded-xl border-2 border-gray-200 shadow-sm hover:border-[#c62d23] hover:shadow-md transition-all duration-200 cursor-pointer group flex items-center gap-2 font-medium text-xs sm:text-sm"
                   >
                     <Download
-                      size={16}
-                      className="text-[#c62d23] group-hover:scale-110 transition-transform"
+                      size={14}
+                      className="sm:w-4 sm:h-4 text-[#c62d23] group-hover:scale-110 transition-transform"
                     />
-                    {f}
+                    <span className="truncate max-w-[200px]">{f}</span>
                   </button>
                 ))}
                 {files.length === 0 && (
-                  <div className="text-gray-500">
+                  <div className="text-gray-500 text-sm">
                     No archived files available
                   </div>
                 )}
@@ -403,7 +624,6 @@ const CalendarComponent = ({ selectedDate, onDateSelect, maxDate }) => {
     return new Date(date.getFullYear(), date.getMonth(), 1);
   });
 
-  // Don't use local state for selected date, use the prop directly
   const selectedDateObj = new Date(selectedDate);
 
   const monthNames = [
@@ -433,12 +653,10 @@ const CalendarComponent = ({ selectedDate, onDateSelect, maxDate }) => {
 
     const days = [];
 
-    // Add empty cells for days before the first day of the month
     for (let i = 0; i < startingDayOfWeek; i++) {
       days.push(null);
     }
 
-    // Add days of the month
     for (let day = 1; day <= daysInMonth; day++) {
       days.push(new Date(year, month, day));
     }
@@ -449,7 +667,7 @@ const CalendarComponent = ({ selectedDate, onDateSelect, maxDate }) => {
   const isDateDisabled = (date) => {
     if (!date) return true;
     const maxDateObj = new Date(maxDate);
-    maxDateObj.setHours(23, 59, 59, 999); // Set to end of day for comparison
+    maxDateObj.setHours(23, 59, 59, 999);
     return date > maxDateObj;
   };
 
@@ -465,7 +683,6 @@ const CalendarComponent = ({ selectedDate, onDateSelect, maxDate }) => {
   const handleDateClick = (date) => {
     if (!date || isDateDisabled(date)) return;
 
-    // Format date as YYYY-MM-DD
     const year = date.getFullYear();
     const month = String(date.getMonth() + 1).padStart(2, "0");
     const day = String(date.getDate()).padStart(2, "0");
@@ -487,32 +704,32 @@ const CalendarComponent = ({ selectedDate, onDateSelect, maxDate }) => {
   return (
     <div className="w-full">
       {/* Header */}
-      <div className="flex items-center justify-between mb-4">
+      <div className="flex items-center justify-between mb-3 sm:mb-4">
         <button
           type="button"
           onClick={() => navigateMonth(-1)}
-          className="p-2 hover:bg-gray-100 rounded-lg transition-colors cursor-pointer"
+          className="p-1.5 sm:p-2 hover:bg-gray-100 rounded-lg transition-colors cursor-pointer"
         >
-          <span className="text-xl font-bold text-gray-600">‹</span>
+          <span className="text-lg sm:text-xl font-bold text-gray-600">‹</span>
         </button>
-        <h3 className="text-lg font-semibold text-gray-900">
+        <h3 className="text-base sm:text-lg font-semibold text-gray-900">
           {monthNames[currentMonth.getMonth()]} {currentMonth.getFullYear()}
         </h3>
         <button
           type="button"
           onClick={() => navigateMonth(1)}
-          className="p-2 hover:bg-gray-100 rounded-lg transition-colors cursor-pointer"
+          className="p-1.5 sm:p-2 hover:bg-gray-100 rounded-lg transition-colors cursor-pointer"
         >
-          <span className="text-xl font-bold text-gray-600">›</span>
+          <span className="text-lg sm:text-xl font-bold text-gray-600">›</span>
         </button>
       </div>
 
       {/* Days of week header */}
-      <div className="grid grid-cols-7 gap-1 mb-2">
+      <div className="grid grid-cols-7 gap-0.5 sm:gap-1 mb-2">
         {daysOfWeek.map((day) => (
           <div
             key={day}
-            className="text-center text-xs font-medium text-gray-500 p-2"
+            className="text-center text-[10px] sm:text-xs font-medium text-gray-500 p-1 sm:p-2"
           >
             {day}
           </div>
@@ -520,7 +737,7 @@ const CalendarComponent = ({ selectedDate, onDateSelect, maxDate }) => {
       </div>
 
       {/* Calendar grid */}
-      <div className="grid grid-cols-7 gap-1">
+      <div className="grid grid-cols-7 gap-0.5 sm:gap-1">
         {days.map((date, index) => {
           const isDisabled = isDateDisabled(date);
           const isSelected = isDateSelected(date);
@@ -532,7 +749,7 @@ const CalendarComponent = ({ selectedDate, onDateSelect, maxDate }) => {
               onClick={() => handleDateClick(date)}
               disabled={isDisabled}
               className={`
-                aspect-square p-2 text-sm rounded-lg transition-all min-h-[36px] flex items-center justify-center
+                aspect-square p-1 sm:p-2 text-xs sm:text-sm rounded-lg transition-all min-h-[32px] sm:min-h-[36px] flex items-center justify-center
                 ${!date ? "invisible" : ""}
                 ${
                   isSelected
@@ -550,11 +767,11 @@ const CalendarComponent = ({ selectedDate, onDateSelect, maxDate }) => {
       </div>
 
       {/* Quick select buttons */}
-      <div className="flex gap-2 mt-4 pt-4 border-t border-gray-200">
+      <div className="flex gap-2 mt-3 sm:mt-4 pt-3 sm:pt-4 border-t border-gray-200">
         <button
           type="button"
           onClick={() => handleDateClick(new Date())}
-          className="px-3 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors flex-1 cursor-pointer"
+          className="px-2 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors flex-1 cursor-pointer"
         >
           Today
         </button>
@@ -565,7 +782,7 @@ const CalendarComponent = ({ selectedDate, onDateSelect, maxDate }) => {
             lastWeek.setDate(lastWeek.getDate() - 7);
             handleDateClick(lastWeek);
           }}
-          className="px-3 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors flex-1 cursor-pointer"
+          className="px-2 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors flex-1 cursor-pointer"
         >
           Last Week
         </button>

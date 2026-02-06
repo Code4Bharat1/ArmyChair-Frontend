@@ -18,6 +18,7 @@ import {
   UserCheck,
   UserCog,
   ChevronDown,
+  Menu,
 } from "lucide-react";
 
 export default function Staff() {
@@ -29,6 +30,7 @@ export default function Staff() {
   const [selectedStaff, setSelectedStaff] = useState(null);
   const [search, setSearch] = useState("");
   const [roleFilter, setRoleFilter] = useState("All");
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const API = process.env.NEXT_PUBLIC_API_URL;
 
   const fetchStaffs = async () => {
@@ -232,85 +234,121 @@ export default function Staff() {
 
   return (
     <div className="flex h-screen bg-gray-50 text-gray-900">
-      <Sidebar />
+      {/* Mobile Sidebar Overlay */}
+      {sidebarOpen && (
+        <div
+          className="fixed inset-0 bg-black/50 z-40 lg:hidden"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
+
+      {/* Sidebar */}
+      <div
+        className={`fixed lg:static inset-y-0 left-0 z-50 transform transition-transform duration-300 lg:transform-none ${
+          sidebarOpen ? "translate-x-0" : "-translate-x-full"
+        } lg:translate-x-0`}
+      >
+        <Sidebar />
+      </div>
 
       <div className="flex-1 overflow-y-auto overflow-x-hidden">
-        {/* HEADER */}
-        <div className="sticky top-0 z-10 bg-white/80 backdrop-blur border-b border-gray-200 p-6 shadow-sm flex justify-between items-center">
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-2">
-              <span>Staff Management</span>
-            </h1>
-            <p className="text-gray-600 mt-2">
-              Manage and track all staff members
-            </p>
-          </div>
-          
+        {/* Mobile Header Bar */}
+        <div className="lg:hidden sticky top-0 z-30 bg-white border-b border-gray-200 px-4 py-3 flex items-center justify-between shadow-sm">
+          <button
+            onClick={() => setSidebarOpen(true)}
+            className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+          >
+            <Menu size={24} className="text-gray-700" />
+          </button>
+          <h1 className="text-lg font-bold text-gray-900 truncate">
+            Staff
+          </h1>
           <button
             onClick={() => setShowForm(true)}
-            className="bg-white px-5 py-3 rounded-xl border-2 border-gray-200 shadow-sm hover:border-[#c62d23] hover:shadow-md transition-all duration-200 cursor-pointer group flex items-center gap-2 font-medium"
+            className="bg-[#c62d23] text-white p-2 rounded-lg transition-colors"
           >
-            <Plus size={18} className="text-[#c62d23] group-hover:scale-110 transition-transform" />
-            Add Staff
+            <Plus size={20} />
           </button>
         </div>
 
-        <div className="p-8 space-y-8">
+        {/* Desktop HEADER */}
+        <div className="hidden lg:block sticky top-0 z-10 bg-white/80 backdrop-blur border-b border-gray-200 p-6 shadow-sm">
+          <div className="flex justify-between items-center">
+            <div>
+              <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-2">
+                <span>Staff Management</span>
+              </h1>
+              <p className="text-gray-600 mt-2">
+                Manage and track all staff members
+              </p>
+            </div>
+            
+            <button
+              onClick={() => setShowForm(true)}
+              className="bg-white px-5 py-3 rounded-xl border-2 border-gray-200 shadow-sm hover:border-[#c62d23] hover:shadow-md transition-all duration-200 cursor-pointer group flex items-center gap-2 font-medium"
+            >
+              <Plus size={18} className="text-[#c62d23] group-hover:scale-110 transition-transform" />
+              Add Staff
+            </button>
+          </div>
+        </div>
+
+        <div className="p-4 sm:p-6 lg:p-8 space-y-6 lg:space-y-8">
           {/* STATS */}
-          <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
-  <KpiCard
-    title="Total Staff"
-    value={totalStaff}
-    icon={<Users className="text-[#c62d23]" />}
-    onClick={() => setRoleFilter("All")}
-    isClickable={true}
-  />
-  <KpiCard
-    title="Sales Team"
-    value={salesCount}
-    icon={<UserCheck className="text-[#c62d23]" />}
-    onClick={() => setRoleFilter("sales")}
-    isClickable={true}
-  />
-  <KpiCard
-    title="Warehouse Team"
-    value={warehouseCount}
-    icon={<UserCog className="text-[#c62d23]" />}
-    onClick={() => setRoleFilter("warehouse")}
-    isClickable={true}
-  />
-  <KpiCard
-    title="Fitting Team"
-    value={fittingCount}
-    icon={<UserCheck className="text-[#c62d23]" />}
-    onClick={() => setRoleFilter("fitting")}
-    isClickable={true}
-  />
-  <KpiCard
-    title="Production Team"
-    value={productionCount}
-    icon={<UserCheck className="text-[#c62d23]" />}
-    onClick={() => setRoleFilter("production")}
-    isClickable={true}
-  />
-</div>
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4 lg:gap-6">
+            <KpiCard
+              title="Total Staff"
+              value={totalStaff}
+              icon={<Users className="text-[#c62d23]" />}
+              onClick={() => setRoleFilter("All")}
+              isClickable={true}
+            />
+            <KpiCard
+              title="Sales Team"
+              value={salesCount}
+              icon={<UserCheck className="text-[#c62d23]" />}
+              onClick={() => setRoleFilter("sales")}
+              isClickable={true}
+            />
+            <KpiCard
+              title="Warehouse Team"
+              value={warehouseCount}
+              icon={<UserCog className="text-[#c62d23]" />}
+              onClick={() => setRoleFilter("warehouse")}
+              isClickable={true}
+            />
+            <KpiCard
+              title="Fitting Team"
+              value={fittingCount}
+              icon={<UserCheck className="text-[#c62d23]" />}
+              onClick={() => setRoleFilter("fitting")}
+              isClickable={true}
+            />
+            <KpiCard
+              title="Production Team"
+              value={productionCount}
+              icon={<UserCheck className="text-[#c62d23]" />}
+              onClick={() => setRoleFilter("production")}
+              isClickable={true}
+            />
+          </div>
 
           {/* SEARCH & TABLE */}
-          <div className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm hover:shadow-md transition-shadow">
-            <div className="mb-6">
+          <div className="bg-white border border-gray-200 rounded-xl sm:rounded-2xl p-4 sm:p-6 shadow-sm hover:shadow-md transition-shadow">
+            <div className="mb-4 sm:mb-6">
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
                 <input
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
-                  placeholder="Search staff by name, email or role..."
-                  className="w-full p-3 pl-10 bg-white rounded-xl border-2 border-gray-200 focus:border-[#c62d23] focus:ring-2 focus:ring-[#c62d23]/20 outline-none transition-all"
+                  placeholder="Search staff..."
+                  className="w-full p-2.5 sm:p-3 pl-10 bg-white rounded-lg sm:rounded-xl border-2 border-gray-200 focus:border-[#c62d23] focus:ring-2 focus:ring-[#c62d23]/20 outline-none transition-all text-sm sm:text-base"
                 />
               </div>
             </div>
 
-            {/* TABLE */}
-            <div className="overflow-auto rounded-lg border border-gray-200">
+            {/* Desktop TABLE */}
+            <div className="hidden lg:block overflow-auto rounded-lg border border-gray-200">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="bg-gray-50">
@@ -367,6 +405,59 @@ export default function Staff() {
                 </div>
               )}
             </div>
+
+            {/* Mobile CARD VIEW */}
+            <div className="lg:hidden space-y-3">
+              {filteredStaff.length === 0 ? (
+                <div className="p-8 text-center text-gray-500">
+                  No staff members found
+                </div>
+              ) : (
+                filteredStaff.map((s) => (
+                  <div
+                    key={s._id}
+                    className="border border-gray-200 rounded-lg p-3 sm:p-4 bg-white hover:border-[#c62d23] transition-colors"
+                  >
+                    <div className="flex items-start gap-3 mb-3">
+                      <img
+                        src={s.photo || "/avatar.png"}
+                        className="w-12 h-12 sm:w-14 sm:h-14 rounded-full object-cover border-2 border-gray-200"
+                        alt={s.name}
+                      />
+                      <div className="flex-1 min-w-0">
+                        <h3 className="font-semibold text-gray-900 text-sm sm:text-base truncate">
+                          {s.name}
+                        </h3>
+                        <p className="text-xs sm:text-sm text-gray-600 truncate">
+                          {s.email}
+                        </p>
+                        <span className="inline-block mt-1 px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                          {s.role}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="space-y-2 text-xs sm:text-sm">
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">Mobile:</span>
+                        <span className="font-medium text-gray-900">{s.mobile}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">Aadhar:</span>
+                        <span className="font-medium text-gray-900">{s.aadharNumber}</span>
+                      </div>
+                    </div>
+
+                    <button
+                      onClick={() => setSelectedStaff(s)}
+                      className="w-full mt-3 text-xs sm:text-sm text-[#c62d23] hover:text-[#a8241c] font-medium hover:underline"
+                    >
+                      View Full Details
+                    </button>
+                  </div>
+                ))
+              )}
+            </div>
           </div>
         </div>
       </div>
@@ -375,9 +466,9 @@ export default function Staff() {
       {selectedStaff && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl w-full max-w-md border border-gray-200 shadow-lg max-h-[90vh] flex flex-col">
-            <div className="p-6 border-b border-gray-200">
+            <div className="p-4 sm:p-6 border-b border-gray-200">
               <div className="flex justify-between items-center">
-                <h2 className="text-xl font-bold text-gray-900">Staff Details</h2>
+                <h2 className="text-lg sm:text-xl font-bold text-gray-900">Staff Details</h2>
                 <button
                   onClick={() => setSelectedStaff(null)}
                   className="p-2 rounded-lg hover:bg-gray-100 transition-colors cursor-pointer"
@@ -387,7 +478,7 @@ export default function Staff() {
               </div>
             </div>
 
-            <div className="flex-1 overflow-y-auto p-6">
+            <div className="flex-1 overflow-y-auto p-4 sm:p-6">
               <div className="flex flex-col items-center">
                 <img
                   src={selectedStaff.photo || "/avatar.png"}
@@ -398,46 +489,46 @@ export default function Staff() {
                       title: "Profile Photo",
                     })
                   }
-                  className="w-28 h-28 rounded-full object-cover border-4 border-gray-200 cursor-pointer hover:opacity-80 transition"
+                  className="w-24 h-24 sm:w-28 sm:h-28 rounded-full object-cover border-4 border-gray-200 cursor-pointer hover:opacity-80 transition"
                   alt={selectedStaff.name}
                 />
 
-                <h2 className="mt-4 text-xl font-bold text-gray-900">{selectedStaff.name}</h2>
-                <span className="mt-2 px-4 py-1 rounded-full text-sm font-medium bg-gray-100 text-gray-800">
+                <h2 className="mt-4 text-lg sm:text-xl font-bold text-gray-900">{selectedStaff.name}</h2>
+                <span className="mt-2 px-4 py-1 rounded-full text-xs sm:text-sm font-medium bg-gray-100 text-gray-800">
                   {selectedStaff.role}
                 </span>
               </div>
 
-              <div className="mt-6 space-y-4">
+              <div className="mt-6 space-y-3 sm:space-y-4">
                 <div className="flex justify-between py-2 border-b border-gray-200">
-                  <span className="text-gray-600">Email</span>
-                  <span className="font-medium text-gray-900">{selectedStaff.email}</span>
+                  <span className="text-xs sm:text-sm text-gray-600">Email</span>
+                  <span className="text-xs sm:text-sm font-medium text-gray-900 truncate ml-2">{selectedStaff.email}</span>
                 </div>
                 <div className="flex justify-between py-2 border-b border-gray-200">
-                  <span className="text-gray-600">Mobile</span>
-                  <span className="font-medium text-gray-900">{selectedStaff.mobile}</span>
+                  <span className="text-xs sm:text-sm text-gray-600">Mobile</span>
+                  <span className="text-xs sm:text-sm font-medium text-gray-900">{selectedStaff.mobile}</span>
                 </div>
                 <div className="flex justify-between py-2 border-b border-gray-200">
-                  <span className="text-gray-600">Aadhar</span>
-                  <span className="font-medium text-gray-900">{selectedStaff.aadharNumber}</span>
+                  <span className="text-xs sm:text-sm text-gray-600">Aadhar</span>
+                  <span className="text-xs sm:text-sm font-medium text-gray-900">{selectedStaff.aadharNumber}</span>
                 </div>
                 <div className="flex justify-between py-2 border-b border-gray-200">
-                  <span className="text-gray-600">Date of Birth</span>
-                  <span className="font-medium text-gray-900">
+                  <span className="text-xs sm:text-sm text-gray-600">Date of Birth</span>
+                  <span className="text-xs sm:text-sm font-medium text-gray-900">
                     {new Date(selectedStaff.dateOfBirth).toLocaleDateString()}
                   </span>
                 </div>
                 <div className="flex justify-between py-2">
-                  <span className="text-gray-600">Blood Group</span>
-                  <span className="font-medium text-gray-900">{selectedStaff.bloodGroup}</span>
+                  <span className="text-xs sm:text-sm text-gray-600">Blood Group</span>
+                  <span className="text-xs sm:text-sm font-medium text-gray-900">{selectedStaff.bloodGroup}</span>
                 </div>
               </div>
 
               {/* AADHAR PHOTOS */}
               {(selectedStaff.aadharPhotoFront || selectedStaff.aadharPhotoBack) && (
                 <div className="mt-6">
-                  <p className="text-sm text-gray-600 mb-3">Aadhar Card</p>
-                  <div className="grid grid-cols-2 gap-4">
+                  <p className="text-xs sm:text-sm text-gray-600 mb-3">Aadhar Card</p>
+                  <div className="grid grid-cols-2 gap-3 sm:gap-4">
                     {selectedStaff.aadharPhotoFront && (
                       <img
                         src={selectedStaff.aadharPhotoFront}
@@ -448,7 +539,7 @@ export default function Staff() {
                             title: "Aadhar Card - Front",
                           })
                         }
-                        className="rounded-lg border border-gray-200 object-cover cursor-pointer hover:opacity-80 transition w-full h-32"
+                        className="rounded-lg border border-gray-200 object-cover cursor-pointer hover:opacity-80 transition w-full h-28 sm:h-32"
                         alt="Aadhar Front"
                       />
                     )}
@@ -462,7 +553,7 @@ export default function Staff() {
                             title: "Aadhar Card - Back",
                           })
                         }
-                        className="rounded-lg border border-gray-200 object-cover cursor-pointer hover:opacity-80 transition w-full h-32"
+                        className="rounded-lg border border-gray-200 object-cover cursor-pointer hover:opacity-80 transition w-full h-28 sm:h-32"
                         alt="Aadhar Back"
                       />
                     )}
@@ -476,16 +567,16 @@ export default function Staff() {
 
       {/* ===== IMAGE VIEWER MODAL ===== */}
       {imageViewer.open && (
-        <div className="fixed inset-0 bg-black/90 z-[999] flex items-center justify-center">
+        <div className="fixed inset-0 bg-black/90 z-[999] flex items-center justify-center p-4">
           <button
             onClick={() => setImageViewer({ open: false, src: "", title: "" })}
-            className="absolute top-6 right-6 text-white hover:text-[#c62d23] cursor-pointer"
+            className="absolute top-4 sm:top-6 right-4 sm:right-6 text-white hover:text-[#c62d23] cursor-pointer"
           >
-            <X size={28} />
+            <X size={24} className="sm:w-7 sm:h-7" />
           </button>
 
-          <div className="max-w-3xl w-full px-4">
-            <p className="text-center text-gray-300 mb-3">{imageViewer.title}</p>
+          <div className="max-w-3xl w-full">
+            <p className="text-center text-gray-300 mb-3 text-sm sm:text-base">{imageViewer.title}</p>
             <img
               src={imageViewer.src}
               className="w-full max-h-[80vh] object-contain rounded-lg border border-gray-700"
@@ -499,9 +590,9 @@ export default function Staff() {
       {showForm && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl w-full max-w-lg border border-gray-200 shadow-lg max-h-[90vh] flex flex-col">
-            <div className="p-6 border-b border-gray-200">
+            <div className="p-4 sm:p-6 border-b border-gray-200">
               <div className="flex justify-between items-center">
-                <h2 className="text-xl font-bold text-gray-900">Add New Staff Member</h2>
+                <h2 className="text-lg sm:text-xl font-bold text-gray-900">Add New Staff Member</h2>
                 <button
                   onClick={() => {
                     setShowForm(false);
@@ -524,8 +615,8 @@ export default function Staff() {
               </div>
             </div>
 
-            <div className="flex-1 overflow-y-auto p-6">
-              <form onSubmit={handleSubmit} className="space-y-5">
+            <div className="flex-1 overflow-y-auto p-4 sm:p-6">
+              <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-5">
                 <div className="relative">
                   <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                   <input
@@ -534,7 +625,7 @@ export default function Staff() {
                     onChange={handleChange}
                     placeholder="Full Name"
                     required
-                    className="w-full pl-10 pr-4 py-3 bg-white rounded-xl border-2 border-gray-200 focus:border-[#c62d23] focus:ring-2 focus:ring-[#c62d23]/20 outline-none transition-all"
+                    className="w-full pl-10 pr-4 py-2.5 sm:py-3 bg-white rounded-lg sm:rounded-xl border-2 border-gray-200 focus:border-[#c62d23] focus:ring-2 focus:ring-[#c62d23]/20 outline-none transition-all text-sm sm:text-base"
                   />
                 </div>
 
@@ -547,7 +638,7 @@ export default function Staff() {
                     onChange={handleChange}
                     placeholder="Email"
                     required
-                    className="w-full pl-10 pr-4 py-3 bg-white rounded-xl border-2 border-gray-200 focus:border-[#c62d23] focus:ring-2 focus:ring-[#c62d23]/20 outline-none transition-all"
+                    className="w-full pl-10 pr-4 py-2.5 sm:py-3 bg-white rounded-lg sm:rounded-xl border-2 border-gray-200 focus:border-[#c62d23] focus:ring-2 focus:ring-[#c62d23]/20 outline-none transition-all text-sm sm:text-base"
                   />
                 </div>
 
@@ -560,7 +651,7 @@ export default function Staff() {
                     onChange={handleChange}
                     placeholder="Password"
                     required
-                    className="w-full pl-10 pr-4 py-3 bg-white rounded-xl border-2 border-gray-200 focus:border-[#c62d23] focus:ring-2 focus:ring-[#c62d23]/20 outline-none transition-all"
+                    className="w-full pl-10 pr-4 py-2.5 sm:py-3 bg-white rounded-lg sm:rounded-xl border-2 border-gray-200 focus:border-[#c62d23] focus:ring-2 focus:ring-[#c62d23]/20 outline-none transition-all text-sm sm:text-base"
                   />
                 </div>
 
@@ -572,7 +663,7 @@ export default function Staff() {
                     onChange={handleChange}
                     placeholder="Mobile Number"
                     required
-                    className="w-full pl-10 pr-4 py-3 bg-white rounded-xl border-2 border-gray-200 focus:border-[#c62d23] focus:ring-2 focus:ring-[#c62d23]/20 outline-none transition-all"
+                    className="w-full pl-10 pr-4 py-2.5 sm:py-3 bg-white rounded-lg sm:rounded-xl border-2 border-gray-200 focus:border-[#c62d23] focus:ring-2 focus:ring-[#c62d23]/20 outline-none transition-all text-sm sm:text-base"
                   />
                 </div>
 
@@ -584,19 +675,20 @@ export default function Staff() {
                     onChange={handleChange}
                     placeholder="Aadhar Number"
                     required
-                    className="w-full pl-10 pr-4 py-3 bg-white rounded-xl border-2 border-gray-200 focus:border-[#c62d23] focus:ring-2 focus:ring-[#c62d23]/20 outline-none transition-all"
+                    className="w-full pl-10 pr-4 py-2.5 sm:py-3 bg-white rounded-lg sm:rounded-xl border-2 border-gray-200 focus:border-[#c62d23] focus:ring-2 focus:ring-[#c62d23]/20 outline-none transition-all text-sm sm:text-base"
                   />
                 </div>
 
                 {/* AADHAR PHOTOS */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-2">
                     Aadhar Card Photos
                   </label>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    <label className="cursor-pointer flex items-center justify-center gap-2 bg-white border-2 border-gray-200 hover:border-[#c62d23] px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200">
-                      <Upload size={16} className="text-[#c62d23]" />
-                      Upload Front
+                  <div className="grid grid-cols-2 gap-2 sm:gap-3">
+                    <label className="cursor-pointer flex items-center justify-center gap-2 bg-white border-2 border-gray-200 hover:border-[#c62d23] px-3 sm:px-4 py-2.5 sm:py-3 rounded-lg sm:rounded-xl text-xs sm:text-sm font-medium transition-all duration-200">
+                      <Upload size={14} className="text-[#c62d23] sm:w-4 sm:h-4" />
+                      <span className="hidden xs:inline">Upload Front</span>
+                      <span className="xs:hidden">Front</span>
                       <input
                         type="file"
                         hidden
@@ -605,9 +697,10 @@ export default function Staff() {
                       />
                     </label>
 
-                    <label className="cursor-pointer flex items-center justify-center gap-2 bg-white border-2 border-gray-200 hover:border-[#c62d23] px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200">
-                      <Upload size={16} className="text-[#c62d23]" />
-                      Upload Back
+                    <label className="cursor-pointer flex items-center justify-center gap-2 bg-white border-2 border-gray-200 hover:border-[#c62d23] px-3 sm:px-4 py-2.5 sm:py-3 rounded-lg sm:rounded-xl text-xs sm:text-sm font-medium transition-all duration-200">
+                      <Upload size={14} className="text-[#c62d23] sm:w-4 sm:h-4" />
+                      <span className="hidden xs:inline">Upload Back</span>
+                      <span className="xs:hidden">Back</span>
                       <input
                         type="file"
                         hidden
@@ -619,7 +712,7 @@ export default function Staff() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-2">
                     Date of Birth
                   </label>
                   <input
@@ -627,20 +720,20 @@ export default function Staff() {
                     name="dateOfBirth"
                     value={form.dateOfBirth}
                     onChange={handleChange}
-                    className="w-full p-3 bg-white rounded-xl border-2 border-gray-200 focus:border-[#c62d23] focus:ring-2 focus:ring-[#c62d23]/20 outline-none transition-all"
+                    className="w-full p-2.5 sm:p-3 bg-white rounded-lg sm:rounded-xl border-2 border-gray-200 focus:border-[#c62d23] focus:ring-2 focus:ring-[#c62d23]/20 outline-none transition-all text-sm sm:text-base"
                     required
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-2">
                     Blood Group
                   </label>
                   <select
                     name="bloodGroup"
                     value={form.bloodGroup}
                     onChange={handleChange}
-                    className="w-full p-3 bg-white rounded-xl border-2 border-gray-200 focus:border-[#c62d23] focus:ring-2 focus:ring-[#c62d23]/20 outline-none transition-all"
+                    className="w-full p-2.5 sm:p-3 bg-white rounded-lg sm:rounded-xl border-2 border-gray-200 focus:border-[#c62d23] focus:ring-2 focus:ring-[#c62d23]/20 outline-none transition-all text-sm sm:text-base"
                     required
                   >
                     <option value="">Select Blood Group</option>
@@ -656,14 +749,14 @@ export default function Staff() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-2">
                     Role
                   </label>
                   <select
                     name="role"
                     value={form.role}
                     onChange={handleChange}
-                    className="w-full p-3 bg-white rounded-xl border-2 border-gray-200 focus:border-[#c62d23] focus:ring-2 focus:ring-[#c62d23]/20 outline-none transition-all"
+                    className="w-full p-2.5 sm:p-3 bg-white rounded-lg sm:rounded-xl border-2 border-gray-200 focus:border-[#c62d23] focus:ring-2 focus:ring-[#c62d23]/20 outline-none transition-all text-sm sm:text-base"
                   >
                     <option value="sales">Sales</option>
                     <option value="warehouse">Warehouse</option>
@@ -673,12 +766,12 @@ export default function Staff() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-2">
                     Photo
                   </label>
-                  <div className="flex gap-3">
-                    <label className="cursor-pointer flex items-center gap-2 bg-white border-2 border-gray-200 hover:border-[#c62d23] px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200">
-                      <Upload size={16} className="text-[#c62d23]" />
+                  <div className="flex gap-2 sm:gap-3">
+                    <label className="cursor-pointer flex items-center gap-2 bg-white border-2 border-gray-200 hover:border-[#c62d23] px-3 sm:px-4 py-2.5 sm:py-3 rounded-lg sm:rounded-xl text-xs sm:text-sm font-medium transition-all duration-200">
+                      <Upload size={14} className="text-[#c62d23] sm:w-4 sm:h-4" />
                       Upload
                       <input
                         type="file"
@@ -690,9 +783,9 @@ export default function Staff() {
                     <button
                       type="button"
                       onClick={openCamera}
-                      className="flex items-center gap-2 bg-white border-2 border-gray-200 hover:border-[#c62d23] px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200 cursor-pointer"
+                      className="flex items-center gap-2 bg-white border-2 border-gray-200 hover:border-[#c62d23] px-3 sm:px-4 py-2.5 sm:py-3 rounded-lg sm:rounded-xl text-xs sm:text-sm font-medium transition-all duration-200 cursor-pointer"
                     >
-                      <Camera size={16} className="text-[#c62d23]" />
+                      <Camera size={14} className="text-[#c62d23] sm:w-4 sm:h-4" />
                       Camera
                     </button>
                   </div>
@@ -702,7 +795,7 @@ export default function Staff() {
                   <div className="flex justify-center">
                     <img
                       src={preview}
-                      className="w-32 h-32 rounded-lg object-cover border-2 border-gray-200"
+                      className="w-28 h-28 sm:w-32 sm:h-32 rounded-lg object-cover border-2 border-gray-200"
                       alt="Preview"
                     />
                   </div>
@@ -710,13 +803,13 @@ export default function Staff() {
 
                 {/* AADHAR PREVIEW */}
                 {(aadharFrontPreview || aadharBackPreview) && (
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-2 gap-3 sm:gap-4">
                     {aadharFrontPreview && (
                       <div className="text-center">
                         <p className="text-xs text-gray-600 mb-1">Front</p>
                         <img
                           src={aadharFrontPreview}
-                          className="w-full h-32 object-cover rounded-lg border border-gray-200"
+                          className="w-full h-28 sm:h-32 object-cover rounded-lg border border-gray-200"
                           alt="Aadhar Front"
                         />
                       </div>
@@ -727,7 +820,7 @@ export default function Staff() {
                         <p className="text-xs text-gray-600 mb-1">Back</p>
                         <img
                           src={aadharBackPreview}
-                          className="w-full h-32 object-cover rounded-lg border border-gray-200"
+                          className="w-full h-28 sm:h-32 object-cover rounded-lg border border-gray-200"
                           alt="Aadhar Back"
                         />
                       </div>
@@ -745,7 +838,7 @@ export default function Staff() {
                     <button
                       type="button"
                       onClick={capturePhoto}
-                      className="w-full bg-[#c62d23] hover:bg-[#a8241c] text-white py-3 rounded-xl font-medium transition-all duration-200 shadow-sm hover:shadow-md cursor-pointer"
+                      className="w-full bg-[#c62d23] hover:bg-[#a8241c] text-white py-2.5 sm:py-3 rounded-lg sm:rounded-xl font-medium transition-all duration-200 shadow-sm hover:shadow-md cursor-pointer text-sm sm:text-base"
                     >
                       Capture Photo
                     </button>
@@ -754,7 +847,7 @@ export default function Staff() {
                 )}
 
                 {message && (
-                  <div className={`text-sm px-4 py-3 rounded-lg ${
+                  <div className={`text-xs sm:text-sm px-3 sm:px-4 py-2.5 sm:py-3 rounded-lg ${
                     message.includes("success")
                       ? "bg-green-50 text-green-700 border border-green-200"
                       : "bg-red-50 text-red-700 border border-red-200"
@@ -766,7 +859,7 @@ export default function Staff() {
                 <button
                   type="submit"
                   disabled={loading}
-                  className="w-full bg-[#c62d23] hover:bg-[#a8241c] disabled:opacity-50 disabled:cursor-not-allowed text-white py-3 rounded-xl font-medium transition-all duration-200 shadow-sm hover:shadow-md cursor-pointer"
+                  className="w-full bg-[#c62d23] hover:bg-[#a8241c] disabled:opacity-50 disabled:cursor-not-allowed text-white py-2.5 sm:py-3 rounded-lg sm:rounded-xl font-medium transition-all duration-200 shadow-sm hover:shadow-md cursor-pointer text-sm sm:text-base"
                 >
                   {loading ? "Adding Staff..." : "Add Staff Member"}
                 </button>
@@ -784,15 +877,15 @@ const KpiCard = ({ title, value, icon, onClick, isClickable }) => (
   <button
     onClick={onClick}
     disabled={!isClickable}
-    className={`bg-white border border-gray-200 rounded-2xl p-6 transition-all duration-200 shadow-sm hover:shadow-md flex flex-col justify-between h-full text-left ${
+    className={`bg-white border border-gray-200 rounded-xl sm:rounded-2xl p-3 sm:p-4 lg:p-6 transition-all duration-200 shadow-sm hover:shadow-md flex flex-col justify-between h-full text-left ${
       isClickable ? 'cursor-pointer hover:border-[#c62d23]' : ''
     }`}
     style={{ borderLeft: '4px solid #c62d23' }}
   >
-    <div className="flex justify-between items-start mb-4">
-      <p className="text-sm text-gray-600 font-medium">{title}</p>
-      {React.cloneElement(icon, { size: 24 })}
+    <div className="flex justify-between items-start mb-2 sm:mb-3 lg:mb-4">
+      <p className="text-xs sm:text-sm text-gray-600 font-medium">{title}</p>
+      {React.cloneElement(icon, { size: 18, className: "sm:w-5 sm:h-5 lg:w-6 lg:h-6" })}
     </div>
-    <p className="text-3xl font-bold text-gray-900">{value}</p>
+    <p className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900">{value}</p>
   </button>
 );
