@@ -38,6 +38,7 @@ export default function InventoryPage() {
 
   const [form, setForm] = useState({
     chairType: "",
+    colour: "",
     vendor: "",
     quantity: "",
   });
@@ -76,7 +77,7 @@ export default function InventoryPage() {
   useEffect(() => {
     fetchInventory();
   }, []);
-  
+
   useEffect(() => {
     const fetchVendors = async () => {
       const res = await axios.get(`${API}/vendors`, { headers });
@@ -92,11 +93,11 @@ export default function InventoryPage() {
       if (!form.chairType || !form.vendor || form.quantity === "") {
         return alert("All fields required");
       }
-
       const payload = {
         type: "FULL",
         chairType: form.chairType,
-        vendor: form.vendor, // ObjectId
+        colour: form.colour,
+        vendor: form.vendor,
         quantity: Number(form.quantity),
         minQuantity: 50,
         maxQuantity: 500,
@@ -112,7 +113,8 @@ export default function InventoryPage() {
       }
 
       setShowForm(false);
-      setForm({ chairType: "", vendor: "", quantity: "" });
+      setForm({ chairType: "", colour: "", vendor: "", quantity: "" });
+
       setEditId(null);
       fetchInventory();
     } catch (err) {
@@ -135,16 +137,20 @@ export default function InventoryPage() {
   const inventoryData = useMemo(() => {
     return inventory.map((item) => {
       const qty = Number(item.quantity || 0);
+      const minQty = Number(item.minQuantity || 0);
 
       let status = "Healthy";
       if (qty === 0) status = "Critical";
-      else if (qty < 100) status = "Low Stock";
+      else if (qty < minQty) status = "Low Stock";
 
       return {
         id: item._id,
         name: item.chairType || "",
+        colour: item.colour || "—",
         vendor: item.vendor || null,
         quantity: qty,
+        minQuantity: minQty,
+        location: item.location || "—",
         status,
       };
     });
@@ -192,7 +198,7 @@ export default function InventoryPage() {
   const closeModal = () => {
     setShowForm(false);
     setEditId(null);
-    setForm({ chairType: "", vendor: "", quantity: "" });
+    setForm({ chairType: "", colour: "", vendor: "", quantity: "" });
   };
 
   /* ================= UI ================= */
@@ -211,7 +217,7 @@ export default function InventoryPage() {
             className="lg:hidden fixed inset-0 bg-black/50 backdrop-blur-sm z-40 animate-fadeIn"
             onClick={() => setMobileMenuOpen(false)}
           />
-          
+
           {/* Sidebar - Slides in from left */}
           <div className="lg:hidden fixed inset-y-0 left-0 z-50 transform transition-transform duration-300 ease-in-out">
             <div className="animate-slideInLeft">
@@ -229,7 +235,10 @@ export default function InventoryPage() {
               {/* LEFT - TITLE */}
               <div className="flex-1 min-w-0">
                 <h1 className="text-lg sm:text-2xl md:text-3xl font-bold text-gray-900 flex items-center gap-2">
-                  <Package size={24} className="text-[#c62d23] flex-shrink-0 sm:w-8 sm:h-8" />
+                  <Package
+                    size={24}
+                    className="text-[#c62d23] flex-shrink-0 sm:w-8 sm:h-8"
+                  />
                   <span className="truncate">Inventory</span>
                 </h1>
                 <p className="text-xs sm:text-sm text-gray-600 mt-1 hidden sm:block">
@@ -313,7 +322,10 @@ export default function InventoryPage() {
               <div className="grid grid-cols-2 gap-3">
                 {/* Vendor */}
                 <div className="flex items-center gap-2 bg-gray-50 px-3 md:px-4 py-3 rounded-xl border border-gray-200">
-                  <Building2 size={16} className="text-gray-400 flex-shrink-0" />
+                  <Building2
+                    size={16}
+                    className="text-gray-400 flex-shrink-0"
+                  />
                   <select
                     value={filterVendor}
                     onChange={(e) => setFilterVendor(e.target.value)}
@@ -369,9 +381,12 @@ export default function InventoryPage() {
                   <thead>
                     <tr className="bg-gray-50 border-b border-gray-200">
                       {[
-                        "Product",
+                        "Item Name",
+                        "Colour",
                         "Vendor",
-                        "Quantity",
+                        "Available Qty",
+                        "Minimum Stock",
+                        "Location",
                         "Status",
                         "Actions",
                       ].map((h) => (
@@ -396,18 +411,28 @@ export default function InventoryPage() {
                         <td className="p-4 font-medium text-gray-900">
                           {i.name}
                         </td>
+
+                        <td className="p-4 text-gray-700">{i.colour}</td>
+
                         <td className="p-4">
                           <div className="flex items-center gap-2 text-gray-700">
                             <Building2 size={16} className="text-gray-400" />
                             {i.vendor?.name || "—"}
                           </div>
                         </td>
+
                         <td className="p-4 font-semibold text-gray-900">
                           {i.quantity}
                         </td>
+
+                        <td className="p-4 text-gray-700">{i.minQuantity}</td>
+
+                        <td className="p-4 text-gray-700">{i.location}</td>
+
                         <td className="p-4">
                           <StatusBadge status={i.status} />
                         </td>
+
                         <td className="p-4">
                           <div className="flex gap-2">
                             <button
@@ -415,13 +440,14 @@ export default function InventoryPage() {
                                 setEditId(i.id);
                                 setForm({
                                   chairType: i.name,
+                                  colour: i.colour,
                                   vendor: i.vendor?._id,
                                   quantity: i.quantity,
                                 });
+
                                 setShowForm(true);
                               }}
                               className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                              title="Edit"
                             >
                               <Pencil size={16} />
                             </button>
@@ -429,7 +455,6 @@ export default function InventoryPage() {
                             <button
                               onClick={() => deleteInventory(i.id)}
                               className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                              title="Delete"
                             >
                               <Trash2 size={16} />
                             </button>
@@ -441,7 +466,7 @@ export default function InventoryPage() {
                     {filteredData.length === 0 && (
                       <tr>
                         <td
-                          colSpan={5}
+                          colSpan={8}
                           className="p-8 text-center text-gray-500"
                         >
                           No inventory found
@@ -479,7 +504,9 @@ export default function InventoryPage() {
                       </h3>
                       <div className="flex items-center gap-2 text-gray-600 mt-1 text-sm">
                         <Building2 size={14} className="text-gray-400" />
-                        <span className="truncate">{i.vendor?.name || "—"}</span>
+                        <span className="truncate">
+                          {i.vendor?.name || "—"}
+                        </span>
                       </div>
                     </div>
                     <StatusBadge status={i.status} />
@@ -499,9 +526,11 @@ export default function InventoryPage() {
                           setEditId(i.id);
                           setForm({
                             chairType: i.name,
+                            colour: i.colour,
                             vendor: i.vendor?._id,
                             quantity: i.quantity,
                           });
+
                           setShowForm(true);
                         }}
                         className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
@@ -554,6 +583,12 @@ export default function InventoryPage() {
                   value={form.chairType}
                   onChange={(v) => setForm({ ...form, chairType: v })}
                   placeholder="Enter chair type"
+                />
+                <Input
+                  label="Colour"
+                  value={form.colour}
+                  onChange={(v) => setForm({ ...form, colour: v })}
+                  placeholder="Enter colour"
                 />
 
                 <div>
@@ -629,7 +664,9 @@ const StatCard = ({ title, value, icon, danger }) => {
         <p className="text-xs md:text-sm text-gray-600 font-medium">{title}</p>
         {React.cloneElement(icon, { size: 20, className: "md:w-6 md:h-6" })}
       </div>
-      <p className="text-2xl md:text-3xl font-bold text-gray-900">{safeValue}</p>
+      <p className="text-2xl md:text-3xl font-bold text-gray-900">
+        {safeValue}
+      </p>
     </div>
   );
 };

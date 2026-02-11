@@ -340,7 +340,6 @@ useEffect(() => {
   { key: "PRODUCTION_PENDING", label: "Production Pending" },
   { key: "PRODUCTION_IN_PROGRESS", label: "Production In Progress" },
   { key: "PRODUCTION_COMPLETED", label: "Production Completed" },
-  { key: "WAREHOUSE_COLLECTED", label: "Warehouse Collected" },
   { key: "FITTING_IN_PROGRESS", label: "Fitting In Progress" },
   { key: "FITTING_COMPLETED", label: "Fitting Completed" },
   { key: "READY_FOR_DISPATCH", label: "Ready For Dispatch" },

@@ -36,10 +36,12 @@ export default function InventoryPage() {
   const [vendorsList, setVendorsList] = useState([]);
 
   const [form, setForm] = useState({
-    chairType: "",
-    vendor: "",
-    quantity: "",
-  });
+  chairType: "",
+  vendor: "",
+  quantity: "",
+  color: "",        // ✅ ADDED
+});
+
 
   const router = useRouter();
 
@@ -92,14 +94,16 @@ export default function InventoryPage() {
       }
 
       const payload = {
-        type: "FULL",
-        chairType: form.chairType,
-        vendor: form.vendor, // ObjectId
-        quantity: Number(form.quantity),
-        minQuantity: 50,
-        maxQuantity: 500,
-        location: "WAREHOUSE",
-      };
+  type: "FULL",
+  chairType: form.chairType,
+  vendor: form.vendor,
+  quantity: Number(form.quantity),
+  colour: form.color,     // ✅ ADDED
+  minQuantity: 50,
+  maxQuantity: 500,
+  location: "WAREHOUSE",
+};
+
 
       if (editId) {
         await axios.patch(`${API}/inventory/update/${editId}`, payload, {
@@ -110,7 +114,8 @@ export default function InventoryPage() {
       }
 
       setShowForm(false);
-      setForm({ chairType: "", vendor: "", quantity: "" });
+      setForm({ chairType: "", vendor: "", quantity: "", color: "" });
+
       setEditId(null);
       fetchInventory();
     } catch (err) {
@@ -139,12 +144,15 @@ export default function InventoryPage() {
       else if (qty < 100) status = "Low Stock";
 
       return {
-        id: item._id,
-        name: item.chairType || "",
-        vendor: item.vendor || null,
-        quantity: qty,
-        status,
-      };
+  id: item._id,
+  name: item.chairType || "",
+  vendor: item.vendor || null,
+  quantity: qty,
+  color: item.colour || "",
+   // ✅ ADDED
+  status,
+};
+
     });
   }, [inventory]);
 
@@ -187,11 +195,17 @@ export default function InventoryPage() {
     [inventoryData],
   );
 
-  const closeModal = () => {
-    setShowForm(false);
-    setEditId(null);
-    setForm({ chairType: "", vendor: "", quantity: "" });
-  };
+ const closeModal = () => {
+  setShowForm(false);
+  setEditId(null);
+  setForm({
+    chairType: "",
+    vendor: "",
+    quantity: "",
+    color: "",
+  });
+};
+
 
   /* ================= UI ================= */
   return (
@@ -358,6 +372,7 @@ export default function InventoryPage() {
                     <tr className="bg-gray-50 border-b border-gray-200">
                       {[
                         "Product",
+                        "color",
                         "Vendor",
                         "Quantity",
                         "Status",
@@ -384,6 +399,9 @@ export default function InventoryPage() {
                         <td className="p-3 lg:p-4 font-medium text-gray-900 text-xs lg:text-sm">
                           {i.name}
                         </td>
+                        <td className="p-3 lg:p-4 text-gray-700 text-xs lg:text-sm">
+  {i.color || "—"}
+</td>
                         <td className="p-3 lg:p-4">
                           <div className="flex items-center gap-2 text-gray-700 text-xs lg:text-sm">
                             <Building2 size={14} className="text-gray-400 lg:w-4 lg:h-4" />
@@ -402,10 +420,12 @@ export default function InventoryPage() {
                               onClick={() => {
                                 setEditId(i.id);
                                 setForm({
-                                  chairType: i.name,
-                                  vendor: i.vendor?._id,
-                                  quantity: i.quantity,
-                                });
+  chairType: i.name,
+  vendor: i.vendor?._id,
+  quantity: i.quantity,
+  color: i.color || "",    // ✅ ADDED
+});
+
                                 setShowForm(true);
                               }}
                               className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
@@ -486,6 +506,7 @@ export default function InventoryPage() {
                             chairType: i.name,
                             vendor: i.vendor?._id,
                             quantity: i.quantity,
+                            color: i.color || "", 
                           });
                           setShowForm(true);
                         }}
@@ -560,6 +581,12 @@ export default function InventoryPage() {
                     ))}
                   </select>
                 </div>
+<Input
+  label="Color"
+  value={form.color}
+  onChange={(v) => setForm({ ...form, color: v })}
+  placeholder="Enter chair color"
+/>
 
                 <Input
                   label="Quantity"

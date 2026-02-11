@@ -9,17 +9,18 @@ export default function SalesLayout({ children }) {
 
   return (
     <ProtectedRoute allowedRoles={["sales"]}>
-      <div className="flex h-screen overflow-hidden">
-        {/* SIDEBAR */}
-        <aside className="fixed left-0 top-0 h-screen w-64 bg-white shadow-md z-40">
-          <SalesSidebar />
-        </aside>
+     <div className="flex h-screen bg-gray-50 overflow-hidden">
+      {/* Sidebar */}
+      <SalesSidebar />
 
-        {/* MAIN */}
-        <main className="ml-64 flex-1 h-screen overflow-y-auto bg-gray-50">
+      {/* Main Content Area */}
+      <div className="flex-1 overflow-auto">
+        {/* Add padding on mobile to account for hamburger button */}
+        <div className="lg:pl-0 pl-0">
           {children}
-        </main>
+        </div>
       </div>
+    </div>
     </ProtectedRoute>
   );
 }

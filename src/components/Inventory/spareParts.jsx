@@ -121,7 +121,8 @@ export default function SparePartsInventory() {
           { headers }
         );
       } else {
-        await axios.post(`${API}/inventory/spare-parts`, payload, { headers });
+        const res =  await axios.post(`${API}/inventory/spare-parts`, payload, { headers });
+        console.log("Create response:", res.data);
       }
 
       setShowForm(false);
@@ -289,6 +290,9 @@ export default function SparePartsInventory() {
     const set = new Set(items.map((i) => i.location));
     return Array.from(set);
   }, [items]);
+
+
+  console.log(items)
 
   /* ================= UI ================= */
   return (

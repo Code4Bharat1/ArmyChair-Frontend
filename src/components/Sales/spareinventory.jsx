@@ -57,15 +57,22 @@ export default function SparePartsInventory() {
 
   /* ================= FETCH ================= */
   const fetchParts = async () => {
-    try {
-      const res = await axios.get(`${API}/inventory/spare-parts`, { headers });
-      setItems(res.data.inventory || res.data);
-    } catch (err) {
-      console.error("Fetch failed", err);
-    } finally {
-      setLoading(false);
-    }
-  };
+  try {
+    const res = await axios.get(`${API}/inventory/spare-parts`, { headers });
+
+    const onlyWarehouse =
+      (res.data.inventory || []).filter(
+        (i) => i.locationType === "WAREHOUSE"
+      );
+
+    setItems(onlyWarehouse);
+  } catch (err) {
+    console.error("Fetch failed", err);
+  } finally {
+    setLoading(false);
+  }
+};
+
 
   useEffect(() => {
     fetchParts();
@@ -159,8 +166,10 @@ export default function SparePartsInventory() {
     role ? role.charAt(0).toUpperCase() + role.slice(1) : "—";
 
   /* ================= DATA ================= */
-  const data = useMemo(() => {
-    return items.map((i) => ({
+const data = useMemo(() => {
+  return items
+    .filter((i) => i.locationType === "WAREHOUSE") // 🔥 only warehouse
+    .map((i) => ({
       id: i._id,
       name: i.partName,
       source: `${formatRole(i.createdByRole)} - ${i.createdBy?.name || "—"}`,
@@ -169,7 +178,8 @@ export default function SparePartsInventory() {
       maxQuantity: i.maxQuantity,
       status: i.status,
     }));
-  }, [items]);
+}, [items]);
+
   const filteredData = useMemo(() => {
     if (statusFilter === "ALL") return data;
 

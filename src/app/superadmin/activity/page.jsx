@@ -38,7 +38,7 @@ export default function ActivityLogPage() {
     const res = await axios.get(`${API.replace("/api", "")}/activity`, {
       headers: { Authorization: `Bearer ${authToken}` },
     });
-    setLogs(res.data.data || []);
+    setLogs(res.data.logs || []);
 
     const exportsRes = await axios.get(`${API}/activity/files`, {
       headers: { Authorization: `Bearer ${authToken}` },

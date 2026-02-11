@@ -63,6 +63,10 @@ const menuItem = (href) =>
           <RotateCcw size={18} />
           Returns
         </Link>
+        <Link href="/superadmin/ClientReport" className={menuItem("/superadmin/ClientReport")}>
+          <Users size={18} />
+          Client List
+        </Link>
 
         <Link href="/superadmin/staff" className={menuItem("/superadmin/staff")}>
           <Users size={18} />

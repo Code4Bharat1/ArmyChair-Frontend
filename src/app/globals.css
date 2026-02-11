@@ -78,3 +78,36 @@ body {
   scrollbar-width: thin;
   scrollbar-color: rgba(245, 158, 11, 0.35) transparent;
 }
+.goog-te-banner-frame {
+  display: none !important;
+}
+
+.goog-te-gadget {
+  font-size: 0px !important;
+}
+
+.goog-te-combo {
+  display: none !important;
+}
+
+body {
+  top: 0px !important;
+}
+/* Hide Google top banner */
+.goog-te-banner-frame {
+  display: none !important;
+}
+
+/* Remove body shift */
+body {
+  top: 0px !important;
+}
+
+/* Hide Google branding area */
+.goog-logo-link {
+  display: none !important;
+}
+
+.goog-te-gadget {
+  font-size: 0px !important;
+}
