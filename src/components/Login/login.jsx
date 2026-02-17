@@ -9,6 +9,7 @@ import {
   AlertCircle,
   CheckCircle,
   ArrowRight,
+  RefreshCw,
 } from "lucide-react";
 import axios from "axios";
 import { useRouter } from "next/navigation";
@@ -23,7 +24,29 @@ export default function Login() {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
 
-  /* ================= SUBMIT HANDLER ================= */
+  /* CAPTCHA STATES */
+  const [showCaptcha, setShowCaptcha] = useState(false);
+  const [captchaSvg, setCaptchaSvg] = useState("");
+  const [captchaId, setCaptchaId] = useState("");
+  const [captchaValue, setCaptchaValue] = useState("");
+  const [captchaLoading, setCaptchaLoading] = useState(false);
+
+  /* LOAD CAPTCHA */
+  const loadCaptcha = async () => {
+    setCaptchaLoading(true);
+    try {
+      const res = await axios.get(
+        `${process.env.NEXT_PUBLIC_API_URL}/auth/captcha`
+      );
+      setCaptchaSvg(res.data.svg);
+      setCaptchaId(res.data.id);
+      setCaptchaValue("");
+    } finally {
+      setCaptchaLoading(false);
+    }
+  };
+
+  /* SUBMIT HANDLER */
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
@@ -38,48 +61,52 @@ export default function Login() {
 
       const res = await axios.post(
         `${process.env.NEXT_PUBLIC_API_URL}/auth/login`,
-        { email, password }
+        {
+          email,
+          password,
+          captchaId,
+          captchaValue,
+        }
       );
 
-      const { token, user } = res.data; // user must contain role
+      const { token, user } = res.data;
 
-      // 🔐 Store in localStorage
       localStorage.setItem("token", token);
       localStorage.setItem("user", JSON.stringify(user));
 
       setSuccess("Login successful. Redirecting...");
 
-      // 🚀 ROLE BASED REDIRECT
       setTimeout(() => {
         switch (user.role) {
           case "admin":
             router.push("/superadmin/dashboard");
             break;
-
           case "fitting":
             router.push("/fitting");
             break;
-
           case "production":
             router.push("/production/incomingorders");
             break;
-
           case "sales":
             router.push("/sales/order");
             break;
-
           case "warehouse":
             router.push("/inventory/full-chair");
             break;
-
           default:
-            router.push("/dashboard"); // normal user / supervisor
+            router.push("/dashboard");
         }
       }, 800);
     } catch (err) {
       setError(
         err.response?.data?.message || "Invalid credentials. Please try again."
       );
+
+      /* SHOW CAPTCHA ONLY WHEN BACKEND ASKS */
+      if (err.response?.data?.requireCaptcha) {
+        setShowCaptcha(true);
+        loadCaptcha();
+      }
     } finally {
       setIsLoading(false);
     }
@@ -90,10 +117,10 @@ export default function Login() {
       <div className="w-full max-w-md">
         {/* Header */}
         <div className="text-center mb-8 flex flex-col items-center">
-          <div className=" rounded-2xl p-4 mb-0 ">
+          <div className="rounded-2xl p-4 mb-0">
             <img
               src="/image.png"
-              alt="Army Industry Logo"
+              alt="Army Industries Logo"
               className="w-24 h-24 object-contain"
             />
           </div>
@@ -133,7 +160,7 @@ export default function Login() {
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="you@example.com"
                   className="w-full bg-white border border-gray-200 rounded-xl pl-12 pr-4 py-3.5 text-sm text-gray-900 placeholder-gray-400 focus:border-[#c62d23] focus:ring-2 focus:ring-[#c62d23]/20 focus:outline-none transition-all"
-                  onKeyDown={(e) => e.key === 'Enter' && handleSubmit(e)}
+                  onKeyDown={(e) => e.key === "Enter" && handleSubmit(e)}
                 />
               </div>
             </div>
@@ -151,7 +178,7 @@ export default function Login() {
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="Enter your password"
                   className="w-full bg-white border border-gray-200 rounded-xl pl-12 pr-12 py-3.5 text-sm text-gray-900 placeholder-gray-400 focus:border-[#c62d23] focus:ring-2 focus:ring-[#c62d23]/20 focus:outline-none transition-all"
-                  onKeyDown={(e) => e.key === 'Enter' && handleSubmit(e)}
+                  onKeyDown={(e) => e.key === "Enter" && handleSubmit(e)}
                 />
                 <button
                   type="button"
@@ -167,7 +194,44 @@ export default function Login() {
               </div>
             </div>
 
-            {/* Button */}
+            {/* CAPTCHA — only shown after failed attempts */}
+            {showCaptcha && (
+              <div>
+                <label className="block text-sm font-semibold text-gray-900 mb-2">
+                  Security Check
+                </label>
+                <div className="border border-gray-200 rounded-xl overflow-hidden bg-gray-50">
+                  {/* SVG captcha display */}
+                  <div className="flex items-center justify-between px-3 py-2 border-b border-gray-200">
+                    <div
+                      dangerouslySetInnerHTML={{ __html: captchaSvg }}
+                      className="flex-1"
+                    />
+                    <button
+                      type="button"
+                      onClick={loadCaptcha}
+                      disabled={captchaLoading}
+                      className="ml-2 p-1.5 rounded-lg text-gray-400 hover:text-[#c62d23] hover:bg-red-50 transition-colors disabled:opacity-40"
+                      title="Refresh captcha"
+                    >
+                      <RefreshCw
+                        className={`w-4 h-4 ${captchaLoading ? "animate-spin" : ""}`}
+                      />
+                    </button>
+                  </div>
+                  <input
+                    type="text"
+                    placeholder="Type the characters above"
+                    value={captchaValue}
+                    onChange={(e) => setCaptchaValue(e.target.value)}
+                    className="w-full bg-white px-4 py-3 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#c62d23]/20 rounded-b-xl transition-all"
+                    onKeyDown={(e) => e.key === "Enter" && handleSubmit(e)}
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* Submit Button */}
             <button
               type="button"
               onClick={handleSubmit}
@@ -187,13 +251,11 @@ export default function Login() {
               )}
             </button>
           </div>
-
-         
         </div>
 
         {/* Footer */}
         <p className="mt-8 text-center text-sm text-gray-500">
-          © 2026 Army Industry. All rights reserved.
+          © 2026 Army Industries. All rights reserved.
         </p>
       </div>
     </div>
