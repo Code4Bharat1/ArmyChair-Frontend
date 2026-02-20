@@ -16,7 +16,7 @@ export default function LanguageToggle() {
   };
 
   return (
-    <div className="fixed top-4 right-6 z-[9999] bg-white shadow-lg rounded-full px-4 py-2 flex gap-3 text-sm font-medium">
+    <div className="fixed bottom-25 right-6 z-[9999] bg-white shadow-lg rounded-full px-4 py-2 flex gap-3 text-sm font-medium">
       <button
         onClick={() => changeLanguage("en")}
         className={language === "en" ? "text-blue-600" : "text-gray-600"}

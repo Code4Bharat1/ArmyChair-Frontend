@@ -14,6 +14,7 @@ import {
   Activity,
   LogOut,
 } from "lucide-react";
+import LanguageToggle from "@/components/LanguageToggle";
 
 export default function Sidebar() {
   const pathname = usePathname();
@@ -91,6 +92,7 @@ const menuItem = (href) =>
 
       {/* Footer */}
       <div className="absolute bottom-0 w-full border-t border-gray-200 bg-gray-50">
+        <LanguageToggle />
         <button
           onClick={() => {
             localStorage.removeItem("token");
@@ -101,6 +103,9 @@ const menuItem = (href) =>
           <LogOut size={18} />
           Logout
         </button>
+         <p className="text-xs py-4 text-gray-500 text-center font-medium">
+            Army Industry © 2026
+          </p>
       </div>
     </div>
   );

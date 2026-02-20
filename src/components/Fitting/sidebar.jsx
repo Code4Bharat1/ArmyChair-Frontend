@@ -12,6 +12,7 @@ import {
   PackagePlus,
 } from "lucide-react";
 import { useState } from "react";
+import LanguageToggle from "@/components/LanguageToggle";
 
 export default function FittingSidebar() {
   const pathname = usePathname();
@@ -125,6 +126,7 @@ export default function FittingSidebar() {
 
         {/* FOOTER */}
         <div className="p-5 pt-1 border-t border-gray-200 bg-gray-50">
+          <LanguageToggle />
           <button
             onClick={() => {
               localStorage.removeItem("token");

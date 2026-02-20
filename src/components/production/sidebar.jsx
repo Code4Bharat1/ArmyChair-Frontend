@@ -9,6 +9,7 @@ import {
   Menu,
   X,
 } from "lucide-react";
+import LanguageToggle from "@/components/LanguageToggle";
 
 export default function ProductionSidebar() {
   const pathname = usePathname();
@@ -97,6 +98,7 @@ export default function ProductionSidebar() {
 
         {/* FOOTER */}
         <div className="p-4 border-t border-gray-200 text-xs text-gray-500 text-center">
+          <LanguageToggle />
           <button
             onClick={() => {
               localStorage.removeItem("token");

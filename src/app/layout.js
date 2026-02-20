@@ -41,7 +41,7 @@ export default function RootLayout({ children }) {
 
         {/* 🔹 Language Switch (Top Right Corner) */}
         <div style={{ position: "fixed", top: 10, right: 20, zIndex: 9999 }}>
-          <LanguageToggle />
+          {/* <LanguageToggle /> */}
 <div id="google_translate_element" style={{ display: "none" }}></div>
 
         </div>

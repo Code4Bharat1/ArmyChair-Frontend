@@ -1,7 +1,6 @@
 "use client";
 import React, { useEffect, useMemo, useState } from "react";
 import { Upload, Download, X } from "lucide-react";
-
 import {
   Pencil,
   Trash2,
@@ -11,9 +10,12 @@ import {
   CheckCircle,
   Truck,
   AlertCircle,
+  ChevronDown,
+  ChevronUp,
+  Search,
+  Filter,
 } from "lucide-react";
 import axios from "axios";
-
 import { UserCircle } from "lucide-react";
 import { useRouter } from "next/navigation";
 
@@ -21,23 +23,20 @@ export default function Orders() {
   const [vendors, setVendors] = useState([]);
   const [vendorSearch, setVendorSearch] = useState("");
   const [showVendorDropdown, setShowVendorDropdown] = useState(false);
-
   const [chairModels, setChairModels] = useState([]);
   const [spareParts, setSpareParts] = useState([]);
-
   const router = useRouter();
-
   const [uploading, setUploading] = useState(false);
-
   const [statusFilter, setStatusFilter] = useState("ALL");
-
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [expandedOrderId, setExpandedOrderId] = useState(null);
-
   const [search, setSearch] = useState("");
   const [showForm, setShowForm] = useState(false);
   const [editingOrderId, setEditingOrderId] = useState(null);
+  const [orderTypeTab, setOrderTypeTab] = useState("ALL"); // "ALL" | "FULL" | "SPARE"
+  const [currentPage, setCurrentPage] = useState(1);
+  const PAGE_SIZE = 10;
 
   const initialFormData = {
     dispatchedTo: "",
@@ -47,69 +46,58 @@ export default function Orders() {
     deliveryDate: "",
     quantity: "",
   };
+
   const today = new Date();
   today.setHours(0, 0, 0, 0);
+
+  function isDelayed(order) {
+    if (!order.deliveryDate) return false;
+    const delivery = new Date(order.deliveryDate);
+    delivery.setHours(0, 0, 0, 0);
+    return (
+      delivery < today && !["DISPATCHED", "PARTIAL"].includes(order.progress)
+    );
+  }
+
   const filteredOrders = useMemo(() => {
     const q = search.toLowerCase();
-
     return orders.filter((o) => {
-      // 🔍 Search filter
       const vendorName =
         typeof o.dispatchedTo === "string"
           ? o.dispatchedTo
           : o.dispatchedTo?.name || "";
-
       const matchesSearch =
         o.orderId?.toLowerCase().includes(q) ||
         vendorName.toLowerCase().includes(q) ||
         o.chairModel?.toLowerCase().includes(q);
-
       if (!matchesSearch) return false;
 
-      // 📊 Stat filter
+      // 🔀 Type tab filter
+      if (orderTypeTab !== "ALL" && o.orderType !== orderTypeTab) return false;
+
       switch (statusFilter) {
         case "IN_PROGRESS":
-          return (
-            !["DISPATCHED", "PARTIAL"].includes(o.progress) && !isDelayed(o)
-          );
-
+          return !["DISPATCHED", "PARTIAL"].includes(o.progress) && !isDelayed(o);
         case "DELAYED":
           return isDelayed(o);
-
         case "READY":
           return o.progress === "READY_FOR_DISPATCH";
-
         case "COMPLETED":
           return o.progress === "DISPATCHED";
-
         case "ALL":
         default:
           return true;
       }
     });
-  }, [orders, search, statusFilter]);
-
-  function isDelayed(order) {
-    if (!order.deliveryDate) return false;
-
-    const delivery = new Date(order.deliveryDate);
-    delivery.setHours(0, 0, 0, 0);
-
-    return (
-      delivery < today && !["DISPATCHED", "PARTIAL"].includes(order.progress)
-    );
-  }
-  const CHAIR_MODELS = chairModels;
+  }, [orders, search, statusFilter, orderTypeTab]);
 
   const [formData, setFormData] = useState(initialFormData);
 
   const API = process.env.NEXT_PUBLIC_API_URL;
   const token =
     typeof window !== "undefined" ? localStorage.getItem("token") : null;
-
   const headers = token ? { Authorization: `Bearer ${token}` } : {};
 
-  /* ================= FETCH ================= */
   const fetchOrders = async () => {
     try {
       const res = await axios.get(`${API}/orders`, { headers });
@@ -121,27 +109,6 @@ export default function Orders() {
     }
   };
 
-  useEffect(() => {
-    fetchOrders();
-  }, []);
-
-  const fetchSpareParts = async () => {
-    try {
-      const res = await axios.get(`${API}/inventory/spare-part-names`, {
-        headers,
-      });
-      setSpareParts(res.data.parts || []);
-    } catch (err) {
-      console.error("Fetch spare parts failed", err);
-    }
-  };
-  useEffect(() => {
-    fetchOrders();
-    fetchVendors();
-    fetchChairModels();
-    fetchSpareParts();
-  }, []);
-
   const fetchVendors = async () => {
     try {
       const res = await axios.get(`${API}/vendors`, { headers });
@@ -151,10 +118,6 @@ export default function Orders() {
     }
   };
 
-  useEffect(() => {
-    fetchOrders();
-    fetchVendors();
-  }, []);
   const fetchChairModels = async () => {
     try {
       const res = await axios.get(`${API}/inventory/chair-models`, { headers });
@@ -163,13 +126,23 @@ export default function Orders() {
       console.error("Fetch chair models failed", err);
     }
   };
+
+  const fetchSpareParts = async () => {
+    try {
+      const res = await axios.get(`${API}/inventory/spare-part-names`, { headers });
+      setSpareParts(res.data.parts || []);
+    } catch (err) {
+      console.error("Fetch spare parts failed", err);
+    }
+  };
+
   useEffect(() => {
     fetchOrders();
     fetchVendors();
     fetchChairModels();
+    fetchSpareParts();
   }, []);
 
-  /* ================= EDIT ================= */
   const handleEditOrder = (order) => {
     setEditingOrderId(order._id);
     setFormData({
@@ -180,41 +153,29 @@ export default function Orders() {
       quantity: order.quantity,
       orderType: order.orderType || "FULL",
     });
-
     setVendorSearch(order.dispatchedTo?.name || "");
     setShowForm(true);
   };
 
-  /* ================= FORM CHANGE ================= */
   const handleFormChange = (e) => {
     const { name, value } = e.target;
-
     if (name === "orderType") {
-      setFormData((prev) => ({
-        ...prev,
-        orderType: value,
-        chairModel: "",
-      }));
+      setFormData((prev) => ({ ...prev, orderType: value, chairModel: "" }));
       return;
     }
-
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
-  /* ================= CREATE / UPDATE ================= */
   const handleCreateOrder = async (e) => {
     e.preventDefault();
-
     if (!formData.dispatchedTo) {
       alert("Please select vendor from dropdown");
       return;
     }
-
     if (!formData.quantity || Number(formData.quantity) <= 0) {
       alert("Please enter valid quantity");
       return;
     }
-
     const payload = {
       dispatchedTo: formData.dispatchedTo,
       chairModel: formData.chairModel,
@@ -223,18 +184,12 @@ export default function Orders() {
       deliveryDate: formData.deliveryDate,
       quantity: Number(formData.quantity),
     };
-
     try {
       if (editingOrderId) {
-        // ✅ UPDATE
-        await axios.put(`${API}/orders/${editingOrderId}`, payload, {
-          headers,
-        });
+        await axios.put(`${API}/orders/${editingOrderId}`, payload, { headers });
       } else {
-        // ✅ CREATE
         await axios.post(`${API}/orders`, payload, { headers });
       }
-
       setShowForm(false);
       setEditingOrderId(null);
       setFormData(initialFormData);
@@ -245,10 +200,8 @@ export default function Orders() {
     }
   };
 
-  /* ================= DELETE ================= */
   const handleDeleteOrder = async (orderId) => {
     if (!window.confirm("Delete this order?")) return;
-
     try {
       await axios.delete(`${API}/orders/${orderId}`, { headers });
       fetchOrders();
@@ -257,89 +210,71 @@ export default function Orders() {
     }
   };
 
- 
-
-  /* ================= STATS ================= */
   const totalOrders = filteredOrders.length;
-
   const delayed = filteredOrders.filter(isDelayed).length;
-
-  const readyToDispatch = filteredOrders.filter(
-    (o) => o.progress === "READY_FOR_DISPATCH",
-  ).length;
-
-  const completed = filteredOrders.filter(
-    (o) => o.progress === "DISPATCHED",
-  ).length;
-
+  const readyToDispatch = filteredOrders.filter((o) => o.progress === "READY_FOR_DISPATCH").length;
+  const completed = filteredOrders.filter((o) => o.progress === "DISPATCHED").length;
   const inProgress = filteredOrders.filter(
-    (o) => !["DISPATCHED", "PARTIAL"].includes(o.progress) && !isDelayed(o),
+    (o) => !["DISPATCHED", "PARTIAL"].includes(o.progress) && !isDelayed(o)
   ).length;
 
-  /* ================= ORDER STEPS ================= */
- const FULL_ORDER_STEPS = [
-  { key: "PRODUCTION_PENDING", label: "Production Pending" },
-  { key: "PRODUCTION_IN_PROGRESS", label: "Production In Progress" },
-  { key: "PRODUCTION_COMPLETED", label: "Production Completed" },
-  { key: "FITTING_IN_PROGRESS", label: "Fitting In Progress" },
-  { key: "FITTING_COMPLETED", label: "Fitting Completed" },
-  { key: "READY_FOR_DISPATCH", label: "Ready For Dispatch" },
-  { key: "DISPATCHED", label: "Dispatched" },
-];
+  // Counts for toggle tabs (not affected by tab filter, so use raw orders)
+  const allOrdersCount = orders.length;
+  const fullChairCount = orders.filter((o) => o.orderType === "FULL").length;
+  const sparePartCount = orders.filter((o) => o.orderType === "SPARE").length;
 
+  // Reset to page 1 whenever filters change
+  useEffect(() => { setCurrentPage(1); }, [search, statusFilter, orderTypeTab]);
 
-const SPARE_ORDER_STEPS = [
-  { key: "ORDER_PLACED", label: "Order Placed" },
-  { key: "WAREHOUSE_COLLECTED", label: "Warehouse Collected" },
-  { key: "READY_FOR_DISPATCH", label: "Ready For Dispatch" },
-  { key: "DISPATCHED", label: "Dispatched" },
-];
-const isOrderLocked = (progress) => {
-  return [
-    "PRODUCTION_PENDING",
-    "PRODUCTION_IN_PROGRESS",
-    "PRODUCTION_COMPLETED",
-    "FITTING_IN_PROGRESS",
-    "FITTING_COMPLETED",
-    "READY_FOR_DISPATCH",
-    "DISPATCHED",
-    "PARTIAL",
-  ].includes(progress);
-};
+  const totalPages = Math.max(1, Math.ceil(filteredOrders.length / PAGE_SIZE));
+  const paginatedOrders = filteredOrders.slice(
+    (currentPage - 1) * PAGE_SIZE,
+    currentPage * PAGE_SIZE
+  );
 
+  const FULL_ORDER_STEPS = [
+    { key: "PRODUCTION_PENDING", label: "Production Pending" },
+    { key: "PRODUCTION_IN_PROGRESS", label: "Production In Progress" },
+    { key: "PRODUCTION_COMPLETED", label: "Production Completed" },
+    { key: "FITTING_IN_PROGRESS", label: "Fitting In Progress" },
+    { key: "FITTING_COMPLETED", label: "Fitting Completed" },
+    { key: "READY_FOR_DISPATCH", label: "Ready For Dispatch" },
+    { key: "DISPATCHED", label: "Dispatched" },
+  ];
 
+  const SPARE_ORDER_STEPS = [
+    { key: "ORDER_PLACED", label: "Order Placed" },
+    { key: "WAREHOUSE_COLLECTED", label: "Warehouse Collected" },
+    { key: "READY_FOR_DISPATCH", label: "Ready For Dispatch" },
+    { key: "DISPATCHED", label: "Dispatched" },
+  ];
 
-  /* ================= PROGRESS ================= */
-  const ProgressTracker = ({ progress, orderType }) => {
+  const isOrderLocked = (progress) => {
+    return [
+      "PRODUCTION_PENDING",
+      "PRODUCTION_IN_PROGRESS",
+      "PRODUCTION_COMPLETED",
+      "FITTING_IN_PROGRESS",
+      "FITTING_COMPLETED",
+      "READY_FOR_DISPATCH",
+      "DISPATCHED",
+      "PARTIAL",
+    ].includes(progress);
+  };
 
-  const steps =
-    orderType === "FULL" ? FULL_ORDER_STEPS : SPARE_ORDER_STEPS;
-
+  const ProgressBadge = ({ progress, orderType }) => {
+    const steps = orderType === "FULL" ? FULL_ORDER_STEPS : SPARE_ORDER_STEPS;
     if (progress === "PARTIAL") {
-      return (
-        <span className="px-3 py-1 rounded-full text-xs font-medium bg-amber-50 text-amber-700 border border-amber-200">
-          Partial / On Hold
-        </span>
-      );
+      return <StatusPill variant="warning" label="Partial / On Hold" />;
     }
-
     const currentIndex = steps.findIndex((s) => s.key === progress);
-    const safeIndex =
-      currentIndex === -1 ? steps.length - 1 : currentIndex;
-
+    const safeIndex = currentIndex === -1 ? steps.length - 1 : currentIndex;
     const isCompleted = progress === "DISPATCHED";
-
     return (
-      <span
-        className={`px-3 py-1 rounded-full text-xs font-medium border ${
-          isCompleted
-            ? "bg-green-50 text-green-700 border-green-200"
-            : "bg-blue-50 text-blue-700 border-blue-200"
-        }`}
-      >
-        {steps[safeIndex]?.label}
-
-      </span>
+      <StatusPill
+        variant={isCompleted ? "success" : "info"}
+        label={steps[safeIndex]?.label}
+      />
     );
   };
 
@@ -347,73 +282,37 @@ const isOrderLocked = (progress) => {
     setExpandedOrderId((prev) => (prev === orderId ? null : orderId));
   };
 
-  /* ================= CSV / FOLDER UPLOAD ================= */
   const handleUploadOrders = async (files) => {
     try {
       setUploading(true);
-
-      const formData = new FormData();
-
-      Array.from(files).forEach((file) => {
-        formData.append("files", file);
+      const fd = new FormData();
+      Array.from(files).forEach((file) => fd.append("files", file));
+      await axios.post(`${API}/orders/upload`, fd, {
+        headers: { ...headers, "Content-Type": "multipart/form-data" },
       });
-
-      await axios.post(`${API}/orders/upload`, formData, {
-        headers: {
-          ...headers,
-          "Content-Type": "multipart/form-data",
-        },
-      });
-
       alert("Orders uploaded successfully");
       fetchOrders();
     } catch (err) {
-      console.error(err);
       alert(err?.response?.data?.message || "Upload failed");
     } finally {
       setUploading(false);
     }
   };
 
-  /* ================= EXPORT CSV ================= */
   const handleExportCSV = () => {
-    if (!orders.length) {
-      alert("No orders to export");
-      return;
-    }
-
-    const headers = [
-      "Order ID",
-      "Vendor",
-      "Product",
-      "Order Type",
-      "Quantity",
-      "Order Date",
-      "Delivery Date",
-      "Status",
-    ];
-
+    if (!orders.length) { alert("No orders to export"); return; }
+    const hdrs = ["Order ID", "Vendor", "Product", "Order Type", "Quantity", "Order Date", "Delivery Date", "Status"];
     const rows = orders.map((o) => [
       o.orderId,
-      typeof o.dispatchedTo === "string"
-        ? o.dispatchedTo
-        : o.dispatchedTo?.name || "",
-      o.chairModel,
-      o.orderType,
-      o.quantity,
+      typeof o.dispatchedTo === "string" ? o.dispatchedTo : o.dispatchedTo?.name || "",
+      o.chairModel, o.orderType, o.quantity,
       o.orderDate ? new Date(o.orderDate).toLocaleDateString() : "",
       o.deliveryDate ? new Date(o.deliveryDate).toLocaleDateString() : "",
       o.progress,
     ]);
-
-    let csvContent =
-      headers.join(",") +
-      "\n" +
-      rows.map((row) => row.map((v) => `"${v}"`).join(",")).join("\n");
-
+    const csvContent = hdrs.join(",") + "\n" + rows.map((r) => r.map((v) => `"${v}"`).join(",")).join("\n");
     const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
-
     const link = document.createElement("a");
     link.href = url;
     link.download = `orders_${new Date().toISOString().slice(0, 10)}.csv`;
@@ -423,586 +322,518 @@ const isOrderLocked = (progress) => {
     URL.revokeObjectURL(url);
   };
 
+  const getOrderStatus = (o) => {
+    if (isDelayed(o)) return { variant: "danger", label: "Delayed" };
+    if (o.progress === "PARTIAL") return { variant: "warning", label: "On Hold" };
+    if (o.progress === "READY_FOR_DISPATCH") return { variant: "ready", label: "Ready" };
+    if (o.progress === "DISPATCHED") return { variant: "success", label: "Dispatched" };
+    return { variant: "info", label: "Processing" };
+  };
+
   return (
-    <div className="flex min-h-screen bg-gray-50 text-gray-900">
+    <div className="flex min-h-screen bg-[#f8f7f5] text-gray-900">
+      {/* Hidden Upload */}
+      <input
+        type="file"
+        id="orderUploadInput"
+        accept=".csv,.xlsx"
+        hidden
+        onChange={(e) => handleUploadOrders(e.target.files)}
+      />
+
       <div className="flex-1 overflow-auto">
-        {/* ================= HIDDEN UPLOAD INPUT ================= */}
-        <input
-          type="file"
-          id="orderUploadInput"
-          accept=".csv,.xlsx"
-          hidden
-          onChange={(e) => handleUploadOrders(e.target.files)}
-        />
+        {/* ── HEADER ── */}
+        <header className="sticky top-0 z-20 bg-white border-b border-gray-100 shadow-sm">
+          <div className="px-4 sm:px-6 lg:px-8 py-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              {/* Title */}
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 bg-[#c62d23]/10 rounded-xl">
+                  <Package size={24} className="text-[#c62d23]" />
+                </div>
+                <div>
+                  <h1 className="text-xl sm:text-2xl font-bold text-gray-900 leading-tight">
+                    Orders Management
+                  </h1>
+                  <p className="text-xs text-gray-500 hidden sm:block">
+                    Create, track and manage all orders
+                  </p>
+                </div>
+              </div>
 
-        {/* HEADER */}
-        <div className="sticky top-0 z-10 bg-white/80 backdrop-blur border-b border-gray-200 p-6 shadow-sm">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-2">
-                <Package size={32} className="text-[#c62d23]" />
-                <span>Orders Management</span>
-              </h1>
-              <p className="text-sm text-gray-600 mt-1">
-                Create, track and manage all orders
-              </p>
-            </div>
-
-            <div className="flex items-center gap-3">
-              {/* UPLOAD ORDERS */}
-              <button
-                onClick={() =>
-                  document.getElementById("orderUploadInput").click()
-                }
-                className="bg-[#c62d23] hover:bg-[#a82419] text-white px-4 py-2.5 rounded-xl flex items-center gap-2 shadow-sm font-medium transition-all"
-              >
-                <Upload size={18} />
-                {uploading ? "Uploading..." : "Upload Orders"}
-              </button>
-
-              {/* ADD ORDER */}
-              <button
-                onClick={() => {
-                  setVendorSearch("");
-                  setFormData(initialFormData);
-                  setEditingOrderId(null);
-                  setShowForm(true);
-                }}
-                className="bg-[#c62d23] hover:bg-[#a82419] text-white px-4 py-2.5 rounded-xl flex items-center gap-2 shadow-sm font-medium transition-all"
-              >
-                <Plus size={18} />
-                Add Order
-              </button>
-
-              {/* EXPORT CSV */}
-              <button
-                onClick={handleExportCSV}
-                className="bg-green-600 hover:bg-green-700 text-white px-4 py-2.5 rounded-xl flex items-center gap-2 shadow-sm font-medium transition-all"
-              >
-                <Download size={18} />
-                Export CSV
-              </button>
-
-              {/* PROFILE */}
-              <button
-                onClick={() => router.push("/profile")}
-                title="My Profile"
-                className="text-gray-600 hover:text-[#c62d23] transition"
-              >
-                <UserCircle size={34} />
-              </button>
+              {/* Actions */}
+              <div className="flex items-center gap-2 flex-wrap">
+                <ActionButton
+                  icon={<Upload size={15} />}
+                  label={uploading ? "Uploading…" : "Upload"}
+                  onClick={() => document.getElementById("orderUploadInput").click()}
+                  variant="primary"
+                />
+                <ActionButton
+                  icon={<Plus size={15} />}
+                  label="New Order"
+                  onClick={() => {
+                    setVendorSearch("");
+                    setFormData(initialFormData);
+                    setEditingOrderId(null);
+                    setShowForm(true);
+                  }}
+                  variant="primary"
+                />
+                <ActionButton
+                  icon={<Download size={15} />}
+                  label="Export"
+                  onClick={handleExportCSV}
+                  variant="success"
+                />
+                <button
+                  onClick={() => router.push("/profile")}
+                  className="ml-1 text-gray-400 hover:text-[#c62d23] transition-colors"
+                  title="My Profile"
+                >
+                  <UserCircle size={32} />
+                </button>
+              </div>
             </div>
           </div>
-        </div>
+        </header>
 
-        {/* STATS */}
-        <div className="p-8 space-y-8">
-          <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
-            <StatCard
-              title="Total Orders"
-              value={totalOrders}
-              icon={<Package className="text-[#c62d23]" />}
-              onClick={() => setStatusFilter("ALL")}
-              active={statusFilter === "ALL"}
-            />
-
-            <StatCard
-              title="In Progress"
-              value={inProgress}
-              icon={<Clock className="text-[#c62d23]" />}
-              onClick={() => setStatusFilter("IN_PROGRESS")}
-              active={statusFilter === "IN_PROGRESS"}
-            />
-
-            <StatCard
-              title="Delayed"
-              value={delayed}
-              icon={<AlertCircle className="text-[#c62d23]" />}
-              danger={delayed > 0}
-              onClick={() => setStatusFilter("DELAYED")}
-              active={statusFilter === "DELAYED"}
-            />
-
-            <StatCard
-              title="Ready to Dispatch"
-              value={readyToDispatch}
-              icon={<Truck className="text-[#c62d23]" />}
-              onClick={() => setStatusFilter("READY")}
-              active={statusFilter === "READY"}
-            />
-
-            <StatCard
-              title="Completed"
-              value={completed}
-              icon={<CheckCircle className="text-[#c62d23]" />}
-              onClick={() => setStatusFilter("COMPLETED")}
-              active={statusFilter === "COMPLETED"}
-            />
+        <div className="px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+          {/* ── STAT CARDS ── */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4">
+            <StatCard title="Total" value={totalOrders} icon={<Package />} onClick={() => setStatusFilter("ALL")} active={statusFilter === "ALL"} accentColor="#c62d23" />
+            <StatCard title="In Progress" value={inProgress} icon={<Clock />} onClick={() => setStatusFilter("IN_PROGRESS")} active={statusFilter === "IN_PROGRESS"} accentColor="#3b82f6" />
+            <StatCard title="Delayed" value={delayed} icon={<AlertCircle />} onClick={() => setStatusFilter("DELAYED")} active={statusFilter === "DELAYED"} accentColor="#ef4444" danger={delayed > 0} />
+            <StatCard title="Ready" value={readyToDispatch} icon={<Truck />} onClick={() => setStatusFilter("READY")} active={statusFilter === "READY"} accentColor="#f59e0b" />
+            <StatCard title="Completed" value={completed} icon={<CheckCircle />} onClick={() => setStatusFilter("COMPLETED")} active={statusFilter === "COMPLETED"} accentColor="#22c55e" />
           </div>
 
-          {/* FILTER BADGE */}
-          {statusFilter !== "ALL" && (
-            <div className="flex items-center gap-3">
-              <div
-                className={`px-4 py-2 rounded-xl flex items-center gap-2 border ${
-                  statusFilter === "DELAYED"
-                    ? "bg-red-50 border-red-200"
-                    : "bg-blue-50 border-blue-200"
+          {/* ── TOOLBAR ── */}
+          <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center">
+            {/* Search */}
+            <div className="relative flex-1">
+              <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
+              <input
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search by order ID, vendor, or product…"
+                className="w-full bg-white border border-gray-200 pl-10 pr-4 py-2.5 rounded-xl text-sm outline-none text-gray-900 placeholder-gray-400 focus:border-[#c62d23] focus:ring-2 focus:ring-[#c62d23]/15 transition-all shadow-sm"
+              />
+            </div>
+
+            {/* Active filter pill */}
+            {statusFilter !== "ALL" && (
+              <div className="flex items-center gap-2 bg-white border border-gray-200 rounded-xl px-3 py-2 shadow-sm">
+                <Filter size={14} className="text-[#c62d23]" />
+                <span className="text-sm font-medium text-gray-700 capitalize">
+                  {statusFilter.toLowerCase().replace("_", " ")}
+                </span>
+                <button
+                  onClick={() => setStatusFilter("ALL")}
+                  className="ml-1 text-gray-400 hover:text-[#c62d23] transition-colors"
+                >
+                  <X size={14} />
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* ── ORDER TYPE TABS ── */}
+          <div className="flex rounded-xl overflow-hidden border border-gray-200 bg-white shadow-sm w-full">
+            {/* All Orders */}
+            <button
+              onClick={() => { setOrderTypeTab("ALL"); setExpandedOrderId(null); }}
+              className={`flex-1 flex items-center justify-center gap-2 py-3 px-3 sm:px-4 text-sm font-semibold transition-all duration-200 ${
+                orderTypeTab === "ALL"
+                  ? "bg-[#c62d23] text-white shadow-inner"
+                  : "text-gray-500 hover:bg-gray-50"
+              }`}
+            >
+              <Package size={15} className="shrink-0" />
+              <span className="hidden sm:inline">All Orders</span>
+              <span className="sm:hidden">All</span>
+              <span
+                className={`ml-0.5 px-2 py-0.5 rounded-full text-xs font-bold shrink-0 ${
+                  orderTypeTab === "ALL"
+                    ? "bg-white/20 text-white"
+                    : "bg-gray-100 text-gray-600"
                 }`}
               >
-                <AlertCircle
-                  className={
-                    statusFilter === "DELAYED"
-                      ? "text-red-600"
-                      : "text-blue-600"
-                  }
-                  size={18}
-                />
-                <span
-                  className={`text-sm font-medium ${
-                    statusFilter === "DELAYED"
-                      ? "text-red-800"
-                      : "text-blue-800"
-                  }`}
-                >
-                  Showing only {statusFilter.toLowerCase().replace("_", " ")}{" "}
-                  orders
-                </span>
-              </div>
-              <button
-                onClick={() => setStatusFilter("ALL")}
-                className="text-sm text-gray-600 hover:text-[#c62d23] font-medium"
-              >
-                Clear filter
-              </button>
-            </div>
-          )}
+                {allOrdersCount}
+              </span>
+            </button>
 
-          {/* SEARCH */}
-          <div className="mb-4">
-            <input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search orders by ID, vendor, or product..."
-              className="w-full bg-white border border-gray-200 px-4 py-3 rounded-xl outline-none text-gray-900 placeholder-gray-400 focus:border-[#c62d23] focus:ring-2 focus:ring-[#c62d23]/20 transition-all shadow-sm"
-            />
+            <div className="w-px bg-gray-200" />
+
+            {/* Full Chair */}
+            <button
+              onClick={() => { setOrderTypeTab("FULL"); setExpandedOrderId(null); }}
+              className={`flex-1 flex items-center justify-center gap-2 py-3 px-3 sm:px-4 text-sm font-semibold transition-all duration-200 ${
+                orderTypeTab === "FULL"
+                  ? "bg-[#c62d23] text-white shadow-inner"
+                  : "text-gray-500 hover:bg-gray-50"
+              }`}
+            >
+              <Package size={15} className="shrink-0" />
+              <span className="hidden sm:inline">Full Chair Orders</span>
+              <span className="sm:hidden">Full</span>
+              <span
+                className={`ml-0.5 px-2 py-0.5 rounded-full text-xs font-bold shrink-0 ${
+                  orderTypeTab === "FULL"
+                    ? "bg-white/20 text-white"
+                    : "bg-gray-100 text-gray-600"
+                }`}
+              >
+                {fullChairCount}
+              </span>
+            </button>
+
+            <div className="w-px bg-gray-200" />
+
+            {/* Spare Part */}
+            <button
+              onClick={() => { setOrderTypeTab("SPARE"); setExpandedOrderId(null); }}
+              className={`flex-1 flex items-center justify-center gap-2 py-3 px-3 sm:px-4 text-sm font-semibold transition-all duration-200 ${
+                orderTypeTab === "SPARE"
+                  ? "bg-[#c62d23] text-white shadow-inner"
+                  : "text-gray-500 hover:bg-gray-50"
+              }`}
+            >
+              <Truck size={15} className="shrink-0" />
+              <span className="hidden sm:inline">Spare Part Orders</span>
+              <span className="sm:hidden">Spare</span>
+              <span
+                className={`ml-0.5 px-2 py-0.5 rounded-full text-xs font-bold shrink-0 ${
+                  orderTypeTab === "SPARE"
+                    ? "bg-white/20 text-white"
+                    : "bg-gray-100 text-gray-600"
+                }`}
+              >
+                {sparePartCount}
+              </span>
+            </button>
           </div>
 
-          {/* TABLE */}
-          <div className="bg-white rounded-2xl overflow-hidden border border-gray-200 shadow-sm">
+          {/* ── TABLE ── */}
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
             {loading ? (
-              <div className="p-8 text-center">
-                <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-[#c62d23]"></div>
-                <p className="mt-2 text-gray-500">Loading...</p>
+              <div className="flex flex-col items-center justify-center py-20 gap-3">
+                <div className="w-8 h-8 rounded-full border-2 border-gray-100 border-t-[#c62d23] animate-spin" />
+                <p className="text-sm text-gray-400">Loading orders…</p>
               </div>
             ) : filteredOrders.length === 0 ? (
-              <div className="text-center text-gray-500 py-16">
-                <Package size={48} className="mx-auto mb-4 text-gray-300" />
-                <p className="text-lg font-medium">No orders found</p>
+              <div className="flex flex-col items-center justify-center py-20 gap-3 text-gray-400">
+                <Package size={44} className="text-gray-200" />
+                <p className="text-base font-medium">No orders found</p>
+                <p className="text-sm">Try adjusting your search or filter</p>
               </div>
             ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="bg-gray-50 border-b border-gray-200">
-                      {[
-                        "Order ID",
-                        "Dispatched To",
-                        "Product",
-                        "Order Date",
-                        "Delivery Date",
-                        "Qty",
-                        "Progress",
-                        "Status",
-                        "Actions",
-                      ].map((h) => (
-                        <th
-                          key={h}
-                          className="p-4 text-left font-semibold text-gray-700"
-                        >
-                          {h}
-                        </th>
-                      ))}
-                    </tr>
-                  </thead>
+              <>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="bg-gray-50 border-b border-gray-200">
+                        {["Order ID", "Dispatched To", "Chair / Part", "Order Date", "Delivery Date", "Qty", "Stage", "Status", "Actions"].map((h) => (
+                          <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap">
+                            {h}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
 
-                  <tbody>
-                    {filteredOrders.map((o, index) => (
-                      <React.Fragment key={o._id}>
-                        {/* MAIN ROW */}
-                        <tr
-                          onClick={() => handleRowClick(o._id)}
-                          className={`border-b border-gray-100 hover:bg-gray-50 transition-colors cursor-pointer ${
-                            index % 2 === 0 ? "bg-white" : "bg-gray-50"
-                          }`}
-                        >
-                          <td className="p-4 font-semibold text-gray-900">
-                            {o.orderId}
-                          </td>
-                          <td className="p-4 text-gray-700">
-                            {o.dispatchedTo?.name || o.dispatchedTo}
-                          </td>
+                    <tbody className="divide-y divide-gray-100">
+                      {paginatedOrders.map((o) => {
+                        const status = getOrderStatus(o);
+                        const isExpanded = expandedOrderId === o._id;
+                        const locked = isOrderLocked(o.progress);
 
-                          <td className="p-4 font-medium text-gray-900">
-                            {o.chairModel}
-                          </td>
-                          <td className="p-4 text-gray-700">
-                            {new Date(o.orderDate).toLocaleDateString()}
-                          </td>
-                          <td className="p-4 text-gray-700">
-                            {o.deliveryDate
-                              ? new Date(o.deliveryDate).toLocaleDateString()
-                              : "-"}
-                          </td>
-                          <td className="p-4 font-semibold text-gray-900">
-                            {o.quantity}
-                          </td>
+                        return (
+                          <React.Fragment key={o._id}>
+                            <tr
+                              onClick={() => handleRowClick(o._id)}
+                              className="hover:bg-gray-50 transition-colors cursor-pointer group"
+                            >
+                              {/* Order ID */}
+                              <td className="px-4 py-3.5 whitespace-nowrap">
+                                <div className="flex items-center gap-1.5">
+                                  <span className="font-mono font-semibold text-gray-900 text-xs bg-gray-100 px-2 py-1 rounded-md">
+                                    {o.orderId}
+                                  </span>
+                                  {isExpanded
+                                    ? <ChevronUp size={12} className="text-gray-400 shrink-0" />
+                                    : <ChevronDown size={12} className="text-gray-300 group-hover:text-gray-400 shrink-0" />}
+                                </div>
+                              </td>
 
-                          <td className="p-4"><ProgressTracker 
-  progress={o.progress} 
-  orderType={o.orderType}
-/>
+                              {/* Dispatched To */}
+                              <td className="px-4 py-3.5 whitespace-nowrap text-sm font-medium text-gray-800">
+                                {o.dispatchedTo?.name || o.dispatchedTo}
+                              </td>
 
-                          </td>
+                              {/* Chair / Part */}
+                              <td className="px-4 py-3.5 whitespace-nowrap text-sm font-medium text-gray-900">
+                                {o.chairModel}
+                              </td>
 
-                          {/* ORDER STATUS */}
-                          <td className="p-4">
-                            {isDelayed(o) ? (
-                              <span className="px-3 py-1 rounded-full text-xs font-medium bg-red-50 text-red-700 border border-red-200">
-                                Delayed
-                              </span>
-                            ) : o.progress === "PARTIAL" ? (
-                              <span className="px-3 py-1 rounded-full text-xs font-medium bg-amber-50 text-amber-700 border border-amber-200">
-                                Partial / On Hold
-                              </span>
-                            ) : o.progress === "READY_FOR_DISPATCH" ? (
-                              <span className="px-3 py-1 rounded-full text-xs font-medium bg-green-50 text-green-700 border border-green-200">
-                                Ready for Dispatch
-                              </span>
-                            ) : o.progress === "DISPATCHED" ? (
-                              <span className="px-3 py-1 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">
-                                Dispatched
-                              </span>
-                            ) : (
-                              <span className="px-3 py-1 rounded-full text-xs font-medium bg-blue-50 text-blue-700 border border-blue-200">
-                                Processing
-                              </span>
-                            )}
-                          </td>
+                              {/* Order Date */}
+                              <td className="px-4 py-3.5 whitespace-nowrap text-sm text-gray-600">
+                                {new Date(o.orderDate).toLocaleDateString()}
+                              </td>
 
-                          {/* ACTIONS */}
-                          <td
-                            className="p-4"
-                            onClick={(e) => e.stopPropagation()}
-                          >
-                            <div className="flex gap-2">
-                              {/* EDIT */}
-                              <button
-                                onClick={() => handleEditOrder(o)}
-                                disabled={isOrderLocked(o.progress)}
-                                className={`p-2 rounded-lg transition-colors ${
-                                  isOrderLocked(o.progress)
-                                    ? "text-gray-300 cursor-not-allowed"
-                                    : "text-blue-600 hover:bg-blue-50"
-                                }`}
-                                title="Edit"
-                              >
-                                <Pencil size={16} />
-                              </button>
+                              {/* Delivery Date */}
+                              <td className={`px-4 py-3.5 whitespace-nowrap text-sm ${isDelayed(o) ? "text-red-500 font-semibold" : "text-gray-600"}`}>
+                                {o.deliveryDate ? new Date(o.deliveryDate).toLocaleDateString() : "—"}
+                              </td>
 
-                              {/* DELETE */}
-                              <button
-                                onClick={() => handleDeleteOrder(o._id)}
-                                disabled={isOrderLocked(o.progress)}
-                                className={`p-2 rounded-lg transition-colors ${
-                                  isOrderLocked(o.progress)
-                                    ? "text-gray-300 cursor-not-allowed"
-                                    : "text-red-600 hover:bg-red-50"
-                                }`}
-                                title="Delete"
-                              >
-                                <Trash2 size={16} />
-                              </button>
+                              {/* Qty */}
+                              <td className="px-4 py-3.5 whitespace-nowrap text-sm font-bold text-gray-900">
+                                {o.quantity}
+                              </td>
 
-                              
-                            </div>
-                          </td>
-                        </tr>
+                              {/* Stage */}
+                              <td className="px-4 py-3.5 whitespace-nowrap">
+                                <ProgressBadge progress={o.progress} orderType={o.orderType} />
+                              </td>
 
-                        {/* EXPANDED PROGRESS ROW */}
-                        {expandedOrderId === o._id &&
-                          o.progress !== "PARTIAL" && (
-                            <tr className="bg-gray-50">
-                              <td colSpan={9} className="p-6">
-                                {(() => {
-  const steps =
-    o.orderType === "FULL"
-      ? FULL_ORDER_STEPS
-      : SPARE_ORDER_STEPS;
+                              {/* Status */}
+                              <td className="px-4 py-3.5 whitespace-nowrap">
+                                <StatusPill variant={status.variant} label={status.label} />
+                              </td>
 
-  const currentIndex = steps.findIndex(
-    (s) => s.key === o.progress
-  );
-
-  const safeIndex =
-    currentIndex === -1
-      ? steps.length - 1
-      : currentIndex;
-
-  const percent =
-    ((safeIndex + 1) / steps.length) * 100;
-
-  return (
-    <div className="w-full space-y-6">
-      <p className="text-sm text-gray-700 font-semibold">
-        Order Progress
-      </p>
-
-      <div className="flex justify-between text-xs text-gray-600">
-        {steps.map((step, index) => (
-          <span
-            key={step.key}
-            className={
-              index <= safeIndex
-                ? "text-gray-900 font-semibold"
-                : ""
-            }
-          >
-            {step.label}
-          </span>
-        ))}
-      </div>
-
-      <div className="relative w-full h-10 flex items-center mt-6">
-        <div className="absolute left-0 right-0 h-[4px] bg-gray-300 rounded-full" />
-
-        <div
-          className="absolute left-0 h-[4px] rounded-full transition-all duration-500"
-          style={{
-            width: `${percent}%`,
-            background:
-              percent === 100
-                ? "#22c55e"
-                : "linear-gradient(90deg,#22c55e,#c62d23)",
-          }}
-        />
-
-        <div
-          className="absolute w-7 h-7 rounded-full border-2 border-white shadow-md
-            flex items-center justify-center text-xs font-bold text-white"
-          style={{
-            left: `calc(${percent}% - 14px)`,
-            backgroundColor:
-              safeIndex === steps.length - 1
-                ? "#22c55e"
-                : "#c62d23",
-          }}
-        >
-          {safeIndex + 1}
-        </div>
-      </div>
-
-      <p className="text-sm">
-        <span className="text-gray-600">
-          Current Stage:
-        </span>{" "}
-        <span className="text-[#c62d23] font-semibold">
-          {steps.find((s) => s.key === o.progress)?.label}
-        </span>
-      </p>
-    </div>
-  );
-})()}
-
+                              {/* Actions */}
+                              <td className="px-4 py-3.5 whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
+                                <div className="flex gap-1">
+                                  <button
+                                    onClick={() => handleEditOrder(o)}
+                                    disabled={locked}
+                                    title="Edit"
+                                    className={`p-2 rounded-lg transition-colors ${locked ? "text-gray-200 cursor-not-allowed" : "text-blue-500 hover:bg-blue-50 hover:text-blue-700"}`}
+                                  >
+                                    <Pencil size={15} />
+                                  </button>
+                                  <button
+                                    onClick={() => handleDeleteOrder(o._id)}
+                                    disabled={locked}
+                                    title="Delete"
+                                    className={`p-2 rounded-lg transition-colors ${locked ? "text-gray-200 cursor-not-allowed" : "text-red-400 hover:bg-red-50 hover:text-red-600"}`}
+                                  >
+                                    <Trash2 size={15} />
+                                  </button>
+                                </div>
                               </td>
                             </tr>
-                          )}
-                      </React.Fragment>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+
+                            {/* Expanded Progress */}
+                            {isExpanded && o.progress !== "PARTIAL" && (
+                              <tr>
+                                <td colSpan={9} className="px-4 py-0 bg-gray-50">
+                                  <div className="my-3 p-5 bg-white rounded-xl border border-gray-100">
+                                    <ExpandedProgress order={o} FULL_ORDER_STEPS={FULL_ORDER_STEPS} SPARE_ORDER_STEPS={SPARE_ORDER_STEPS} />
+                                  </div>
+                                </td>
+                              </tr>
+                            )}
+                          </React.Fragment>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* ── PAGINATION FOOTER ── */}
+                <div className="px-4 py-3 border-t border-gray-100 flex flex-col sm:flex-row items-center justify-between gap-3">
+                  <p className="text-xs text-gray-400 order-2 sm:order-1">
+                    Showing{" "}
+                    <span className="font-semibold text-gray-600">
+                      {Math.min((currentPage - 1) * PAGE_SIZE + 1, filteredOrders.length)}–{Math.min(currentPage * PAGE_SIZE, filteredOrders.length)}
+                    </span>{" "}
+                    of <span className="font-semibold text-gray-600">{filteredOrders.length}</span> orders
+                  </p>
+
+                  <div className="flex items-center gap-1 order-1 sm:order-2">
+                    <button
+                      onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                      disabled={currentPage === 1}
+                      className="px-3 py-1.5 text-xs rounded-lg border border-gray-200 font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed hover:border-[#c62d23] hover:text-[#c62d23]"
+                    >
+                      ← Prev
+                    </button>
+
+                    {Array.from({ length: totalPages }, (_, i) => i + 1)
+                      .filter((p) => p === 1 || p === totalPages || Math.abs(p - currentPage) <= 1)
+                      .reduce((acc, p, idx, arr) => {
+                        if (idx > 0 && p - arr[idx - 1] > 1) acc.push("...");
+                        acc.push(p);
+                        return acc;
+                      }, [])
+                      .map((p, idx) =>
+                        p === "..." ? (
+                          <span key={`e-${idx}`} className="px-2 text-xs text-gray-400">…</span>
+                        ) : (
+                          <button
+                            key={p}
+                            onClick={() => setCurrentPage(p)}
+                            className={`w-8 h-8 text-xs rounded-lg border font-semibold transition-colors ${
+                              currentPage === p
+                                ? "bg-[#c62d23] text-white border-[#c62d23]"
+                                : "border-gray-200 text-gray-600 hover:border-[#c62d23] hover:text-[#c62d23]"
+                            }`}
+                          >
+                            {p}
+                          </button>
+                        )
+                      )}
+
+                    <button
+                      onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                      disabled={currentPage === totalPages}
+                      className="px-3 py-1.5 text-xs rounded-lg border border-gray-200 font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed hover:border-[#c62d23] hover:text-[#c62d23]"
+                    >
+                      Next →
+                    </button>
+                  </div>
+                </div>
+              </>
             )}
           </div>
         </div>
       </div>
 
-      {/* MODAL */}
+      {/* ── MODAL ── */}
       {showForm && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div
-            className="bg-white rounded-2xl w-full max-w-[520px] 
-  max-h-[90vh] flex flex-col border border-gray-200 shadow-2xl"
-          >
-            <div className="flex items-center justify-between px-8 pt-8 pb-4 border-b border-gray-200">
-              <h2 className="text-2xl font-bold text-gray-900">
-                {editingOrderId ? "Update Order" : "Create Order"}
-              </h2>
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl w-full max-w-lg max-h-[92vh] flex flex-col shadow-2xl border border-gray-100 animate-in fade-in slide-in-from-bottom-4 duration-200">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between px-6 pt-6 pb-4 border-b border-gray-100">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-[#c62d23]/10 rounded-lg">
+                  <Package size={18} className="text-[#c62d23]" />
+                </div>
+                <h2 className="text-lg font-bold text-gray-900">
+                  {editingOrderId ? "Update Order" : "Create New Order"}
+                </h2>
+              </div>
               <button
-                onClick={() => {
-                  setShowForm(false);
-                  setEditingOrderId(null);
-                  setFormData(initialFormData);
-                }}
-                className="text-gray-400 hover:text-gray-600 hover:bg-gray-100 p-2 rounded-lg transition-colors"
+                onClick={() => { setShowForm(false); setEditingOrderId(null); setFormData(initialFormData); }}
+                className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
               >
-                <X size={20} />
+                <X size={18} />
               </button>
             </div>
 
-            <div className="p-8 overflow-y-auto flex-1 space-y-4">
-              <div>
-                <label className="text-sm text-gray-700 font-semibold block mb-2">
-                  Dispatched To
-                </label>
-
-                <input
-                  placeholder="Search or type vendor name"
-                  value={vendorSearch}
-                  onFocus={() => setShowVendorDropdown(true)}
-                  onChange={(e) => setVendorSearch(e.target.value)}
-                  className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl outline-none
-      focus:border-[#c62d23] focus:ring-2 focus:ring-[#c62d23]/20 transition-all"
-                />
-
-                {showVendorDropdown && (
-                  <div className="bg-white border border-gray-200 mt-1 rounded-xl max-h-48 overflow-auto shadow-lg">
-                    {/* EXISTING VENDORS */}
-                    {vendors
-                      // .filter((v) =>
-                      //   v.name
-                      //     .toLowerCase()
-                      //     .includes(vendorSearch.toLowerCase()),
-                      // )
-                      .map((v) => (
+            {/* Modal Body */}
+            <div className="px-6 py-5 overflow-y-auto flex-1 space-y-4">
+              {/* Vendor */}
+              <FormField label="Dispatched To">
+                <div className="relative">
+                  <input
+                    placeholder="Search vendor…"
+                    value={vendorSearch}
+                    onFocus={() => setShowVendorDropdown(true)}
+                    onChange={(e) => setVendorSearch(e.target.value)}
+                    className="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-xl text-sm outline-none focus:border-[#c62d23] focus:ring-2 focus:ring-[#c62d23]/15 transition-all"
+                  />
+                  {showVendorDropdown && (
+                    <div className="absolute z-10 left-0 right-0 bg-white border border-gray-200 mt-1 rounded-xl max-h-44 overflow-auto shadow-xl">
+                      {vendors.map((v) => (
                         <div
                           key={v._id}
                           onClick={() => {
                             setVendorSearch(v.name);
-                            setFormData((prev) => ({
-                              ...prev,
-                              dispatchedTo: v._id,
-                            }));
+                            setFormData((prev) => ({ ...prev, dispatchedTo: v._id }));
                             setShowVendorDropdown(false);
                           }}
-                          className="px-4 py-2 hover:bg-gray-50 cursor-pointer transition-colors"
+                          className="px-4 py-2.5 text-sm hover:bg-gray-50 cursor-pointer transition-colors"
                         >
                           {v.name}
                         </div>
                       ))}
-                  </div>
-                )}
-              </div>
+                    </div>
+                  )}
+                </div>
+              </FormField>
 
-              <div>
-                <label className="text-sm text-gray-700 font-semibold block mb-2">
-                  Order Type
-                </label>
+              {/* Order Type */}
+              <FormField label="Order Type">
+                <div className="grid grid-cols-2 gap-2">
+                  {["FULL", "SPARE"].map((type) => (
+                    <button
+                      key={type}
+                      type="button"
+                      onClick={() => setFormData((prev) => ({ ...prev, orderType: type, chairModel: "" }))}
+                      className={`py-2.5 rounded-xl text-sm font-medium border transition-all ${
+                        formData.orderType === type
+                          ? "bg-[#c62d23] text-white border-[#c62d23] shadow-sm"
+                          : "bg-white text-gray-600 border-gray-200 hover:border-gray-300"
+                      }`}
+                    >
+                      {type === "FULL" ? "Full Chair" : "Spare Part"}
+                    </button>
+                  ))}
+                </div>
+              </FormField>
+
+              {/* Chair / Spare Model */}
+              <FormField label={formData.orderType === "FULL" ? "Chair Model" : "Spare Part"}>
                 <select
-                  name="orderType"
-                  value={formData.orderType}
+                  name="chairModel"
+                  value={formData.chairModel}
                   onChange={handleFormChange}
-                  className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl outline-none focus:border-[#c62d23] focus:ring-2 focus:ring-[#c62d23]/20 transition-all"
+                  className="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-xl text-sm outline-none focus:border-[#c62d23] focus:ring-2 focus:ring-[#c62d23]/15 transition-all"
+                  required
                 >
-                  <option value="FULL">Full Chair</option>
-                  <option value="SPARE">Spare Part</option>
+                  <option value="">Select {formData.orderType === "FULL" ? "chair model" : "spare part"}…</option>
+                  {(formData.orderType === "FULL" ? chairModels : spareParts).map((item) => (
+                    <option key={item} value={item}>{item}</option>
+                  ))}
                 </select>
-              </div>
+              </FormField>
 
-              <div>
-                {formData.orderType === "FULL" && (
-                  <div>
-                    <label className="block text-sm text-gray-700 mb-2 font-semibold">
-                      Chair Model
-                    </label>
-                    <select
-                      name="chairModel"
-                      value={formData.chairModel}
-                      onChange={handleFormChange}
-                      className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl outline-none focus:border-[#c62d23] focus:ring-2 focus:ring-[#c62d23]/20 transition-all"
-                      required
-                    >
-                      <option value="">Select Chair Model</option>
-                      {chairModels.map((model) => (
-                        <option key={model} value={model}>
-                          {model}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                )}
-
-                {formData.orderType === "SPARE" && (
-                  <div>
-                    <label className="block text-sm text-gray-700 mb-2 font-semibold">
-                      Spare Part
-                    </label>
-                    <select
-                      name="chairModel"
-                      value={formData.chairModel}
-                      onChange={handleFormChange}
-                      className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl outline-none focus:border-[#c62d23] focus:ring-2 focus:ring-[#c62d23]/20 transition-all"
-                      required
-                    >
-                      <option value="">Select Spare Part</option>
-                      {spareParts.map((part) => (
-                        <option key={part} value={part}>
-                          {part}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                )}
-              </div>
-
-              <div>
-                <label className="text-sm text-gray-700 font-semibold block mb-2">
-                  Order Date
-                </label>
-
-                <div
-                  className="w-full px-4 py-3 bg-gray-100 border border-gray-200
-                  rounded-xl text-gray-600 cursor-not-allowed select-none"
-                >
+              {/* Order Date (readonly) */}
+              <FormField label="Order Date">
+                <div className="w-full px-4 py-2.5 bg-gray-50 border border-gray-100 rounded-xl text-sm text-gray-500 select-none">
                   {formData.orderDate || new Date().toISOString().split("T")[0]}
                 </div>
-              </div>
+              </FormField>
 
-              <Input
-                label="Quantity"
-                name="quantity"
-                type="number"
-                value={formData.quantity}
-                onChange={handleFormChange}
-              />
+              {/* Quantity */}
+              <FormField label="Quantity">
+                <input
+                  type="number"
+                  name="quantity"
+                  value={formData.quantity}
+                  onChange={handleFormChange}
+                  className="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-xl text-sm outline-none focus:border-[#c62d23] focus:ring-2 focus:ring-[#c62d23]/15 transition-all"
+                  min="1"
+                />
+              </FormField>
 
-              <Input
-                label="Delivery Date"
-                name="deliveryDate"
-                type="date"
-                value={formData.deliveryDate}
-                onChange={handleFormChange}
-              />
+              {/* Delivery Date */}
+              <FormField label="Delivery Date">
+                <input
+                  type="date"
+                  name="deliveryDate"
+                  value={formData.deliveryDate}
+                  onChange={handleFormChange}
+                  className="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-xl text-sm outline-none focus:border-[#c62d23] focus:ring-2 focus:ring-[#c62d23]/15 transition-all"
+                />
+              </FormField>
             </div>
 
-            <div className="flex justify-end gap-3 px-8 py-4 border-t border-gray-200 bg-white">
+            {/* Modal Footer */}
+            <div className="flex justify-end gap-2 px-6 py-4 border-t border-gray-100">
               <button
                 type="button"
-                onClick={() => {
-                  setShowForm(false);
-                  setEditingOrderId(null);
-                  setFormData(initialFormData);
-                }}
-                className="px-6 py-2.5 text-gray-700 hover:bg-gray-100 rounded-xl transition-all font-medium border border-gray-200"
+                onClick={() => { setShowForm(false); setEditingOrderId(null); setFormData(initialFormData); }}
+                className="px-5 py-2.5 text-sm text-gray-600 hover:bg-gray-100 rounded-xl transition-all font-medium border border-gray-200"
               >
                 Cancel
               </button>
-
               <button
                 onClick={handleCreateOrder}
-                className="bg-[#c62d23] hover:bg-[#a82419] text-white px-6 py-2.5 rounded-xl transition-all font-semibold shadow-sm"
+                className="bg-[#c62d23] hover:bg-[#b02620] text-white px-5 py-2.5 rounded-xl text-sm transition-all font-semibold shadow-sm active:scale-95"
               >
-                {editingOrderId ? "Update" : "Create"}
+                {editingOrderId ? "Save Changes" : "Create Order"}
               </button>
             </div>
           </div>
@@ -1012,41 +843,140 @@ const isOrderLocked = (progress) => {
   );
 }
 
-/* ================= SMALL COMPONENTS ================= */
+/* ═══════════════════════════════════════
+   SUB-COMPONENTS
+═══════════════════════════════════════ */
 
-const StatCard = ({ title, value, icon, danger, onClick, active }) => (
-  <div
-    onClick={onClick}
-    className={`bg-white border rounded-2xl p-6 transition-all duration-200 shadow-sm hover:shadow-md flex flex-col justify-between h-full cursor-pointer ${
-      danger ? "border-red-300 bg-red-50" : "border-gray-200"
-    } ${active ? "ring-2 ring-[#c62d23]" : ""} hover:border-[#c62d23]`}
-    style={{
-      borderLeft: "4px solid #c62d23",
-    }}
-  >
-    <div className="flex justify-between items-start mb-4">
-      <p className="text-sm text-gray-600 font-medium">{title}</p>
-      {React.cloneElement(icon, { size: 24 })}
-    </div>
-    <p className="text-3xl font-bold text-gray-900 mb-1">{value}</p>
-    <div className="mt-2 text-xs text-gray-500 flex items-center gap-1">
-      <span>{active ? "Click to show all" : "Click to view details"}</span>
-      <span className="text-[#c62d23]">→</span>
-    </div>
-  </div>
-);
+function ExpandedProgress({ order, FULL_ORDER_STEPS, SPARE_ORDER_STEPS }) {
+  const steps = order.orderType === "FULL" ? FULL_ORDER_STEPS : SPARE_ORDER_STEPS;
+  const currentIndex = steps.findIndex((s) => s.key === order.progress);
+  const safeIndex = currentIndex === -1 ? steps.length - 1 : currentIndex;
+  const percent = ((safeIndex + 1) / steps.length) * 100;
+  const isCompleted = order.progress === "DISPATCHED";
 
-const Input = ({ label, name, value, onChange, type = "text" }) => (
-  <div>
-    <label className="text-sm text-gray-700 font-semibold block mb-2">
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Order Progress</p>
+        <span className="text-xs text-gray-500">
+          Step {safeIndex + 1} of {steps.length}
+        </span>
+      </div>
+
+      {/* Progress bar */}
+      <div className="relative">
+        <div className="h-1.5 bg-gray-100 rounded-full w-full" />
+        <div
+          className="absolute top-0 left-0 h-1.5 rounded-full transition-all duration-700"
+          style={{
+            width: `${percent}%`,
+            background: isCompleted
+              ? "#22c55e"
+              : "linear-gradient(90deg, #22c55e, #c62d23)",
+          }}
+        />
+      </div>
+
+      {/* Step dots */}
+      <div className="flex justify-between relative">
+        {steps.map((step, index) => {
+          const done = index < safeIndex;
+          const active = index === safeIndex;
+          return (
+            <div key={step.key} className="flex flex-col items-center gap-1.5 flex-1">
+              <div
+                className={`w-5 h-5 rounded-full border-2 flex items-center justify-center text-[10px] font-bold transition-all ${
+                  done
+                    ? "bg-green-500 border-green-500 text-white"
+                    : active
+                    ? "bg-[#c62d23] border-[#c62d23] text-white scale-110 shadow-sm"
+                    : "bg-white border-gray-200 text-gray-300"
+                }`}
+              >
+                {done ? "✓" : index + 1}
+              </div>
+              <span
+                className={`text-[9px] text-center leading-tight max-w-[56px] ${
+                  active ? "text-[#c62d23] font-semibold" : done ? "text-green-600" : "text-gray-300"
+                }`}
+              >
+                {step.label}
+              </span>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+const STATUS_VARIANTS = {
+  danger: "bg-red-50 text-red-700 border-red-200",
+  warning: "bg-amber-50 text-amber-700 border-amber-200",
+  ready: "bg-violet-50 text-violet-700 border-violet-200",
+  success: "bg-green-50 text-green-700 border-green-200",
+  info: "bg-blue-50 text-blue-700 border-blue-200",
+};
+
+function StatusPill({ variant, label }) {
+  return (
+    <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium border ${STATUS_VARIANTS[variant] || STATUS_VARIANTS.info}`}>
       {label}
-    </label>
-    <input
-      type={type}
-      name={name}
-      value={value}
-      onChange={onChange}
-      className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl outline-none focus:border-[#c62d23] focus:ring-2 focus:ring-[#c62d23]/20 transition-all text-gray-900"
-    />
-  </div>
-);
+    </span>
+  );
+}
+
+function StatCard({ title, value, icon, danger, onClick, active, accentColor }) {
+  return (
+    <div
+      onClick={onClick}
+      className={`bg-white border rounded-xl p-4 sm:p-5 cursor-pointer transition-all duration-200 shadow-sm hover:shadow-md group ${
+        danger ? "border-red-200" : "border-gray-100"
+      } ${active ? "ring-2 ring-offset-1" : "hover:border-gray-200"}`}
+      style={{
+        borderLeftWidth: "3px",
+        borderLeftColor: accentColor,
+        ...(active ? { "--tw-ring-color": accentColor } : {}),
+      }}
+    >
+      <div className="flex items-start justify-between mb-3">
+        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">{title}</p>
+        <div
+          className="p-1.5 rounded-lg transition-colors"
+          style={{ backgroundColor: `${accentColor}15`, color: accentColor }}
+        >
+          {React.cloneElement(icon, { size: 14 })}
+        </div>
+      </div>
+      <p className="text-2xl sm:text-3xl font-bold text-gray-900">{value}</p>
+      <p className="text-[10px] text-gray-400 mt-1.5 group-hover:text-gray-500 transition-colors">
+        {active ? "Showing filtered" : "Click to filter"}
+      </p>
+    </div>
+  );
+}
+
+function ActionButton({ icon, label, onClick, variant = "primary" }) {
+  const base = "flex items-center gap-1.5 px-3 sm:px-4 py-2 rounded-xl text-sm font-medium transition-all shadow-sm active:scale-95";
+  const variants = {
+    primary: "bg-[#c62d23] hover:bg-[#b02620] text-white",
+    success: "bg-emerald-600 hover:bg-emerald-700 text-white",
+  };
+  return (
+    <button onClick={onClick} className={`${base} ${variants[variant]}`}>
+      {icon}
+      <span className="hidden sm:inline">{label}</span>
+    </button>
+  );
+}
+
+function FormField({ label, children }) {
+  return (
+    <div className="space-y-1.5">
+      <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wide">
+        {label}
+      </label>
+      {children}
+    </div>
+  );
+}

@@ -29,7 +29,7 @@ export default function AmendOrderModal({ order, onClose, onSuccess }) {
       onSuccess();
       onClose();
     } catch (err) {
-      alert(err?.response?.data?.message || "Failed to amend order");
+      alert(err?.response?.data?.message || "Failed to change order");
     } finally {
       setLoading(false);
     }
@@ -39,7 +39,7 @@ export default function AmendOrderModal({ order, onClose, onSuccess }) {
     <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center">
       <div className="bg-white w-full max-w-md rounded-xl shadow-lg p-6">
         <h2 className="text-lg font-bold mb-4">
-          Amend Order Before Dispatch
+          Change Order Before Dispatch
         </h2>
 
         {/* Dispatched To */}

@@ -549,7 +549,7 @@ export default function SparePartsInventory() {
                                       className="text-gray-500 hover:text-blue-600"
                                     />
                                   </button>
-
+{/* 
                                   <button
                                     onClick={(e) => {
                                       e.stopPropagation();
@@ -568,7 +568,7 @@ export default function SparePartsInventory() {
                                       size={14}
                                       className="text-gray-500 hover:text-green-600"
                                     />
-                                  </button>
+                                  </button> */}
 
                                   <button
                                     onClick={(e) => {

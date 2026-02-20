@@ -220,16 +220,16 @@ export default function WarehouseOrders() {
     let data = [...orders];
 
     if (activeFilter === "ALL") {
-  data = data.filter(
-    (o) => !["DISPATCHED", "COMPLETED"].includes(o.progress)
-  );
-}
-console.log(
-  orders.reduce((acc, o) => {
-    acc[o.progress] = (acc[o.progress] || 0) + 1;
-    return acc;
-  }, {})
-);
+      data = data.filter(
+        (o) => !["DISPATCHED", "COMPLETED"].includes(o.progress),
+      );
+    }
+    console.log(
+      orders.reduce((acc, o) => {
+        acc[o.progress] = (acc[o.progress] || 0) + 1;
+        return acc;
+      }, {}),
+    );
 
     if (activeFilter === "DELAYED") {
       data = data.filter((o) => isDelayed(o));
@@ -239,12 +239,10 @@ console.log(
       data = data.filter((o) => o.progress === "READY_FOR_DISPATCH");
     }
     if (activeFilter === "COMPLETED") {
-  data = data.filter((o) =>
-    ["DISPATCHED", "COMPLETED"].includes(o.progress)
-  );
-}
-
-
+      data = data.filter((o) =>
+        ["DISPATCHED", "COMPLETED"].includes(o.progress),
+      );
+    }
 
     const q = (search || "").toLowerCase();
     if (q) {
@@ -258,17 +256,16 @@ console.log(
 
     return data;
   }, [orders, search, activeFilter]);
-const fullChairOrders = filteredOrders.filter(
-  (o) =>
-    o.orderType === "FULL" &&
-    [
-      "FITTING_COMPLETED",
-      "READY_FOR_DISPATCH",
-      "DISPATCHED",
-      "COMPLETED",
-    ].includes(o.progress)
-);
-
+  const fullChairOrders = filteredOrders.filter(
+    (o) =>
+      o.orderType === "FULL" &&
+      [
+        "FITTING_COMPLETED",
+        "READY_FOR_DISPATCH",
+        "DISPATCHED",
+        "COMPLETED",
+      ].includes(o.progress),
+  );
 
   const sparePartOrders = filteredOrders.filter((o) => o.orderType === "SPARE");
 
@@ -282,19 +279,17 @@ const fullChairOrders = filteredOrders.filter(
   );
 
   /* ================= STATS ================= */
-  const totalOrders =
-  fullChairOrders.length + sparePartOrders.length;
+  const totalOrders = fullChairOrders.length + sparePartOrders.length;
 
   const delayedOrders = orders.filter((o) => isDelayed(o)).length;
 
   const readyForDispatch = orders.filter(
     (o) => o.progress === "READY_FOR_DISPATCH",
   ).length;
-  
-  const completedOrders = orders.filter(
-  (o) => ["DISPATCHED", "COMPLETED"].includes(o.progress)
-).length;
 
+  const completedOrders = orders.filter((o) =>
+    ["DISPATCHED", "COMPLETED"].includes(o.progress),
+  ).length;
 
   /* ================= STATUS BADGE ================= */
   const getStatusBadge = (progress) => {
@@ -350,7 +345,10 @@ const fullChairOrders = filteredOrders.filter(
   const sumPartQty = (parts, partName) => {
     if (!parts) return 0;
 
-    const part = parts.find((p) => p.partName === partName);
+    const part = parts.find(
+      (p) =>
+        p.partName?.toLowerCase().trim() === partName?.toLowerCase().trim(),
+    );
     if (!part) return 0;
 
     let total = 0;
@@ -379,114 +377,99 @@ const fullChairOrders = filteredOrders.filter(
   };
 
   const handlePartialAccepted = async (orderId) => {
-    let parts = inventoryPreview[orderId];
-    if (!parts) return alert("No parts selected");
+  let parts = inventoryPreview[orderId];
+  if (!parts) return alert("No parts selected");
 
-    const order = orders.find((o) => o._id === orderId);
-    if (!order) return alert("Order not found");
+  const order = orders.find((o) => o._id === orderId);
+  if (!order) return alert("Order not found");
 
-    // 🔥 FILTER FOR SPARE
-    if (order.orderType === "SPARE") {
-      parts = parts.filter(
-        (p) =>
-          p.partName?.toLowerCase().trim() ===
-          order.chairModel?.toLowerCase().trim(),
-      );
+  // ✅ SPARE → only matching part
+  if (order.orderType === "SPARE") {
+    parts = parts.filter(
+      (p) =>
+        p.partName?.toLowerCase().trim() ===
+        order.chairModel?.toLowerCase().trim()
+    );
+  }
+
+  let buildable;
+  try {
+    buildable = Math.min(
+      ...parts.map((p) =>
+        p.locations.reduce((sum, l) => sum + Number(l.picked || 0), 0)
+      )
+    );
+  } catch (e) {
+    return alert(e.message);
+  }
+
+  if (buildable === 0) {
+    return alert("Not enough parts selected");
+  }
+
+  // ================= FULL ACCEPT (INVENTORY DEDUCTS) =================
+  if (buildable >= order.quantity) {
+    const items = parts.flatMap((p) =>
+      p.locations
+        .filter((l) => l.picked > 0)
+        .map((l) => ({
+          inventoryId: l.inventoryId,
+          qty: l.picked,
+        }))
+    );
+
+    if (!items.length) {
+      return alert("No inventory selected");
     }
 
-    let buildable;
+    if (!confirm("Confirm inventory deduction and dispatch?")) return;
 
-    try {
-      buildable = Math.min(...parts.map((p) => sumPartQty(parts, p.partName)));
-    } catch (e) {
-      return alert(e.message);
-    }
+    await axios.post(
+      `${API}/warehouse/order/dispatch`,
+      { orderId, items },
+      { headers }
+    );
 
-    if (buildable > order.quantity) {
-      return alert(
-        `You selected parts for ${buildable} but order requires only ${order.quantity}.
-Please reduce picks to exactly ${order.quantity}.`,
-      );
-    }
+    alert("Order accepted and inventory deducted");
+    fetchOrders();
+    setExpandedOrderId(null);
+    setShowDecisionPanel(false);
+    return;
+  }
 
-    if (buildable >= order.quantity) {
-      // 🔥 SPARE ORDER → DIRECT DISPATCH
-      if (order.orderType === "SPARE") {
-        if (!confirm("All spare parts available. Mark as Ready for Dispatch?"))
-          return;
+  // ================= PARTIAL ACCEPT (NO INVENTORY TOUCH) =================
+  if (
+    !confirm(`Only ${buildable} can be fulfilled. Save partial acceptance?`)
+  )
+    return;
 
-        await axios.patch(
-          `${API}/orders/${orderId}/progress`,
-          { progress: "READY_FOR_DISPATCH" },
-          { headers },
-        );
-
-        alert("Spare order marked Ready for Dispatch");
-        fetchOrders();
-        setExpandedOrderId(null);
-        setShowDecisionPanel(false);
-        return;
+  const items = [];
+  parts.forEach((p) => {
+    p.locations.forEach((l) => {
+      if (l.picked > 0) {
+        items.push({
+          inventoryId: l.inventoryId,
+          qty: l.picked,
+        });
       }
-
-      // 🔥 FULL ORDER → SEND TO FITTING
-      if (!confirm("All parts available. Send full order to fitting?")) return;
-
-      await axios.post(
-        `${API}/warehouse/order/dispatch`,
-        {
-          orderId,
-          items: parts.flatMap((p) =>
-            p.locations
-              .filter((l) => l.picked > 0)
-              .map((l) => ({
-                inventoryId: l.inventoryId,
-                qty: l.picked,
-              })),
-          ),
-        },
-        { headers },
-      );
-
-      alert("Order sent to fitting successfully");
-      fetchOrders();
-      setExpandedOrderId(null);
-      setShowDecisionPanel(false);
-      return;
-    }
-
-    if (buildable === 0) return alert("Not enough parts selected");
-
-    if (
-      !confirm(`Only ${buildable} can be fulfilled. Save partial acceptance?`)
-    )
-      return;
-
-    const items = [];
-    parts.forEach((p) => {
-      p.locations.forEach((l) => {
-        if (l.picked > 0)
-          items.push({
-            inventoryId: l.inventoryId,
-            qty: l.picked,
-          });
-      });
     });
+  });
 
-    try {
-      await axios.post(
-        `${API}/warehouse/order/partial-accept`,
-        { orderId, buildable, items },
-        { headers },
-      );
+  try {
+    await axios.post(
+      `${API}/warehouse/order/partial-accept`,
+      { orderId, buildable, items },
+      { headers }
+    );
 
-      alert(`Partial accepted for ${buildable}`);
-      setExpandedOrderId(null);
-      setShowDecisionPanel(false);
-      fetchOrders();
-    } catch (err) {
-      alert("Partial accept failed");
-    }
-  };
+    alert(`Partial accepted for ${buildable}`);
+    setExpandedOrderId(null);
+    setShowDecisionPanel(false);
+    fetchOrders();
+  } catch (err) {
+    alert("Partial accept failed");
+  }
+};
 
   /* ================= ACTION BUTTON ================= */
   const renderAction = (o) => {
@@ -542,7 +525,11 @@ Please reduce picks to exactly ${order.quantity}.`,
             onClick={() => handleMarkReady(o._id)}
             className="bg-emerald-600 hover:bg-emerald-700 px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm font-medium disabled:opacity-50 text-white transition-all shadow-sm hover:shadow-md"
           >
-            {isLoading ? "Processing..." : <span className="hidden sm:inline">Mark Complete</span>}
+            {isLoading ? (
+              "Processing..."
+            ) : (
+              <span className="hidden sm:inline">Mark Complete</span>
+            )}
             {isLoading ? "" : <span className="sm:hidden">Complete</span>}
           </button>
         </div>
@@ -550,26 +537,25 @@ Please reduce picks to exactly ${order.quantity}.`,
     }
 
     if (o.progress === "READY_FOR_DISPATCH") {
-  return (
-    <div className="flex gap-2">
-      <button
-        onClick={() => setAmendOrder(o)}
-        className="bg-amber-600 hover:bg-amber-700 text-white px-3 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-medium"
-      >
-        Amend Order
-      </button>
+      return (
+        <div className="flex gap-2">
+          <button
+            onClick={() => setAmendOrder(o)}
+            className="bg-amber-600 hover:bg-amber-700 text-white px-3 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-medium"
+          >
+            Change Order
+          </button>
 
-      <button
-        disabled={processingId === o._id}
-        onClick={() => handleDispatch(o._id)}
-        className="bg-green-600 hover:bg-green-700 text-white px-3 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-medium disabled:opacity-50"
-      >
-        {processingId === o._id ? "Dispatching..." : "Dispatch"}
-      </button>
-    </div>
-  );
-}
-
+          <button
+            disabled={processingId === o._id}
+            onClick={() => handleDispatch(o._id)}
+            className="bg-green-600 hover:bg-green-700 text-white px-3 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-medium disabled:opacity-50"
+          >
+            {processingId === o._id ? "Dispatching..." : "Dispatch"}
+          </button>
+        </div>
+      );
+    }
 
     if (o.progress === "DISPATCHED" || o.progress === "COMPLETED") {
       return (
@@ -605,7 +591,9 @@ Please reduce picks to exactly ${order.quantity}.`,
     }
 
     return (
-      <span className="text-gray-500 text-xs sm:text-sm font-medium">In Progress</span>
+      <span className="text-gray-500 text-xs sm:text-sm font-medium">
+        In Progress
+      </span>
     );
   };
 
@@ -643,7 +631,10 @@ Please reduce picks to exactly ${order.quantity}.`,
 
               <div className="min-w-0 flex-1">
                 <h1 className="text-lg sm:text-2xl md:text-3xl font-bold text-gray-900 flex items-center gap-2 truncate">
-                  <Truck size={20} className="text-[#c62d23] sm:w-6 sm:h-6 md:w-8 md:h-8 flex-shrink-0" />
+                  <Truck
+                    size={20}
+                    className="text-[#c62d23] sm:w-6 sm:h-6 md:w-8 md:h-8 flex-shrink-0"
+                  />
                   <span className="truncate">Warehouse Orders</span>
                 </h1>
                 <p className="text-xs sm:text-sm text-gray-600 mt-0.5 sm:mt-1 hidden sm:block">
@@ -693,14 +684,13 @@ Please reduce picks to exactly ${order.quantity}.`,
               onClick={() => setActiveFilter("READY")}
             />
             <StatCard
-  title="Completed Orders"
-  value={completedOrders}
-  icon={<CheckCircle className="text-[#c62d23]" />}
-  clickable={true}
-  active={activeFilter === "COMPLETED"}
-  onClick={() => setActiveFilter("COMPLETED")}
-/>
-
+              title="Completed Orders"
+              value={completedOrders}
+              icon={<CheckCircle className="text-[#c62d23]" />}
+              clickable={true}
+              active={activeFilter === "COMPLETED"}
+              onClick={() => setActiveFilter("COMPLETED")}
+            />
           </div>
 
           {/* FILTER BADGE */}
@@ -770,7 +760,9 @@ Please reduce picks to exactly ${order.quantity}.`,
                   : "text-gray-600 hover:bg-gray-50"
               }`}
             >
-              <span className="hidden sm:inline">Full Chair Orders ({fullChairOrders.length})</span>
+              <span className="hidden sm:inline">
+                Full Chair Orders ({fullChairOrders.length})
+              </span>
               <span className="sm:hidden">Full ({fullChairOrders.length})</span>
             </button>
 
@@ -782,8 +774,12 @@ Please reduce picks to exactly ${order.quantity}.`,
                   : "text-gray-600 hover:bg-gray-50"
               }`}
             >
-              <span className="hidden sm:inline">Spare Part Orders ({sparePartOrders.length})</span>
-              <span className="sm:hidden">Spare ({sparePartOrders.length})</span>
+              <span className="hidden sm:inline">
+                Spare Part Orders ({sparePartOrders.length})
+              </span>
+              <span className="sm:hidden">
+                Spare ({sparePartOrders.length})
+              </span>
             </button>
           </div>
 
@@ -829,13 +825,12 @@ Please reduce picks to exactly ${order.quantity}.`,
         </div>
       </div>
       {amendOrder && (
-  <AmendOrderModal
-    order={amendOrder}
-    onClose={() => setAmendOrder(null)}
-    onSuccess={fetchOrders}
-  />
-)}
-
+        <AmendOrderModal
+          order={amendOrder}
+          onClose={() => setAmendOrder(null)}
+          onSuccess={fetchOrders}
+        />
+      )}
     </div>
   );
 }
@@ -867,34 +862,37 @@ const OrdersTable = ({
   if (!orders.length) {
     return (
       <div className="text-center text-gray-500 py-12 sm:py-16 bg-white rounded-xl border border-gray-200">
-        <Package size={40} className="mx-auto mb-3 sm:mb-4 text-gray-300 sm:w-12 sm:h-12" />
+        <Package
+          size={40}
+          className="mx-auto mb-3 sm:mb-4 text-gray-300 sm:w-12 sm:h-12"
+        />
         <p className="text-base sm:text-lg font-medium">No orders found</p>
       </div>
     );
   }
 
   const getLiveBuildable = (orderId, order) => {
-    const parts = inventoryPreview[orderId];
-    if (!parts || parts.length === 0) return 0;
+  const parts = inventoryPreview[orderId];
+  if (!parts || parts.length === 0) return 0;
 
-    let filteredParts = parts;
+  let relevantParts = parts;
 
-    if (order.orderType === "SPARE") {
-      filteredParts = parts.filter(
-        (p) =>
-          p.partName?.toLowerCase().trim() ===
-          order.chairModel?.toLowerCase().trim(),
-      );
-    }
-
-    if (!filteredParts || filteredParts.length === 0) return 0;
-
-    const totals = filteredParts.map((p) =>
-      p.locations.reduce((sum, l) => sum + Number(l.picked || 0), 0),
+  if (order.orderType === "SPARE") {
+    relevantParts = parts.filter(
+      (p) =>
+        p.partName?.toLowerCase().trim() ===
+        order.chairModel?.toLowerCase().trim()
     );
+  }
 
-    return Math.min(...totals);
-  };
+  if (!relevantParts.length) return 0;
+
+  const totals = relevantParts.map((p) =>
+    p.locations.reduce((sum, l) => sum + Number(l.picked || 0), 0)
+  );
+
+  return Math.min(...totals);
+};
 
   return (
     <>
@@ -935,7 +933,9 @@ const OrdersTable = ({
                     <td className="p-3 lg:p-4 font-semibold text-gray-900 text-xs lg:text-sm">
                       {o.orderId}
                     </td>
-                    <td className="p-3 lg:p-4 text-gray-700 text-xs lg:text-sm">{o.dispatchedTo?.name}</td>
+                    <td className="p-3 lg:p-4 text-gray-700 text-xs lg:text-sm">
+                      {o.dispatchedTo?.name}
+                    </td>
                     <td className="p-3 lg:p-4 font-medium text-gray-900 text-xs lg:text-sm">
                       {o.chairModel || "Spare Parts"}
                     </td>
@@ -981,14 +981,19 @@ const OrdersTable = ({
       {/* Mobile Cards */}
       <div className="md:hidden space-y-3">
         {orders.map((o) => (
-          <div key={o._id} className="bg-white rounded-xl border border-gray-200 shadow-sm">
+          <div
+            key={o._id}
+            className="bg-white rounded-xl border border-gray-200 shadow-sm"
+          >
             <div className="p-4">
               <div className="flex items-start justify-between mb-3">
                 <div className="flex-1 min-w-0">
                   <h3 className="font-bold text-gray-900 text-sm mb-1 truncate">
                     {o.orderId}
                   </h3>
-                  <p className="text-xs text-gray-600 truncate">{o.dispatchedTo?.name}</p>
+                  <p className="text-xs text-gray-600 truncate">
+                    {o.dispatchedTo?.name}
+                  </p>
                 </div>
                 {getStatusBadge(o.progress)}
               </div>
@@ -996,7 +1001,9 @@ const OrdersTable = ({
               <div className="grid grid-cols-2 gap-3 mb-3 text-xs">
                 <div>
                   <p className="text-gray-500 mb-0.5">Chair/Part</p>
-                  <p className="font-medium text-gray-900 truncate">{o.chairModel || "Spare Parts"}</p>
+                  <p className="font-medium text-gray-900 truncate">
+                    {o.chairModel || "Spare Parts"}
+                  </p>
                 </div>
                 <div>
                   <p className="text-gray-500 mb-0.5">Quantity</p>
@@ -1004,12 +1011,16 @@ const OrdersTable = ({
                 </div>
                 <div>
                   <p className="text-gray-500 mb-0.5">Order Date</p>
-                  <p className="text-gray-700">{new Date(o.orderDate).toLocaleDateString()}</p>
+                  <p className="text-gray-700">
+                    {new Date(o.orderDate).toLocaleDateString()}
+                  </p>
                 </div>
                 <div>
                   <p className="text-gray-500 mb-0.5">Delivery</p>
                   <p className="text-gray-700">
-                    {o.deliveryDate ? new Date(o.deliveryDate).toLocaleDateString() : "-"}
+                    {o.deliveryDate
+                      ? new Date(o.deliveryDate).toLocaleDateString()
+                      : "-"}
                   </p>
                 </div>
               </div>
@@ -1149,18 +1160,20 @@ const ExpandedInventoryPanel = ({
           ) : (
             <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-3 sm:gap-4">
               {inventoryPreview[o._id]
-                ?.filter((part) => {
-                  if (o.orderType === "FULL") return true;
+  ?.filter((part) => {
+    // ✅ FULL ORDER → show everything
+    if (o.orderType === "FULL") return true;
 
-                  if (o.orderType === "SPARE") {
-                    return (
-                      part.partName?.toLowerCase() ===
-                      o.chairModel?.toLowerCase()
-                    );
-                  }
+    // ✅ SPARE ORDER → strict case-insensitive match
+    if (o.orderType === "SPARE") {
+      return (
+        part.partName?.toLowerCase().trim() ===
+        o.chairModel?.toLowerCase().trim()
+      );
+    }
 
-                  return false;
-                })
+    return false;
+  })
                 .map((part, idx) => (
                   <div
                     key={`${o._id}-${part.partName}`}
@@ -1281,7 +1294,10 @@ const ExpandedInventoryPanel = ({
         : "bg-[#c62d23] hover:bg-[#a82419] text-white"
     }`}
                 >
-                  <CheckCircle size={16} className="sm:w-4 sm:h-4 md:w-5 md:h-5" />
+                  <CheckCircle
+                    size={16}
+                    className="sm:w-4 sm:h-4 md:w-5 md:h-5"
+                  />
                   {isExact ? "Accept Order" : "Partial Accept"}
                 </button>
 
@@ -1326,7 +1342,10 @@ const StatCard = ({
   >
     <div className="flex justify-between items-start mb-3 sm:mb-4">
       <p className="text-xs sm:text-sm text-gray-600 font-medium">{title}</p>
-      {React.cloneElement(icon, { size: 20, className: `sm:w-6 sm:h-6 ${icon.props.className}` })}
+      {React.cloneElement(icon, {
+        size: 20,
+        className: `sm:w-6 sm:h-6 ${icon.props.className}`,
+      })}
     </div>
     <p className="text-2xl sm:text-3xl font-bold text-gray-900 mb-1">{value}</p>
     {clickable && (

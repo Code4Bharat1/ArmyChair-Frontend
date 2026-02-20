@@ -13,6 +13,7 @@ import {
   FileCheck,
   X,
 } from "lucide-react";
+import LanguageToggle from "@/components/LanguageToggle";
 
 export default function InventorySidebar({ onClose }) {
   const pathname = usePathname();
@@ -122,6 +123,7 @@ export default function InventorySidebar({ onClose }) {
 
       {/* Footer */}
       <div className="border-t border-gray-200 bg-gray-50 flex-shrink-0">
+        <LanguageToggle />
         <button
           onClick={() => {
             localStorage.removeItem("token");

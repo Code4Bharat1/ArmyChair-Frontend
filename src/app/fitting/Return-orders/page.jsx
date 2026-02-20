@@ -58,32 +58,35 @@ useEffect(() => {
 }, []);
 
 
- const submitDecision = async () => {
+const submitDecision = async () => {
+  if (!decision) {
+    alert("Please select Accept or Reject");
+    return;
+  }
+
+  if (decision === "Accepted" && !inventoryType) {
+    alert("Please select inventory type");
+    return;
+  }
+
+  if (inventoryType === "GOOD" && !assignedTo) {
+    alert("Please assign warehouse staff");
+    return;
+  }
+
   try {
-    const payload = {
-      decision,
-      remarks,
-    };
-
-    if (decision === "Accepted") {
-      payload.inventoryType = inventoryType;
-
-      if (inventoryType === "GOOD") {
-        payload.assignedTo = assignedTo;
-      }
-    }
-
     await axios.post(
       `${API}/returns/${selected._id}/fitting-decision`,
-      payload,
+      {
+        decision,
+        remarks,
+        inventoryType,
+        assignedTo,
+      },
       { headers: getAuthHeaders() }
     );
 
-    setOpenModal(false);
-    setSelected(null);
-    setRemarks("");
-    setInventoryType("");
-    setAssignedTo("");
+    closeModal();
     fetchReturns();
   } catch (err) {
     alert(err.response?.data?.message || "Action failed");
