@@ -150,20 +150,35 @@ export default function Orders() {
   }, []);
 
   const handleEditOrder = (order) => {
-    setEditingOrderId(order._id);
-    setFormData({
-      dispatchedTo: order.dispatchedTo?._id || order.dispatchedTo,
-      remark: order.remark || "",
-      orderDate: order.orderDate?.split("T")[0],
-      deliveryDate: order.deliveryDate?.split("T")[0] || "",
-      orderType: order.orderType || "FULL",
-      items: [{ chairModel: order.chairModel, quantity: order.quantity }],
-    });
-    setVendorSearch(order.dispatchedTo?.name || "");
-    setItemSearches([order.chairModel || ""]); // ✅ pre-fill search text
-    setShowItemDropdowns([false]); // ✅ dropdown closed
-    setShowForm(true);
-  };
+  setEditingOrderId(order._id);
+
+  const items =
+    order.items && order.items.length > 0
+      ? order.items.map((i) => ({
+          chairModel: i.name,
+          quantity: i.quantity,
+        }))
+      : [
+          {
+            chairModel: order.chairModel,
+            quantity: order.quantity,
+          },
+        ];
+
+  setFormData({
+    dispatchedTo: order.dispatchedTo?._id || order.dispatchedTo,
+    remark: order.remark || "",
+    orderDate: order.orderDate?.split("T")[0],
+    deliveryDate: order.deliveryDate?.split("T")[0] || "",
+    orderType: order.orderType || "FULL",
+    items,
+  });
+
+  setVendorSearch(order.dispatchedTo?.name || "");
+  setItemSearches(items.map((i) => i.chairModel));
+  setShowItemDropdowns(items.map(() => false));
+  setShowForm(true);
+};
 
   const handleFormChange = (e) => {
     const { name, value } = e.target;
@@ -231,17 +246,18 @@ export default function Orders() {
 
     try {
       if (editingOrderId) {
-        // Editing = single order, use first item only
-        await axios.put(
-          `${API}/orders/${editingOrderId}`,
-          {
-            ...basePayload,
-            chairModel: validItems[0].chairModel,
-            quantity: Number(validItems[0].quantity),
-          },
-          { headers },
-        );
-      }else {
+  await axios.put(
+    `${API}/orders/${editingOrderId}`,
+    {
+      ...basePayload,
+      items: validItems.map((item) => ({
+        name: item.chairModel,
+        quantity: Number(item.quantity),
+      })),
+    },
+    { headers },
+  );
+}else {
   await axios.post(
     `${API}/orders`,
     {
@@ -363,48 +379,91 @@ export default function Orders() {
   };
 
   const handleExportCSV = () => {
-    if (!orders.length) {
-      alert("No orders to export");
-      return;
-    }
-    const hdrs = [
-      "Order ID",
-      "Vendor",
-      "Product",
-      "Remarks",
-      "Order Type",
-      "Quantity",
-      "Order Date",
-      "Delivery Date",
-      "Status",
-    ];
-    const rows = orders.map((o) => [
-      o.orderId,
+  if (!orders.length) {
+    alert("No orders to export");
+    return;
+  }
+
+  const headers = [
+    "Order ID",
+    "Vendor",
+    "Product",
+    "Remarks",
+    "Order Type",
+    "Quantity",
+    "Order Date",
+    "Delivery Date",
+    "Status",
+  ];
+
+  const rows = [];
+
+  orders.forEach((o) => {
+    const vendorName =
       typeof o.dispatchedTo === "string"
         ? o.dispatchedTo
-        : o.dispatchedTo?.name || "",
-      o.chairModel,
-      o.remark || "",
-      o.orderType,
-      o.quantity,
-      o.orderDate ? new Date(o.orderDate).toLocaleDateString() : "",
-      o.deliveryDate ? new Date(o.deliveryDate).toLocaleDateString() : "",
-      o.progress,
-    ]);
-    const csvContent =
-      hdrs.join(",") +
-      "\n" +
-      rows.map((r) => r.map((v) => `"${v}"`).join(",")).join("\n");
-    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = `orders_${new Date().toISOString().slice(0, 10)}.csv`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
-  };
+        : o.dispatchedTo?.name || "";
+
+    const orderDate = o.orderDate
+      ? new Date(o.orderDate).toLocaleDateString()
+      : "";
+
+    const deliveryDate = o.deliveryDate
+      ? new Date(o.deliveryDate).toLocaleDateString()
+      : "";
+
+    // 🔥 MULTI ITEM SUPPORT
+    if (o.items && o.items.length > 0) {
+      o.items.forEach((item) => {
+        rows.push([
+          o.orderId,
+          vendorName,
+          item.name,
+          o.remark || "",
+          o.orderType,
+          item.quantity,
+          orderDate,
+          deliveryDate,
+          o.progress,
+        ]);
+      });
+    } else {
+      // fallback for legacy single-item orders
+      rows.push([
+        o.orderId,
+        vendorName,
+        o.chairModel,
+        o.remark || "",
+        o.orderType,
+        o.quantity,
+        orderDate,
+        deliveryDate,
+        o.progress,
+      ]);
+    }
+  });
+
+  const csvContent =
+    headers.join(",") +
+    "\n" +
+    rows.map((r) => r.map((v) => `"${v ?? ""}"`).join(",")).join("\n");
+
+  const blob = new Blob([csvContent], {
+    type: "text/csv;charset=utf-8;",
+  });
+
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+
+  link.href = url;
+  link.download = `orders_${new Date().toISOString().slice(0, 10)}.csv`;
+
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+
+  URL.revokeObjectURL(url);
+};
 
   const getOrderStatus = (o) => {
     if (isDelayed(o)) return { variant: "danger", label: "Delayed" };
