@@ -1,3 +1,4 @@
+//Inventory full chair page
 "use client";
 import { useRouter } from "next/navigation";
 import React, { useEffect, useMemo, useState } from "react";
@@ -16,57 +17,86 @@ import {
   Package,
   UserCircle,
   Menu,
+  Upload,
+  Download,
+  ChevronLeft,
+  ChevronRight,
+  ChevronsLeft,
+  ChevronsRight,
 } from "lucide-react";
 import axios from "axios";
 import InventorySidebar from "./sidebar";
+
+const PAGE_SIZE_OPTIONS = [20, 25, 50, 100];
+
+/* ================= CSV EXPORT ================= */
+const exportToCSV = (data) => {
+  const rows = [
+    ["Product", "Color", "Mesh", "Remark", "Vendor", "Quantity", "Status"],
+    ...data.map((i) => [
+      i.name,
+      i.color || "",
+      i.mesh || "",
+      i.remark || "",
+      i.vendor?.name || "",
+      i.quantity,
+      i.status,
+    ]),
+  ];
+  const csv = rows
+    .map((r) => r.map((v) => `"${String(v).replace(/"/g, '""')}"`).join(","))
+    .join("\n");
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `inventory-${new Date().toISOString().slice(0, 10)}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+};
 
 export default function InventoryPage() {
   const [inventory, setInventory] = useState([]);
   const [loading, setLoading] = useState(true);
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
-  /* FILTERS */
   const [searchTerm, setSearchTerm] = useState("");
   const [filterVendor, setFilterVendor] = useState("All");
   const [filterStatus, setFilterStatus] = useState("All");
 
-  /* MODAL STATE */
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+
   const [showForm, setShowForm] = useState(false);
   const [editId, setEditId] = useState(null);
   const [vendorsList, setVendorsList] = useState([]);
 
   const [form, setForm] = useState({
-  chairType: "",
-  vendor: "",
-  quantity: "",
-  color: "",        // ✅ ADDED
-});
-
+    chairType: "",
+    vendor: "",
+    quantity: "",
+    color: "",
+    mesh: "",
+    remark: "",
+  });
 
   const router = useRouter();
-
   const API = process.env.NEXT_PUBLIC_API_URL;
   const token =
     typeof window !== "undefined" ? localStorage.getItem("token") : null;
-
   const headers = token ? { Authorization: `Bearer ${token}` } : {};
 
   /* ================= FETCH ================= */
   const fetchInventory = async () => {
     try {
       const res = await axios.get(`${API}/inventory`, { headers });
-
       const data = res.data.inventory || [];
-
       const safeData = data.map((i) => ({
         ...i,
         quantity: Number(i.quantity || 0),
       }));
-
-      // ✅ ONLY FULL CHAIRS
-      const onlyFullChairs = safeData.filter((i) => i.type === "FULL");
-
-      setInventory(onlyFullChairs);
+      setInventory(safeData.filter((i) => i.type === "FULL"));
     } catch (err) {
       console.error("Fetch failed", err);
     } finally {
@@ -78,45 +108,36 @@ export default function InventoryPage() {
     fetchInventory();
   }, []);
   useEffect(() => {
-    const fetchVendors = async () => {
-      const res = await axios.get(`${API}/vendors`, { headers });
-      setVendorsList(res.data);
-    };
-
-    fetchVendors();
+    axios
+      .get(`${API}/vendors`, { headers })
+      .then((res) => setVendorsList(res.data))
+      .catch(console.error);
   }, []);
 
-  /* ================= CREATE / UPDATE ================= */
+  /* ================= SAVE ================= */
   const submitInventory = async () => {
     try {
-      if (!form.chairType || !form.vendor || form.quantity === "") {
-        return alert("All fields required");
+      if (!form.chairType || !form.vendor || !form.color || form.quantity === "") {
+        return alert("Please fill all required fields");
       }
-
       const payload = {
-  type: "FULL",
-  chairType: form.chairType,
-  vendor: form.vendor,
-  quantity: Number(form.quantity),
-  colour: form.color,     // ✅ ADDED
-  minQuantity: 50,
-  maxQuantity: 500,
-  location: "WAREHOUSE",
-};
-
-
+        type: "FULL",
+        chairType: form.chairType,
+        vendor: form.vendor,
+        quantity: Number(form.quantity),
+        colour: form.color,
+        mesh: form.mesh,
+        remark: form.remark,
+        minQuantity: 50,
+        maxQuantity: 500,
+        location: "WAREHOUSE",
+      };
       if (editId) {
-        await axios.patch(`${API}/inventory/update/${editId}`, payload, {
-          headers,
-        });
+        await axios.patch(`${API}/inventory/update/${editId}`, payload, { headers });
       } else {
         await axios.post(`${API}/inventory`, payload, { headers });
       }
-
-      setShowForm(false);
-      setForm({ chairType: "", vendor: "", quantity: "", color: "" });
-
-      setEditId(null);
+      closeModal();
       fetchInventory();
     } catch (err) {
       console.error("Save failed", err);
@@ -136,81 +157,104 @@ export default function InventoryPage() {
 
   /* ================= TRANSFORM ================= */
   const inventoryData = useMemo(() => {
-    return inventory.map((item) => {
-      const qty = Number(item.quantity || 0);
-
-      let status = "Healthy";
-      if (qty === 0) status = "Critical";
-      else if (qty < 100) status = "Low Stock";
-
-      return {
-  id: item._id,
-  name: item.chairType || "",
-  vendor: item.vendor || null,
-  quantity: qty,
-  color: item.colour || "",
-   // ✅ ADDED
-  status,
-};
-
-    });
+    return inventory.map((item) => ({
+      id: item._id,
+      name: item.chairType || "",
+      vendor: item.vendor || null,
+      quantity: Number(item.quantity || 0),
+      color: item.colour || "",
+      mesh: item.mesh || "",
+      remark: item.remark || "",
+      status: item.status || "Healthy",
+    }));
   }, [inventory]);
 
-  /* ===== FILTER OPTIONS ===== */
   const vendors = useMemo(() => {
     const names = inventoryData.map((i) => i.vendor?.name).filter(Boolean);
-
     return ["All", ...new Set(names)];
   }, [inventoryData]);
 
   const statuses = ["All", "Healthy", "Low Stock", "Critical"];
 
-  /* ================= FILTER ================= */
   const filteredData = useMemo(() => {
     const term = (searchTerm || "").toLowerCase();
-
     return inventoryData.filter((i) => {
-      const name = (i.name || "").toLowerCase();
-      const vendor = i.vendor?.name || "";
-      const status = i.status || "";
-
       return (
-        name.includes(term) &&
-        (filterVendor === "All" || vendor === filterVendor) &&
-        (filterStatus === "All" || status === filterStatus)
+        (i.name || "").toLowerCase().includes(term) &&
+        (filterVendor === "All" || (i.vendor?.name || "") === filterVendor) &&
+        (filterStatus === "All" || (i.status || "") === filterStatus)
       );
     });
   }, [inventoryData, searchTerm, filterVendor, filterStatus]);
 
-  /* ================= STATS ================= */
+  // Reset to page 1 when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, filterVendor, filterStatus, pageSize]);
+
+  /* ================= PAGINATION ================= */
+  const totalItems = filteredData.length;
+  const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
+  const safePage = Math.min(currentPage, totalPages);
+  const startIdx = (safePage - 1) * pageSize;
+  const endIdx = Math.min(startIdx + pageSize, totalItems);
+  const paginatedData = filteredData.slice(startIdx, endIdx);
+
+  const goToPage = (p) => setCurrentPage(Math.max(1, Math.min(p, totalPages)));
+
+  // Generate page numbers to show (max 5 around current)
+  const pageNumbers = useMemo(() => {
+    const pages = [];
+    const delta = 2;
+    const left = Math.max(1, safePage - delta);
+    const right = Math.min(totalPages, safePage + delta);
+    for (let i = left; i <= right; i++) pages.push(i);
+    return pages;
+  }, [safePage, totalPages]);
+
   const totalStock = useMemo(
     () => inventoryData.reduce((s, i) => s + Number(i.quantity || 0), 0),
-    [inventoryData],
+    [inventoryData]
   );
-
   const totalProducts = inventoryData.length;
-
   const lowStockCount = useMemo(
     () => inventoryData.filter((i) => i.status !== "Healthy").length,
-    [inventoryData],
+    [inventoryData]
   );
 
- const closeModal = () => {
-  setShowForm(false);
-  setEditId(null);
-  setForm({
-    chairType: "",
-    vendor: "",
-    quantity: "",
-    color: "",
-  });
-};
+  const closeModal = () => {
+    setShowForm(false);
+    setEditId(null);
+    setForm({ chairType: "", vendor: "", quantity: "", color: "", mesh: "", remark: "" });
+  };
 
+  const TABLE_HEADERS = ["Product", "Color", "Mesh", "Remark", "Vendor", "Quantity", "Status", "Actions"];
 
   /* ================= UI ================= */
   return (
     <div className="flex h-screen bg-gray-50 text-gray-900">
-      {/* Mobile Sidebar Overlay */}
+      <input
+        type="file"
+        accept=".xlsx"
+        id="full-bulk-upload"
+        className="hidden"
+        onChange={async (e) => {
+          const file = e.target.files[0];
+          if (!file) return;
+          const formData = new FormData();
+          formData.append("file", file);
+          try {
+            await axios.post(`${API}/inventory/full/bulk-upload`, formData, { headers });
+            fetchInventory();
+            e.target.value = "";
+            alert("Bulk upload successful ✅");
+          } catch (err) {
+            console.error("Bulk upload failed", err);
+            alert("Bulk upload failed ❌");
+          }
+        }}
+      />
+
       {sidebarOpen && (
         <div
           className="fixed inset-0 bg-black/50 z-40 lg:hidden"
@@ -218,47 +262,59 @@ export default function InventoryPage() {
         />
       )}
 
-      {/* Sidebar */}
       <div
-        className={`fixed lg:static inset-y-0 left-0 z-50 transform transition-transform duration-300 ease-in-out ${
-          sidebarOpen ? "translate-x-0" : "-translate-x-full"
-        } lg:translate-x-0`}
+        className={`fixed lg:static inset-y-0 left-0 z-50 transform transition-transform duration-300 ease-in-out ${sidebarOpen ? "translate-x-0" : "-translate-x-full"} lg:translate-x-0`}
       >
         <InventorySidebar />
       </div>
 
       <div className="flex-1 overflow-y-auto overflow-x-hidden w-full">
         {/* HEADER */}
-        <div className="sticky top-0 z-10 bg-white/80 backdrop-blur border-b border-gray-200 p-3 sm:p-4 md:p-6 shadow-sm">
-          <div className="flex items-center justify-between gap-2 sm:gap-4">
-            {/* LEFT SIDE */}
-            <div className="flex items-center gap-2 sm:gap-4 flex-1 min-w-0">
-              {/* Mobile Menu Button */}
+        <div className="sticky top-0 z-10 bg-white/90 backdrop-blur-md border-b border-gray-200 px-4 py-3 sm:px-6 sm:py-4 shadow-sm">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-3 flex-1 min-w-0">
               <button
                 onClick={() => setSidebarOpen(!sidebarOpen)}
-                className="lg:hidden text-gray-600 hover:text-[#c62d23] transition p-2 hover:bg-gray-100 rounded-lg"
+                className="lg:hidden text-gray-500 hover:text-[#c62d23] p-2 hover:bg-red-50 rounded-lg transition flex-shrink-0"
               >
-                <Menu size={24} />
+                <Menu size={22} />
               </button>
-
-              <div className="min-w-0 flex-1">
-                <h1 className="text-lg sm:text-2xl md:text-3xl font-bold text-gray-900 flex items-center gap-2 truncate">
-                  <Package size={20} className="text-[#c62d23] sm:w-6 sm:h-6 md:w-8 md:h-8 flex-shrink-0" />
+              <div className="min-w-0">
+                <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-gray-900 flex items-center gap-2 truncate leading-tight">
+                  <Package size={22} className="text-[#c62d23] flex-shrink-0" />
                   <span className="truncate">Inventory Management</span>
                 </h1>
-                <p className="text-xs sm:text-sm text-gray-600 mt-0.5 sm:mt-1 hidden sm:block">
+                <p className="text-xs sm:text-sm text-gray-500 mt-0.5 hidden sm:block">
                   Track stock, vendors and availability
                 </p>
               </div>
             </div>
 
-            {/* RIGHT SIDE */}
-            <div className="flex items-center gap-2 sm:gap-3 md:gap-4 flex-shrink-0">
+            <div className="flex items-center gap-2 flex-shrink-0">
+              <button
+                onClick={() => exportToCSV(filteredData)}
+                className="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-2 sm:px-4 sm:py-2.5 rounded-lg sm:rounded-xl font-medium flex items-center gap-1.5 transition-all shadow-sm hover:shadow-md text-xs sm:text-sm"
+                title="Export to CSV"
+              >
+                <Download size={15} />
+                <span className="hidden sm:inline">Export CSV</span>
+                <span className="sm:hidden">CSV</span>
+              </button>
+
+              <button
+                onClick={() => document.getElementById("full-bulk-upload").click()}
+                className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 sm:px-4 sm:py-2.5 rounded-lg sm:rounded-xl font-medium flex items-center gap-1.5 transition-all shadow-sm hover:shadow-md text-xs sm:text-sm"
+              >
+                <Upload size={15} />
+                <span className="hidden sm:inline">Bulk Upload</span>
+                <span className="sm:hidden">Upload</span>
+              </button>
+
               <button
                 onClick={() => setShowForm(true)}
-                className="bg-[#c62d23] hover:bg-[#a82419] text-white px-3 py-2 sm:px-4 sm:py-2.5 md:px-5 md:py-3 rounded-lg sm:rounded-xl flex items-center gap-1.5 sm:gap-2 shadow-lg shadow-[#c62d23]/20 font-medium transition-all text-xs sm:text-sm md:text-base"
+                className="bg-[#c62d23] hover:bg-[#a82419] text-white px-3 py-2 sm:px-4 sm:py-2.5 rounded-lg sm:rounded-xl font-medium flex items-center gap-1.5 transition-all shadow-sm hover:shadow-md text-xs sm:text-sm"
               >
-                <Plus size={16} className="sm:w-4 sm:h-4 md:w-5 md:h-5" />
+                <Plus size={15} />
                 <span className="hidden sm:inline">Add Inventory</span>
                 <span className="sm:hidden">Add</span>
               </button>
@@ -266,203 +322,225 @@ export default function InventoryPage() {
               <button
                 onClick={() => router.push("/profile")}
                 title="My Profile"
-                className="text-gray-600 hover:text-[#c62d23] transition p-1 sm:p-0"
+                className="text-gray-500 hover:text-[#c62d23] transition p-1"
               >
-                <UserCircle size={28} className="sm:w-8 sm:h-8 md:w-9 md:h-9" />
+                <UserCircle size={30} className="sm:w-8 sm:h-8" />
               </button>
             </div>
           </div>
         </div>
 
-        <div className="p-3 sm:p-4 md:p-6 lg:p-8 space-y-4 sm:space-y-6 md:space-y-8">
-          {/* ===== TOP CARDS ===== */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 md:gap-6">
-            <StatCard
-              title="Total Stock"
-              value={totalStock}
-              icon={<Warehouse className="text-[#c62d23]" />}
-            />
-            <StatCard
-              title="Total Products"
-              value={totalProducts}
-              icon={<Boxes className="text-[#c62d23]" />}
-            />
-            <StatCard
-              title="Low / Critical"
-              value={lowStockCount}
-              danger
-              icon={<TrendingDown className="text-[#c62d23]" />}
-            />
+        <div className="p-3 sm:p-5 md:p-6 lg:p-8 space-y-5 md:space-y-6">
+          {/* STATS */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
+            <StatCard title="Total Stock" value={totalStock} icon={<Warehouse className="text-[#c62d23]" />} />
+            <StatCard title="Total Products" value={totalProducts} icon={<Boxes className="text-[#c62d23]" />} />
+            <StatCard title="Low / Critical" value={lowStockCount} danger icon={<TrendingDown className="text-[#c62d23]" />} />
           </div>
 
-          {/* ===== FILTER BAR ===== */}
-          <div className="bg-white border border-gray-200 rounded-xl sm:rounded-2xl p-3 sm:p-4 md:p-5 shadow-sm">
-            <div className="flex flex-col gap-3 sm:gap-4">
-              {/* Search */}
-              <div className="flex items-center gap-2 sm:gap-3 bg-gray-50 px-3 sm:px-4 py-2.5 sm:py-3 rounded-lg sm:rounded-xl border border-gray-200 w-full">
-                <Search size={16} className="text-gray-400 sm:w-4 sm:h-4 md:w-5 md:h-5 flex-shrink-0" />
+          {/* FILTER BAR */}
+          <div className="bg-white border border-gray-200 rounded-xl sm:rounded-2xl p-3 sm:p-4 shadow-sm">
+            <div className="flex flex-col sm:flex-row gap-3">
+              <div className="relative flex-1">
+                <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
                 <input
                   placeholder="Search product..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="bg-transparent outline-none text-xs sm:text-sm w-full text-gray-900 placeholder-gray-400"
+                  className="w-full pl-9 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-[#c62d23]/20 focus:border-[#c62d23] outline-none bg-gray-50"
                 />
               </div>
 
-              {/* Vendor & Status Filters */}
-              <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
-                {/* Vendor */}
-                <div className="flex items-center gap-2 sm:gap-3 bg-gray-50 px-3 sm:px-4 py-2.5 sm:py-3 rounded-lg sm:rounded-xl border border-gray-200 flex-1">
-                  <Building2 size={16} className="text-gray-400 sm:w-4 sm:h-4 md:w-5 md:h-5 flex-shrink-0" />
-                  <select
-                    value={filterVendor}
-                    onChange={(e) => setFilterVendor(e.target.value)}
-                    className="bg-transparent outline-none text-xs sm:text-sm text-gray-900 font-medium cursor-pointer w-full"
-                  >
-                    <option value="All">All</option>
-{vendorsList.map((v) => (
-  <option key={v._id} value={v.name}>
-    {v.name}
-  </option>
-))}
+              <div className="relative sm:w-48">
+                <Building2 size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+                <select
+                  value={filterVendor}
+                  onChange={(e) => setFilterVendor(e.target.value)}
+                  className="w-full pl-8 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-[#c62d23]/20 focus:border-[#c62d23] outline-none bg-gray-50 appearance-none cursor-pointer"
+                >
+                  <option value="All">All Vendors</option>
+                  {vendorsList.map((v) => (
+                    <option key={v._id} value={v.name}>{v.name}</option>
+                  ))}
+                </select>
+              </div>
 
-                  </select>
-                </div>
+              <div className="relative sm:w-40">
+                <Filter size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+                <select
+                  value={filterStatus}
+                  onChange={(e) => setFilterStatus(e.target.value)}
+                  className="w-full pl-8 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-[#c62d23]/20 focus:border-[#c62d23] outline-none bg-gray-50 appearance-none cursor-pointer"
+                >
+                  {statuses.map((s) => (
+                    <option key={s} value={s}>{s}</option>
+                  ))}
+                </select>
+              </div>
 
-                {/* Status */}
-                <div className="flex items-center gap-2 sm:gap-3 bg-gray-50 px-3 sm:px-4 py-2.5 sm:py-3 rounded-lg sm:rounded-xl border border-gray-200 flex-1">
-                  <Filter size={16} className="text-gray-400 sm:w-4 sm:h-4 md:w-5 md:h-5 flex-shrink-0" />
-                  <select
-                    value={filterStatus}
-                    onChange={(e) => setFilterStatus(e.target.value)}
-                    className="bg-transparent outline-none text-xs sm:text-sm text-gray-900 font-medium cursor-pointer w-full"
-                  >
-                    {statuses.map((s) => (
-                      <option key={s} value={s} className="bg-white">
-                        {s}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+              <div className="flex items-center text-xs text-gray-400 font-medium whitespace-nowrap self-center">
+                {filteredData.length} item{filteredData.length !== 1 ? "s" : ""}
               </div>
             </div>
           </div>
 
           {/* ALERT */}
           {lowStockCount > 0 && (
-            <div className="bg-amber-50 border border-amber-200 p-3 sm:p-4 flex gap-2 sm:gap-3 rounded-lg sm:rounded-xl">
-              <AlertCircle className="text-amber-600 flex-shrink-0" size={18} />
+            <div className="bg-amber-50 border border-amber-200 p-3 sm:p-4 flex gap-2 sm:gap-3 rounded-xl items-center">
+              <AlertCircle className="text-amber-600 flex-shrink-0" size={17} />
               <span className="text-xs sm:text-sm text-amber-800 font-medium">
-                {lowStockCount} items need immediate restocking
+                {lowStockCount} item{lowStockCount !== 1 ? "s" : ""} need immediate restocking
               </span>
             </div>
           )}
 
-          {/* TABLE - Desktop */}
-          <div className="hidden md:block bg-white rounded-xl lg:rounded-2xl overflow-hidden border border-gray-200 shadow-sm">
+          {/* ===== DESKTOP TABLE ===== */}
+          <div className="hidden md:block bg-white rounded-2xl overflow-hidden border border-gray-200 shadow-sm">
             {loading ? (
-              <div className="p-8 text-center">
+              <div className="py-16 text-center">
                 <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-[#c62d23]"></div>
-                <p className="mt-2 text-gray-500">Loading...</p>
+                <p className="mt-3 text-gray-400 text-sm">Loading inventory...</p>
               </div>
             ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="bg-gray-50 border-b border-gray-200">
-                      {[
-                        "Product",
-                        "color",
-                        "Vendor",
-                        "Quantity",
-                        "Status",
-                        "Actions",
-                      ].map((h) => (
-                        <th
-                          key={h}
-                          className="p-3 lg:p-4 text-left font-semibold text-gray-700 text-xs lg:text-sm"
+              <>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm border-collapse">
+                    <thead>
+                      <tr className="bg-gray-50 border-b border-gray-200">
+                        {TABLE_HEADERS.map((h) => (
+                          <th
+                            key={h}
+                            className={`px-3 py-2 text-xs font-semibold text-gray-600 whitespace-nowrap ${h === "Quantity" ? "text-right" : "text-left"}`}
+                          >
+                            {h}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+
+                    <tbody className="divide-y divide-gray-100">
+                      {paginatedData.length === 0 ? (
+                        <tr>
+                          <td colSpan={8} className="py-14 text-center text-gray-400 text-sm">
+                            No inventory found
+                          </td>
+                        </tr>
+                      ) : (
+                        paginatedData.map((i, idx) => (
+                          <tr
+                            key={i.id}
+                            className={`transition-colors hover:bg-blue-50/30 ${idx % 2 === 1 ? "bg-gray-50/40" : "bg-white"}`}
+                          >
+                            <td className="px-3 py-2 font-semibold text-gray-900 text-sm whitespace-nowrap">{i.name}</td>
+                            <td className="px-3 py-2 text-gray-600 text-xs">{i.color || "—"}</td>
+                            <td className="px-3 py-2 text-gray-600 text-xs">{i.mesh || "—"}</td>
+                            <td className="px-3 py-2 text-gray-500 text-xs max-w-[160px] truncate" title={i.remark}>
+                              {i.remark || "—"}
+                            </td>
+                            <td className="px-3 py-2">
+                              <div className="flex items-center gap-1.5 text-gray-600 text-xs">
+                                <Building2 size={12} className="text-gray-400 flex-shrink-0" />
+                                {i.vendor?.name || "—"}
+                              </div>
+                            </td>
+                            <td className="px-3 py-2 font-bold text-gray-900 text-sm text-right tabular-nums">{i.quantity}</td>
+                            <td className="px-3 py-2"><StatusBadge status={i.status} /></td>
+                            <td className="px-3 py-2">
+                              <div className="flex items-center gap-1">
+                                <button
+                                  onClick={() => {
+                                    setEditId(i.id);
+                                    setForm({ chairType: i.name, vendor: i.vendor?._id, quantity: i.quantity, color: i.color || "", mesh: i.mesh || "", remark: i.remark || "" });
+                                    setShowForm(true);
+                                  }}
+                                  className="p-1 hover:bg-blue-100 rounded-md transition"
+                                  title="Edit"
+                                >
+                                  <Pencil size={13} className="text-gray-400 hover:text-blue-600" />
+                                </button>
+                                <button
+                                  onClick={() => deleteInventory(i.id)}
+                                  className="p-1 hover:bg-red-100 rounded-md transition"
+                                  title="Delete"
+                                >
+                                  <Trash2 size={13} className="text-gray-400 hover:text-red-600" />
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* ===== PAGINATION BAR ===== */}
+                {totalItems > 0 && (
+                  <div className="flex items-center justify-between px-4 py-3 border-t border-gray-100 bg-gray-50/50">
+                    {/* Left: rows per page + info */}
+                    <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-2 text-xs text-gray-500">
+                        <span>Rows per page:</span>
+                        <select
+                          value={pageSize}
+                          onChange={(e) => setPageSize(Number(e.target.value))}
+                          className="border border-gray-200 rounded-md px-2 py-1 text-xs text-gray-700 bg-white focus:outline-none focus:ring-1 focus:ring-[#c62d23] cursor-pointer"
                         >
-                          {h}
-                        </th>
+                          {PAGE_SIZE_OPTIONS.map((s) => (
+                            <option key={s} value={s}>{s}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <span className="text-xs text-gray-400">
+                        {startIdx + 1}–{endIdx} of {totalItems}
+                      </span>
+                    </div>
+
+                    {/* Right: page buttons */}
+                    <div className="flex items-center gap-1">
+                      <PagBtn onClick={() => goToPage(1)} disabled={safePage === 1} title="First page">
+                        <ChevronsLeft size={14} />
+                      </PagBtn>
+                      <PagBtn onClick={() => goToPage(safePage - 1)} disabled={safePage === 1} title="Previous page">
+                        <ChevronLeft size={14} />
+                      </PagBtn>
+
+                      {pageNumbers[0] > 1 && (
+                        <>
+                          <PagBtn onClick={() => goToPage(1)}>1</PagBtn>
+                          {pageNumbers[0] > 2 && <span className="px-1 text-gray-400 text-xs">…</span>}
+                        </>
+                      )}
+
+                      {pageNumbers.map((p) => (
+                        <PagBtn key={p} onClick={() => goToPage(p)} active={p === safePage}>
+                          {p}
+                        </PagBtn>
                       ))}
-                    </tr>
-                  </thead>
 
-                  <tbody>
-                    {filteredData.map((i, index) => (
-                      <tr
-                        key={i.id}
-                        className={`border-b border-gray-100 hover:bg-gray-50 transition-colors ${
-                          index % 2 === 0 ? "bg-white" : "bg-gray-50"
-                        }`}
-                      >
-                        <td className="p-3 lg:p-4 font-medium text-gray-900 text-xs lg:text-sm">
-                          {i.name}
-                        </td>
-                        <td className="p-3 lg:p-4 text-gray-700 text-xs lg:text-sm">
-  {i.color || "—"}
-</td>
-                        <td className="p-3 lg:p-4">
-                          <div className="flex items-center gap-2 text-gray-700 text-xs lg:text-sm">
-                            <Building2 size={14} className="text-gray-400 lg:w-4 lg:h-4" />
-                            {i.vendor?.name || "—"}
-                          </div>
-                        </td>
-                        <td className="p-3 lg:p-4 font-semibold text-gray-900 text-xs lg:text-sm">
-                          {i.quantity}
-                        </td>
-                        <td className="p-3 lg:p-4">
-                          <StatusBadge status={i.status} />
-                        </td>
-                        <td className="p-3 lg:p-4">
-                          <div className="flex gap-2">
-                            <button
-                              onClick={() => {
-                                setEditId(i.id);
-                                setForm({
-  chairType: i.name,
-  vendor: i.vendor?._id,
-  quantity: i.quantity,
-  color: i.color || "",    // ✅ ADDED
-});
+                      {pageNumbers[pageNumbers.length - 1] < totalPages && (
+                        <>
+                          {pageNumbers[pageNumbers.length - 1] < totalPages - 1 && (
+                            <span className="px-1 text-gray-400 text-xs">…</span>
+                          )}
+                          <PagBtn onClick={() => goToPage(totalPages)}>{totalPages}</PagBtn>
+                        </>
+                      )}
 
-                                setShowForm(true);
-                              }}
-                              className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                              title="Edit"
-                            >
-                              <Pencil size={14} className="lg:w-4 lg:h-4" />
-                            </button>
-
-                            <button
-                              onClick={() => deleteInventory(i.id)}
-                              className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                              title="Delete"
-                            >
-                              <Trash2 size={14} className="lg:w-4 lg:h-4" />
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-
-                    {filteredData.length === 0 && (
-                      <tr>
-                        <td
-                          colSpan={5}
-                          className="p-8 text-center text-gray-500 text-xs lg:text-sm"
-                        >
-                          No inventory found
-                        </td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
+                      <PagBtn onClick={() => goToPage(safePage + 1)} disabled={safePage === totalPages} title="Next page">
+                        <ChevronRight size={14} />
+                      </PagBtn>
+                      <PagBtn onClick={() => goToPage(totalPages)} disabled={safePage === totalPages} title="Last page">
+                        <ChevronsRight size={14} />
+                      </PagBtn>
+                    </div>
+                  </div>
+                )}
+              </>
             )}
           </div>
 
-          {/* CARDS - Mobile/Tablet */}
+          {/* ===== MOBILE CARDS ===== */}
           <div className="md:hidden space-y-3">
             {loading ? (
               <div className="bg-white rounded-xl p-8 text-center border border-gray-200">
@@ -470,145 +548,150 @@ export default function InventoryPage() {
                 <p className="mt-2 text-gray-500 text-sm">Loading...</p>
               </div>
             ) : filteredData.length === 0 ? (
-              <div className="bg-white rounded-xl p-8 text-center text-gray-500 border border-gray-200 text-sm">
+              <div className="bg-white rounded-xl p-8 text-center text-gray-400 border border-gray-200 text-sm">
                 No inventory found
               </div>
             ) : (
-              filteredData.map((i) => (
-                <div
-                  key={i.id}
-                  className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm"
-                >
-                  <div className="flex items-start justify-between mb-3">
-                    <div className="flex-1 min-w-0">
-                      <h3 className="font-semibold text-gray-900 text-sm mb-1 truncate">
-                        {i.name}
-                      </h3>
-                      <div className="flex items-center gap-1.5 text-gray-600 text-xs">
-                        <Building2 size={12} className="text-gray-400 flex-shrink-0" />
-                        <span className="truncate">{i.vendor?.name || "—"}</span>
+              <>
+                {paginatedData.map((i) => (
+                  <div key={i.id} className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
+                    <div className="flex items-start justify-between mb-3">
+                      <div className="flex-1 min-w-0">
+                        <h3 className="font-semibold text-gray-900 text-sm mb-1 truncate">{i.name}</h3>
+                        <div className="flex items-center gap-1.5 text-gray-500 text-xs">
+                          <Building2 size={11} className="text-gray-400 flex-shrink-0" />
+                          <span className="truncate">{i.vendor?.name || "—"}</span>
+                        </div>
+                      </div>
+                      <StatusBadge status={i.status} />
+                    </div>
+
+                    {(i.color || i.mesh || i.remark) && (
+                      <div className="grid grid-cols-3 gap-2 mb-3 text-xs">
+                        {i.color && (
+                          <div>
+                            <p className="text-gray-400 mb-0.5">Color</p>
+                            <p className="font-medium text-gray-700">{i.color}</p>
+                          </div>
+                        )}
+                        {i.mesh && (
+                          <div>
+                            <p className="text-gray-400 mb-0.5">Mesh</p>
+                            <p className="font-medium text-gray-700">{i.mesh}</p>
+                          </div>
+                        )}
+                        {i.remark && (
+                          <div>
+                            <p className="text-gray-400 mb-0.5">Remark</p>
+                            <p className="font-medium text-gray-700 truncate">{i.remark}</p>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    <div className="flex items-center justify-between pt-3 border-t border-gray-100">
+                      <div>
+                        <p className="text-xs text-gray-400 mb-0.5">Quantity</p>
+                        <p className="font-bold text-gray-900 text-xl leading-none">{i.quantity}</p>
+                      </div>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => {
+                            setEditId(i.id);
+                            setForm({ chairType: i.name, vendor: i.vendor?._id, quantity: i.quantity, color: i.color || "", mesh: i.mesh || "", remark: i.remark || "" });
+                            setShowForm(true);
+                          }}
+                          className="p-2.5 bg-blue-50 hover:bg-blue-100 text-blue-600 rounded-lg transition flex items-center gap-1.5 text-xs font-medium"
+                        >
+                          <Pencil size={13} /> Edit
+                        </button>
+                        <button
+                          onClick={() => deleteInventory(i.id)}
+                          className="p-2.5 bg-red-50 hover:bg-red-100 text-red-600 rounded-lg transition"
+                        >
+                          <Trash2 size={13} />
+                        </button>
                       </div>
                     </div>
-                    <StatusBadge status={i.status} />
                   </div>
+                ))}
 
-                  <div className="flex items-center justify-between pt-3 border-t border-gray-100">
-                    <div>
-                      <p className="text-xs text-gray-500 mb-0.5">Quantity</p>
-                      <p className="font-bold text-gray-900 text-lg">{i.quantity}</p>
-                    </div>
-
-                    <div className="flex gap-2">
+                {/* Mobile Pagination */}
+                {totalItems > 0 && (
+                  <div className="bg-white rounded-xl border border-gray-200 p-3 flex items-center justify-between shadow-sm">
+                    <span className="text-xs text-gray-500">
+                      {startIdx + 1}–{endIdx} of {totalItems}
+                    </span>
+                    <div className="flex items-center gap-1.5">
                       <button
-                        onClick={() => {
-                          setEditId(i.id);
-                          setForm({
-                            chairType: i.name,
-                            vendor: i.vendor?._id,
-                            quantity: i.quantity,
-                            color: i.color || "", 
-                          });
-                          setShowForm(true);
-                        }}
-                        className="p-2.5 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                        title="Edit"
+                        onClick={() => goToPage(safePage - 1)}
+                        disabled={safePage === 1}
+                        className="p-1.5 rounded-lg border border-gray-200 text-gray-500 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-gray-100 transition"
                       >
-                        <Pencil size={16} />
+                        <ChevronLeft size={15} />
                       </button>
-
+                      <span className="text-xs text-gray-700 font-medium px-1">
+                        Page {safePage} / {totalPages}
+                      </span>
                       <button
-                        onClick={() => deleteInventory(i.id)}
-                        className="p-2.5 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                        title="Delete"
+                        onClick={() => goToPage(safePage + 1)}
+                        disabled={safePage === totalPages}
+                        className="p-1.5 rounded-lg border border-gray-200 text-gray-500 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-gray-100 transition"
                       >
-                        <Trash2 size={16} />
+                        <ChevronRight size={15} />
                       </button>
                     </div>
                   </div>
-                </div>
-              ))
+                )}
+              </>
             )}
           </div>
         </div>
 
-        {/* MODAL */}
+        {/* ===== MODAL ===== */}
         {showForm && (
-          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-3 sm:p-4">
-            <div className="bg-white rounded-xl sm:rounded-2xl w-full max-w-md border border-gray-200 shadow-2xl max-h-[90vh] overflow-y-auto">
-              {/* Modal Header */}
-              <div className="flex items-center justify-between p-4 sm:p-6 border-b border-gray-200 sticky top-0 bg-white z-10 rounded-t-xl sm:rounded-t-2xl">
-                <div className="flex items-center gap-2 sm:gap-3 flex-1 min-w-0">
-                  <div className="w-8 h-8 sm:w-10 sm:h-10 bg-[#c62d23]/10 rounded-lg sm:rounded-xl flex items-center justify-center flex-shrink-0">
-                    <Package className="text-[#c62d23]" size={18} />
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-2xl w-full max-w-md border border-gray-200 shadow-2xl max-h-[90vh] overflow-y-auto">
+              <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 sticky top-0 bg-white z-10 rounded-t-2xl">
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 bg-[#c62d23]/10 rounded-xl flex items-center justify-center flex-shrink-0">
+                    <Package className="text-[#c62d23]" size={17} />
                   </div>
-                  <h2 className="text-lg sm:text-xl font-bold text-gray-900 truncate">
+                  <h2 className="text-lg font-bold text-gray-900">
                     {editId ? "Update Inventory" : "Add Inventory"}
                   </h2>
                 </div>
-                <button
-                  onClick={closeModal}
-                  className="text-gray-400 hover:text-gray-600 hover:bg-gray-100 p-2 rounded-lg transition-colors flex-shrink-0"
-                >
-                  <X size={20} />
+                <button onClick={closeModal} className="text-gray-400 hover:text-gray-600 hover:bg-gray-100 p-2 rounded-lg transition">
+                  <X size={18} />
                 </button>
               </div>
 
-              {/* Modal Body */}
-              <div className="p-4 sm:p-6 space-y-3 sm:space-y-4">
-                <Input
-                  label="Chair Type"
-                  value={form.chairType}
-                  onChange={(v) => setForm({ ...form, chairType: v })}
-                  placeholder="Enter chair type"
-                />
-
+              <div className="px-5 py-4 space-y-4">
+                <Input label="Chair Type" value={form.chairType} onChange={(v) => setForm({ ...form, chairType: v })} placeholder="Enter chair type" />
                 <div>
-                  <label className="block text-xs sm:text-sm font-semibold text-gray-900 mb-1.5 sm:mb-2">
-                    Vendor
-                  </label>
+                  <label className="block text-sm font-semibold text-gray-900 mb-1.5">Vendor</label>
                   <select
                     value={form.vendor}
-                    onChange={(e) =>
-                      setForm({ ...form, vendor: e.target.value })
-                    }
-                    className="w-full p-2.5 sm:p-3 bg-white border border-gray-200 rounded-lg sm:rounded-xl outline-none text-gray-900 focus:border-[#c62d23] focus:ring-2 focus:ring-[#c62d23]/20 transition-all text-xs sm:text-sm"
+                    onChange={(e) => setForm({ ...form, vendor: e.target.value })}
+                    className="w-full p-2.5 bg-white border border-gray-300 rounded-xl outline-none text-gray-900 focus:border-[#c62d23] focus:ring-2 focus:ring-[#c62d23]/20 transition text-sm"
                   >
                     <option value="">Select Vendor</option>
                     {vendorsList.map((v) => (
-                      <option key={v._id} value={v._id} className="bg-white">
-                        {v.name}
-                      </option>
+                      <option key={v._id} value={v._id}>{v.name}</option>
                     ))}
                   </select>
                 </div>
-<Input
-  label="Color"
-  value={form.color}
-  onChange={(v) => setForm({ ...form, color: v })}
-  placeholder="Enter chair color"
-/>
-
-                <Input
-                  label="Quantity"
-                  type="number"
-                  value={form.quantity}
-                  onChange={(v) => setForm({ ...form, quantity: v })}
-                  placeholder="Enter quantity"
-                />
+                <Input label="Color" value={form.color} onChange={(v) => setForm({ ...form, color: v })} placeholder="Enter chair color" />
+                <Input label="Mesh" value={form.mesh} onChange={(v) => setForm({ ...form, mesh: v })} placeholder="e.g. Net / Fabric" />
+                <Input label="Remark" value={form.remark} onChange={(v) => setForm({ ...form, remark: v })} placeholder="Any notes…" />
+                <Input label="Quantity" type="number" value={form.quantity} onChange={(v) => setForm({ ...form, quantity: v })} placeholder="Enter quantity" />
               </div>
 
-              {/* Modal Footer */}
-              <div className="p-4 sm:p-6 border-t border-gray-200 flex gap-2 sm:gap-3 sticky bottom-0 bg-white z-10 rounded-b-xl sm:rounded-b-2xl">
-                <button
-                  onClick={closeModal}
-                  className="flex-1 py-2.5 sm:py-3 rounded-lg sm:rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium transition-colors text-sm sm:text-base"
-                >
+              <div className="px-5 py-4 border-t border-gray-100 flex gap-3 sticky bottom-0 bg-white z-10 rounded-b-2xl">
+                <button onClick={closeModal} className="flex-1 py-2.5 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium transition text-sm">
                   Cancel
                 </button>
-                <button
-                  onClick={submitInventory}
-                  className="flex-1 py-2.5 sm:py-3 rounded-lg sm:rounded-xl bg-[#c62d23] hover:bg-[#a82419] text-white font-medium transition-colors shadow-sm text-sm sm:text-base"
-                >
+                <button onClick={submitInventory} className="flex-1 py-2.5 rounded-xl bg-[#c62d23] hover:bg-[#a82419] text-white font-medium transition shadow-sm text-sm">
                   {editId ? "Update" : "Save"}
                 </button>
               </div>
@@ -620,40 +703,51 @@ export default function InventoryPage() {
   );
 }
 
+/* ================= PAGINATION BUTTON ================= */
+const PagBtn = ({ children, onClick, disabled, active, title }) => (
+  <button
+    onClick={onClick}
+    disabled={disabled}
+    title={title}
+    className={`min-w-[28px] h-7 px-1.5 rounded-md text-xs font-medium transition-all flex items-center justify-center
+      ${active
+        ? "bg-[#c62d23] text-white shadow-sm"
+        : "text-gray-600 hover:bg-gray-100 border border-transparent hover:border-gray-200"
+      }
+      ${disabled ? "opacity-35 cursor-not-allowed pointer-events-none" : "cursor-pointer"}
+    `}
+  >
+    {children}
+  </button>
+);
+
 /* ================= SMALL COMPONENTS ================= */
-
 const StatCard = ({ title, value, icon, danger }) => {
-  const safeValue =
-    typeof value === "number" && !Number.isNaN(value) ? value : 0;
-
+  const safeValue = typeof value === "number" && !Number.isNaN(value) ? value : 0;
   return (
     <div
-      className={`bg-white border rounded-xl sm:rounded-2xl p-4 sm:p-5 md:p-6 transition-all duration-200 shadow-sm hover:shadow-md flex flex-col justify-between h-full ${
-        danger ? "border-amber-300 bg-amber-50" : "border-gray-200"
-      }`}
-      style={{
-        borderLeft: "4px solid #c62d23",
-      }}
+      className={`bg-white border rounded-2xl p-4 sm:p-5 transition-all shadow-sm hover:shadow-md flex flex-col justify-between h-full ${danger ? "border-amber-200 bg-amber-50/50" : "border-gray-200"}`}
+      style={{ borderLeft: "4px solid #c62d23" }}
     >
-      <div className="flex justify-between items-start mb-3 sm:mb-4">
-        <p className="text-xs sm:text-sm text-gray-600 font-medium">{title}</p>
-        {React.cloneElement(icon, { size: 20, className: `sm:w-6 sm:h-6 ${icon.props.className}` })}
+      <div className="flex justify-between items-start mb-3">
+        <p className="text-xs sm:text-sm text-gray-500 font-medium">{title}</p>
+        {React.cloneElement(icon, { size: 20 })}
       </div>
-      <p className="text-2xl sm:text-3xl font-bold text-gray-900">{safeValue}</p>
+      <p className={`text-2xl sm:text-3xl font-bold ${danger ? "text-amber-700" : "text-gray-900"}`}>
+        {safeValue}
+      </p>
     </div>
   );
 };
 
 const StatusBadge = ({ status }) => {
   const map = {
-    Healthy: "bg-green-50 text-green-700 border-green-200",
-    "Low Stock": "bg-amber-50 text-amber-700 border-amber-200",
-    Critical: "bg-red-50 text-red-700 border-red-200",
+    Healthy: "bg-green-100 text-green-800",
+    "Low Stock": "bg-amber-100 text-amber-800",
+    Critical: "bg-red-100 text-red-800",
   };
   return (
-    <span
-      className={`px-2 sm:px-3 py-0.5 sm:py-1 rounded-full text-[10px] sm:text-xs font-medium border ${map[status]} whitespace-nowrap`}
-    >
+    <span className={`px-2.5 py-1 rounded-full text-[11px] font-semibold whitespace-nowrap ${map[status] || "bg-gray-100 text-gray-700"}`}>
       {status}
     </span>
   );
@@ -661,15 +755,13 @@ const StatusBadge = ({ status }) => {
 
 const Input = ({ label, value, onChange, type = "text", placeholder = "" }) => (
   <div>
-    <label className="block text-xs sm:text-sm font-semibold text-gray-900 mb-1.5 sm:mb-2">
-      {label}
-    </label>
+    <label className="block text-sm font-semibold text-gray-900 mb-1.5">{label}</label>
     <input
       type={type}
       value={value}
       onChange={(e) => onChange(e.target.value)}
       placeholder={placeholder}
-      className="w-full p-2.5 sm:p-3 bg-white border border-gray-200 rounded-lg sm:rounded-xl outline-none text-gray-900 placeholder-gray-400 focus:border-[#c62d23] focus:ring-2 focus:ring-[#c62d23]/20 transition-all text-xs sm:text-sm"
+      className="w-full p-2.5 bg-white border border-gray-300 rounded-xl outline-none text-gray-900 placeholder-gray-400 focus:border-[#c62d23] focus:ring-2 focus:ring-[#c62d23]/20 transition text-sm"
     />
   </div>
 );

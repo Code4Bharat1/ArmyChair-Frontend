@@ -27,6 +27,25 @@ import {
 import axios from "axios";
 import InventorySidebar from "./sidebar";
 import { useRouter } from "next/navigation";
+// ====== HELPERS (shared across components) ======
+const isSpareFullyPicked = (order, parts) => {
+  return order.items.every((item) => {
+    const part = parts.find(
+      (p) =>
+        p.partName?.toLowerCase().trim() ===
+        item.name?.toLowerCase().trim()
+    );
+
+    if (!part) return false;
+
+    const pickedQty = part.locations.reduce(
+      (sum, l) => sum + Number(l.picked || 0),
+      0
+    );
+
+    return pickedQty >= item.quantity;
+  });
+};
 
 export default function WarehouseOrders() {
   const router = useRouter();
@@ -50,6 +69,11 @@ export default function WarehouseOrders() {
   const [inventoryPreview, setInventoryPreview] = useState({});
 
   const [showDecisionPanel, setShowDecisionPanel] = useState(false);
+  
+const [dispatchOrder, setDispatchOrder] = useState(null);
+const [dispatchQty, setDispatchQty] = useState("");
+const [dispatchNotes, setDispatchNotes] = useState("");
+const [dispatchLoading, setDispatchLoading] = useState(false);
 
   const today = new Date();
   today.setHours(0, 0, 0, 0);
@@ -77,17 +101,18 @@ export default function WarehouseOrders() {
       const res = await axios.get(`${API}/orders`, { headers });
 
       const warehouseOrders = (res.data.orders || res.data).filter((o) =>
-        [
-          "ORDER_PLACED",
-          "WAREHOUSE_COLLECTED",
-          "FITTING_IN_PROGRESS",
-          "FITTING_COMPLETED",
-          "READY_FOR_DISPATCH",
-          "DISPATCHED",
-          "PARTIAL",
-          "COMPLETED",
-        ].includes(o.progress),
-      );
+  [
+    "ORDER_PLACED",
+    "WAREHOUSE_COLLECTED",
+    "FITTING_IN_PROGRESS",
+    "FITTING_COMPLETED",
+    "READY_FOR_DISPATCH",
+    "DISPATCHED",
+    "PARTIAL",
+    "PARTIALLY_DISPATCHED",  // ← ADD THIS
+    "COMPLETED",
+  ].includes(o.progress),
+);
 
       setOrders(warehouseOrders);
     } catch (err) {
@@ -140,7 +165,25 @@ export default function WarehouseOrders() {
       setProcessingId(null);
     }
   };
-
+const handlePartialDispatch = async () => {
+  if (!dispatchQty || Number(dispatchQty) <= 0) return alert("Enter a valid quantity");
+  try {
+    setDispatchLoading(true);
+    await axios.post(
+      `${API}/orders/${dispatchOrder._id}/partial-dispatch`,
+      { quantity: Number(dispatchQty), notes: dispatchNotes },
+      { headers }
+    );
+    setDispatchOrder(null);
+    setDispatchQty("");
+    setDispatchNotes("");
+    fetchOrders();
+  } catch (err) {
+    alert(err?.response?.data?.message || "Dispatch failed");
+  } finally {
+    setDispatchLoading(false);
+  }
+};
   const handleMarkPartial = async (id) => {
     if (!window.confirm("Mark this order as PARTIAL?")) return;
 
@@ -246,26 +289,29 @@ export default function WarehouseOrders() {
 
     const q = (search || "").toLowerCase();
     if (q) {
-      data = data.filter(
-        (o) =>
-          o.orderId?.toLowerCase().includes(q) ||
-          o.dispatchedTo?.name?.toLowerCase().includes(q) ||
-          o.chairModel?.toLowerCase().includes(q),
-      );
-    }
-
+  data = data.filter(
+    (o) =>
+      o.orderId?.toLowerCase().includes(q) ||
+      o.dispatchedTo?.name?.toLowerCase().includes(q) ||
+      o.chairModel?.toLowerCase().includes(q) ||
+      o.items?.some((i) =>
+        i.name.toLowerCase().includes(q)
+      )
+  );
+}
     return data;
   }, [orders, search, activeFilter]);
-  const fullChairOrders = filteredOrders.filter(
-    (o) =>
-      o.orderType === "FULL" &&
-      [
-        "FITTING_COMPLETED",
-        "READY_FOR_DISPATCH",
-        "DISPATCHED",
-        "COMPLETED",
-      ].includes(o.progress),
-  );
+ const fullChairOrders = filteredOrders.filter(
+  (o) =>
+    o.orderType === "FULL" &&
+    [
+      "FITTING_COMPLETED",
+      "READY_FOR_DISPATCH",
+      "DISPATCHED",
+      "PARTIALLY_DISPATCHED",  // ← ADD THIS
+      "COMPLETED",
+    ].includes(o.progress),
+);
 
   const sparePartOrders = filteredOrders.filter((o) => o.orderType === "SPARE");
 
@@ -292,36 +338,48 @@ export default function WarehouseOrders() {
   ).length;
 
   /* ================= STATUS BADGE ================= */
-  const getStatusBadge = (progress) => {
+  const getStatusBadge = (order) => {
+    const { progress, orderType } = order;
+
     const statusMap = {
       ORDER_PLACED: {
         label: "Pending Picking",
         color: "bg-amber-50 text-amber-700 border-amber-200",
       },
+
       WAREHOUSE_COLLECTED: {
-        label: "Sent to Fitting",
+        label: orderType === "SPARE" ? "Dispatched" : "Sent to Fitting",
         color: "bg-blue-50 text-blue-700 border-blue-200",
       },
+
       FITTING_IN_PROGRESS: {
         label: "Fitting In Progress",
         color: "bg-blue-50 text-blue-700 border-blue-200",
       },
+
       FITTING_COMPLETED: {
         label: "Returned from Fitting",
         color: "bg-emerald-50 text-emerald-700 border-emerald-200",
       },
+
       READY_FOR_DISPATCH: {
         label: "Ready for Dispatch",
         color: "bg-green-50 text-green-700 border-green-200",
       },
+
       DISPATCHED: {
         label: "Dispatched",
         color: "bg-green-50 text-green-700 border-green-200",
       },
+      PARTIALLY_DISPATCHED: {
+  label: "Partially Dispatched",
+  color: "bg-blue-50 text-blue-700 border-blue-200",
+},
       PARTIAL: {
         label: "Partial / Issue",
         color: "bg-amber-50 text-amber-700 border-amber-200",
       },
+
       COMPLETED: {
         label: "Completed",
         color: "bg-green-50 text-green-700 border-green-200",
@@ -335,7 +393,7 @@ export default function WarehouseOrders() {
 
     return (
       <span
-        className={`px-2 sm:px-3 py-0.5 sm:py-1 rounded-full text-[10px] sm:text-xs font-medium border ${status.color} whitespace-nowrap`}
+        className={`px-2 sm:px-3 py-0.5 sm:py-1 rounded-full text-[10px] sm:text-xs font-medium border ${status.color}`}
       >
         {status.label}
       </span>
@@ -376,100 +434,116 @@ export default function WarehouseOrders() {
     return Math.min(seats, back, wheels);
   };
 
+
+
   const handlePartialAccepted = async (orderId) => {
-  let parts = inventoryPreview[orderId];
-  if (!parts) return alert("No parts selected");
+    let parts = inventoryPreview[orderId];
+    if (!parts) return alert("No parts selected");
 
-  const order = orders.find((o) => o._id === orderId);
-  if (!order) return alert("Order not found");
+    const order = orders.find((o) => o._id === orderId);
+    if (!order) return alert("Order not found");
 
-  // ✅ SPARE → only matching part
-  if (order.orderType === "SPARE") {
-    parts = parts.filter(
-      (p) =>
-        p.partName?.toLowerCase().trim() ===
-        order.chairModel?.toLowerCase().trim()
-    );
-  }
-
-  let buildable;
-  try {
-    buildable = Math.min(
-      ...parts.map((p) =>
-        p.locations.reduce((sum, l) => sum + Number(l.picked || 0), 0)
-      )
-    );
-  } catch (e) {
-    return alert(e.message);
-  }
-
-  if (buildable === 0) {
-    return alert("Not enough parts selected");
-  }
-
-  // ================= FULL ACCEPT (INVENTORY DEDUCTS) =================
-  if (buildable >= order.quantity) {
-    const items = parts.flatMap((p) =>
-      p.locations
-        .filter((l) => l.picked > 0)
-        .map((l) => ({
-          inventoryId: l.inventoryId,
-          qty: l.picked,
-        }))
-    );
-
-    if (!items.length) {
-      return alert("No inventory selected");
+    if (order.orderType === "SPARE") {
+      parts = parts.filter((p) =>
+        order.items?.some(
+          (i) =>
+            i.name.toLowerCase().trim() === p.partName.toLowerCase().trim(),
+        ),
+      );
     }
 
-    if (!confirm("Confirm inventory deduction and dispatch?")) return;
+    let buildable;
+    try {
+      buildable = Math.min(
+        ...parts.map((p) =>
+          p.locations.reduce((sum, l) => sum + Number(l.picked || 0), 0),
+        ),
+      );
+    } catch (e) {
+      return alert(e.message);
+    }
 
-    await axios.post(
-      `${API}/warehouse/order/dispatch`,
-      { orderId, items },
-      { headers }
-    );
+    if (buildable === 0) {
+      return alert("Not enough parts selected");
+    }
+    // 🔥 ADD THIS JUST ABOVE FULL ACCEPT
+    const requiredQty = order.items?.length
+      ? order.items.reduce((sum, i) => sum + i.quantity, 0)
+      : order.quantity;
 
-    alert("Order accepted and inventory deducted");
-    fetchOrders();
-    setExpandedOrderId(null);
-    setShowDecisionPanel(false);
-    return;
+    // ================= FULL ACCEPT (INVENTORY DEDUCTS) =================
+   // ================= FULL ACCEPT (INVENTORY DEDUCTS) =================
+const isFullAccept =
+  order.orderType === "SPARE"
+    ? isSpareFullyPicked(order, parts)
+    : buildable >= order.quantity;
+
+if (isFullAccept) {
+  const items = parts.flatMap((p) =>
+    p.locations
+      .filter((l) => l.picked > 0)
+      .map((l) => ({
+        inventoryId: l.inventoryId,
+        qty: l.picked,
+      }))
+  );
+
+  if (!items.length) {
+    return alert("No inventory selected");
   }
 
-  // ================= PARTIAL ACCEPT (NO INVENTORY TOUCH) =================
-  if (
-    !confirm(`Only ${buildable} can be fulfilled. Save partial acceptance?`)
-  )
-    return;
+  if (!confirm("Confirm inventory deduction and dispatch?")) return;
 
-  const items = [];
-  parts.forEach((p) => {
-    p.locations.forEach((l) => {
-      if (l.picked > 0) {
-        items.push({
-          inventoryId: l.inventoryId,
-          qty: l.picked,
-        });
-      }
+  await axios.post(
+    `${API}/warehouse/order/dispatch`,
+    { orderId, items },
+    { headers }
+  );
+
+  alert("Order accepted and inventory deducted");
+  fetchOrders();
+  setExpandedOrderId(null);
+  setShowDecisionPanel(false);
+  return;
+}
+
+    // ================= PARTIAL ACCEPT (NO INVENTORY TOUCH) =================
+    if (
+      !confirm(
+  order.orderType === "SPARE"
+    ? "Some items are not fully fulfilled. Save partial acceptance?"
+    : `Only ${buildable} can be fulfilled. Save partial acceptance?`
+)
+    )
+      return;
+
+    const items = [];
+    parts.forEach((p) => {
+      p.locations.forEach((l) => {
+        if (l.picked > 0) {
+          items.push({
+            inventoryId: l.inventoryId,
+            qty: l.picked,
+          });
+        }
+      });
     });
-  });
 
-  try {
-    await axios.post(
-      `${API}/warehouse/order/partial-accept`,
-      { orderId, buildable, items },
-      { headers }
-    );
+    try {
+      await axios.post(
+        `${API}/warehouse/order/partial-accept`,
+        { orderId, buildable, items },
+        { headers },
+      );
 
-    alert(`Partial accepted for ${buildable}`);
-    setExpandedOrderId(null);
-    setShowDecisionPanel(false);
-    fetchOrders();
-  } catch (err) {
-    alert("Partial accept failed");
-  }
-};
+      alert(`Partial accepted for ${buildable}`);
+      setExpandedOrderId(null);
+      setShowDecisionPanel(false);
+      fetchOrders();
+    } catch (err) {
+      alert("Partial accept failed");
+    }
+  };
 
   /* ================= ACTION BUTTON ================= */
   const renderAction = (o) => {
@@ -536,26 +610,26 @@ export default function WarehouseOrders() {
       );
     }
 
-    if (o.progress === "READY_FOR_DISPATCH") {
-      return (
-        <div className="flex gap-2">
-          <button
-            onClick={() => setAmendOrder(o)}
-            className="bg-amber-600 hover:bg-amber-700 text-white px-3 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-medium"
-          >
-            Change Order
-          </button>
-
-          <button
-            disabled={processingId === o._id}
-            onClick={() => handleDispatch(o._id)}
-            className="bg-green-600 hover:bg-green-700 text-white px-3 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-medium disabled:opacity-50"
-          >
-            {processingId === o._id ? "Dispatching..." : "Dispatch"}
-          </button>
-        </div>
-      );
-    }
+    if (o.progress === "READY_FOR_DISPATCH" || o.progress === "PARTIALLY_DISPATCHED") {
+  return (
+    <div className="flex gap-2">
+      {o.progress === "READY_FOR_DISPATCH" && (
+        <button
+          onClick={() => setAmendOrder(o)}
+          className="bg-amber-600 hover:bg-amber-700 text-white px-3 py-2 rounded-lg text-xs sm:text-sm font-medium"
+        >
+          Change Order
+        </button>
+      )}
+      <button
+        onClick={() => setDispatchOrder(o)}
+        className="bg-green-600 hover:bg-green-700 text-white px-3 py-2 rounded-lg text-xs sm:text-sm font-medium"
+      >
+        Dispatch
+      </button>
+    </div>
+  );
+}
 
     if (o.progress === "DISPATCHED" || o.progress === "COMPLETED") {
       return (
@@ -831,6 +905,136 @@ export default function WarehouseOrders() {
           onSuccess={fetchOrders}
         />
       )}
+      {dispatchOrder && (() => {
+  // ✅ FIXED: check items first, fallback to quantity
+  const totalQty = (dispatchOrder.items?.length)
+    ? dispatchOrder.items.reduce((s, i) => s + Number(i.quantity), 0)
+    : Number(dispatchOrder.quantity);
+    
+  const alreadyDispatched = Number(dispatchOrder.dispatchedQuantity) || 0;
+  const remaining = totalQty - alreadyDispatched;
+
+  return (
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl overflow-hidden">
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 py-5 border-b border-gray-100">
+          <div>
+            <h2 className="text-lg font-bold text-gray-900">Dispatch Order</h2>
+            <p className="text-sm text-gray-500 mt-0.5">{dispatchOrder.orderId}</p>
+          </div>
+          <button onClick={() => { setDispatchOrder(null); setDispatchQty(""); setDispatchNotes(""); }} className="p-2 hover:bg-gray-100 rounded-lg transition text-gray-400">
+            <X size={18} />
+          </button>
+        </div>
+
+        {/* Info */}
+        <div className="px-6 py-4 bg-gray-50 border-b border-gray-100">
+          <div className="grid grid-cols-3 gap-4 text-center">
+            <div>
+              <p className="text-xs text-gray-500 mb-1">Total Ordered</p>
+              <p className="text-xl font-bold text-gray-900">{totalQty}</p>
+            </div>
+            <div>
+              <p className="text-xs text-gray-500 mb-1">Dispatched</p>
+              <p className="text-xl font-bold text-blue-600">{alreadyDispatched}</p>
+            </div>
+            <div>
+              <p className="text-xs text-gray-500 mb-1">Remaining</p>
+              <p className="text-xl font-bold text-[#c62d23]">{remaining}</p>
+            </div>
+          </div>
+
+          {/* Dispatch history */}
+          {dispatchOrder.dispatches?.length > 0 && (
+            <div className="mt-4">
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Dispatch History</p>
+              <div className="space-y-1.5 max-h-28 overflow-y-auto">
+                {dispatchOrder.dispatches.map((d, i) => (
+                  <div key={i} className="flex justify-between items-center text-xs bg-white border border-gray-200 rounded-lg px-3 py-1.5">
+                    <span className="font-medium text-gray-700">Batch {i + 1}: {d.quantity} units</span>
+                    <span className="text-gray-400">{new Date(d.date).toLocaleDateString()}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Form */}
+        <div className="px-6 py-5 space-y-4">
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-2">
+              Quantity to Dispatch Now <span className="text-[#c62d23]">*</span>
+            </label>
+            <input
+              type="number"
+              min={1}
+              max={remaining}
+              value={dispatchQty}
+              onChange={(e) => {
+                const val = Math.min(Number(e.target.value), remaining);
+                setDispatchQty(val > 0 ? val : "");
+              }}
+              placeholder={`Max: ${remaining}`}
+              className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm outline-none focus:border-[#c62d23] focus:ring-2 focus:ring-[#c62d23]/20 transition"
+            />
+            {Number(dispatchQty) > 0 && Number(dispatchQty) < remaining && (
+              <p className="text-xs text-amber-600 mt-1.5 font-medium">
+                ⚠ Partial dispatch — {remaining - Number(dispatchQty)} will remain for next dispatch
+              </p>
+            )}
+            {Number(dispatchQty) > 0 && Number(dispatchQty) >= remaining && (
+              <p className="text-xs text-green-600 mt-1.5 font-medium">
+                ✓ This will fully complete the order
+              </p>
+            )}
+          </div>
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-2">Notes (optional)</label>
+            <input
+              type="text"
+              value={dispatchNotes}
+              onChange={(e) => setDispatchNotes(e.target.value)}
+              placeholder="e.g. Vehicle no, driver name..."
+              className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm outline-none focus:border-[#c62d23] focus:ring-2 focus:ring-[#c62d23]/20 transition"
+            />
+          </div>
+        </div>
+
+        {/* Footer — 3 buttons */}
+        <div className="px-6 py-4 border-t border-gray-100 flex flex-col gap-2">
+          {/* Complete Dispatch button — only show if partially dispatched already */}
+          {alreadyDispatched > 0 && (
+            <button
+              onClick={() => {
+                setDispatchQty(remaining);
+              }}
+              className="w-full py-2.5 rounded-xl bg-green-50 hover:bg-green-100 text-green-700 font-semibold text-sm border border-green-200 transition"
+            >
+              Complete Full Dispatch (remaining {remaining})
+            </button>
+          )}
+          <div className="flex gap-3">
+            <button
+              onClick={() => { setDispatchOrder(null); setDispatchQty(""); setDispatchNotes(""); }}
+              className="flex-1 py-2.5 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium text-sm transition"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handlePartialDispatch}
+              disabled={dispatchLoading || !dispatchQty || Number(dispatchQty) <= 0}
+              className="flex-1 py-2.5 rounded-xl bg-[#c62d23] hover:bg-[#a82419] text-white font-medium text-sm transition disabled:opacity-50"
+            >
+              {dispatchLoading ? "Dispatching..." : `Dispatch ${dispatchQty || 0}`}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+})()}
     </div>
   );
 }
@@ -872,27 +1076,28 @@ const OrdersTable = ({
   }
 
   const getLiveBuildable = (orderId, order) => {
-  const parts = inventoryPreview[orderId];
-  if (!parts || parts.length === 0) return 0;
+    const parts = inventoryPreview[orderId];
+    if (!parts || parts.length === 0) return 0;
 
-  let relevantParts = parts;
+    let relevantParts = parts;
 
-  if (order.orderType === "SPARE") {
-    relevantParts = parts.filter(
-      (p) =>
-        p.partName?.toLowerCase().trim() ===
-        order.chairModel?.toLowerCase().trim()
+    if (order.orderType === "SPARE") {
+      relevantParts = parts.filter((p) =>
+        order.items?.some(
+          (i) =>
+            i.name.toLowerCase().trim() === p.partName.toLowerCase().trim(),
+        ),
+      );
+    }
+
+    if (!relevantParts.length) return 0;
+
+    const totals = relevantParts.map((p) =>
+      p.locations.reduce((sum, l) => sum + Number(l.picked || 0), 0),
     );
-  }
 
-  if (!relevantParts.length) return 0;
-
-  const totals = relevantParts.map((p) =>
-    p.locations.reduce((sum, l) => sum + Number(l.picked || 0), 0)
-  );
-
-  return Math.min(...totals);
-};
+    return Math.min(...totals);
+  };
 
   return (
     <>
@@ -906,6 +1111,7 @@ const OrdersTable = ({
                   "Order ID",
                   "Dispatched To",
                   "Chair / Part",
+                  "Remark",
                   "Order Date",
                   "Delivery Date",
                   "Qty",
@@ -937,8 +1143,32 @@ const OrdersTable = ({
                       {o.dispatchedTo?.name}
                     </td>
                     <td className="p-3 lg:p-4 font-medium text-gray-900 text-xs lg:text-sm">
-                      {o.chairModel || "Spare Parts"}
+                      {o.items?.length > 1 ? (
+                        <details className="cursor-pointer">
+                          <summary className="text-[#c62d23] font-semibold">
+                            {o.items.length} items
+                          </summary>
+                          <ul className="mt-1 text-xs text-gray-700 list-disc ml-4">
+                            {o.items.map((i, idx) => (
+                              <li key={idx}>
+                                {i.name} × {i.quantity}
+                              </li>
+                            ))}
+                          </ul>
+                        </details>
+                      ) : (
+                        o.items?.[0]?.name || o.chairModel
+                      )}
                     </td>
+
+                    {/* <td className="p-3 lg:p-4 font-semibold text-gray-900 text-xs lg:text-sm">
+                      {o.items
+                        ? o.items.reduce((sum, i) => sum + i.quantity, 0)
+                        : o.quantity}
+                    </td> */}
+                    <td className="p-3 lg:p-4 text-gray-700 text-xs lg:text-sm">
+  {o.remark || "-"}
+</td>
                     <td className="p-3 lg:p-4 text-gray-700 text-xs lg:text-sm">
                       {new Date(o.orderDate).toLocaleDateString()}
                     </td>
@@ -947,9 +1177,7 @@ const OrdersTable = ({
                         ? new Date(o.deliveryDate).toLocaleDateString()
                         : "-"}
                     </td>
-                    <td className="p-3 lg:p-4 font-semibold text-gray-900 text-xs lg:text-sm">
-                      {o.quantity}
-                    </td>
+
                     <td className="p-3 lg:p-4">{getStatusBadge(o.progress)}</td>
                     <td className="p-3 lg:p-4">{renderAction(o)}</td>
                   </tr>
@@ -1002,12 +1230,18 @@ const OrdersTable = ({
                 <div>
                   <p className="text-gray-500 mb-0.5">Chair/Part</p>
                   <p className="font-medium text-gray-900 truncate">
-                    {o.chairModel || "Spare Parts"}
+                    {o.items?.length > 1
+                      ? `${o.items.length} items`
+                      : o.items?.[0]?.name || o.chairModel}
                   </p>
                 </div>
                 <div>
                   <p className="text-gray-500 mb-0.5">Quantity</p>
-                  <p className="font-bold text-gray-900">{o.quantity}</p>
+                  <p className="font-bold text-gray-900">
+                    {o.items
+                      ? o.items.reduce((s, i) => s + i.quantity, 0)
+                      : o.quantity}
+                  </p>
                 </div>
                 <div>
                   <p className="text-gray-500 mb-0.5">Order Date</p>
@@ -1105,15 +1339,15 @@ const ExpandedInventoryPanel = ({
                     Chair Model:
                   </span>
                   <span className="font-semibold text-gray-900">
-                    {o.chairModel}
+                    {o.items?.length
+                      ? `${o.items.length} Spare Items`
+                      : o.chairModel}
                   </span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-gray-500 font-medium">
-                    Required Quantity:
-                  </span>
+
                   <span className="font-semibold text-[#c62d23] text-base sm:text-lg">
-                    {o.quantity}
+                    {o.items
+                      ? o.items.reduce((s, i) => s + i.quantity, 0)
+                      : o.quantity}
                   </span>
                 </div>
               </div>
@@ -1160,20 +1394,21 @@ const ExpandedInventoryPanel = ({
           ) : (
             <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-3 sm:gap-4">
               {inventoryPreview[o._id]
-  ?.filter((part) => {
-    // ✅ FULL ORDER → show everything
-    if (o.orderType === "FULL") return true;
+                ?.filter((part) => {
+                  // ✅ FULL ORDER → show everything
+                  if (o.orderType === "FULL") return true;
 
-    // ✅ SPARE ORDER → strict case-insensitive match
-    if (o.orderType === "SPARE") {
-      return (
-        part.partName?.toLowerCase().trim() ===
-        o.chairModel?.toLowerCase().trim()
-      );
-    }
+                  // ✅ SPARE ORDER → strict case-insensitive match
+                  if (o.orderType === "SPARE") {
+                    return o.items?.some(
+                      (i) =>
+                        i.name.toLowerCase().trim() ===
+                        part.partName.toLowerCase().trim(),
+                    );
+                  }
 
-    return false;
-  })
+                  return false;
+                })
                 .map((part, idx) => (
                   <div
                     key={`${o._id}-${part.partName}`}
@@ -1230,7 +1465,12 @@ const ExpandedInventoryPanel = ({
                                   const parts = prev[o._id].map((p) => {
                                     if (p.partName !== part.partName) return p;
 
-                                    let remaining = o.quantity;
+                                    let remaining = o.items
+                                      ? o.items.reduce(
+                                          (s, i) => s + i.quantity,
+                                          0,
+                                        )
+                                      : o.quantity;
 
                                     const locations = p.locations.map((l) => {
                                       if (l.inventoryId === loc.inventoryId) {
@@ -1278,41 +1518,65 @@ const ExpandedInventoryPanel = ({
         {/* Action Buttons */}
         <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 pt-4 sm:pt-6 border-t border-gray-200">
           {(() => {
-            const liveBuildable = getLiveBuildable(o._id, o);
-            const isOver = liveBuildable > o.quantity;
-            const isExact = liveBuildable === o.quantity;
+  const parts = inventoryPreview[o._id] || [];
+  const isSpare = o.orderType === "SPARE";
 
-            return (
-              <>
-                <button
-                  onClick={() => handlePartialAccepted(o._id)}
-                  disabled={liveBuildable === 0 || isOver}
-                  className={`flex-1 px-4 sm:px-6 py-2.5 sm:py-3 rounded-lg sm:rounded-xl font-semibold transition-all shadow-md hover:shadow-lg flex items-center justify-center gap-2 text-sm sm:text-base
-    ${
-      liveBuildable === 0 || isOver
-        ? "bg-gray-300 cursor-not-allowed text-gray-600"
-        : "bg-[#c62d23] hover:bg-[#a82419] text-white"
-    }`}
-                >
-                  <CheckCircle
-                    size={16}
-                    className="sm:w-4 sm:h-4 md:w-5 md:h-5"
-                  />
-                  {isExact ? "Accept Order" : "Partial Accept"}
-                </button>
+  const pickedQtyPerPart = parts.map((p) =>
+    p.locations.reduce((s, l) => s + Number(l.picked || 0), 0)
+  );
 
-                <button
-                  onClick={() => {
-                    setExpandedOrderId(null);
-                    setShowDecisionPanel(false);
-                  }}
-                  className="flex-1 bg-white border-2 border-gray-300 hover:border-gray-400 text-gray-700 px-4 sm:px-6 py-2.5 sm:py-3 rounded-lg sm:rounded-xl font-semibold transition-all hover:bg-gray-50 text-sm sm:text-base"
-                >
-                  Cancel
-                </button>
-              </>
-            );
-          })()}
+  const totalPicked = pickedQtyPerPart.reduce((a, b) => a + b, 0);
+
+  const spareFullyPicked = isSpare
+    ? isSpareFullyPicked(o, parts)
+    : false;
+
+  const liveBuildable = !isSpare
+    ? getLiveBuildable(o._id, o)
+    : 0;
+
+  // ✅ BUTTON ENABLE RULE
+  const isDisabled = isSpare
+    ? totalPicked === 0          // ❗ allow PARTIAL
+    : liveBuildable === 0;
+
+  // ✅ BUTTON LABEL
+  const buttonLabel = isSpare
+    ? spareFullyPicked
+      ? "Accept Order"
+      : "Partial Accept"
+    : liveBuildable === o.quantity
+    ? "Accept Order"
+    : "Partial Accept";
+
+  return (
+    <>
+      <button
+        onClick={() => handlePartialAccepted(o._id)}
+        disabled={isDisabled}
+        className={`flex-1 px-4 sm:px-6 py-2.5 sm:py-3 rounded-xl font-semibold transition-all shadow-md hover:shadow-lg flex items-center justify-center gap-2
+          ${
+            isDisabled
+              ? "bg-gray-300 cursor-not-allowed text-gray-600"
+              : "bg-[#c62d23] hover:bg-[#a82419] text-white"
+          }`}
+      >
+        <CheckCircle size={16} />
+        {buttonLabel}
+      </button>
+
+      <button
+        onClick={() => {
+          setExpandedOrderId(null);
+          setShowDecisionPanel(false);
+        }}
+        className="flex-1 bg-white border-2 border-gray-300 hover:border-gray-400 text-gray-700 px-4 py-2.5 rounded-xl font-semibold"
+      >
+        Cancel
+      </button>
+    </>
+  );
+})()}
         </div>
       </div>
     </div>

@@ -1,3 +1,4 @@
+//Admin orders page
 "use client";
 import React, { useEffect, useMemo, useState, useRef } from "react";
 import { Upload, Download, Menu, X, Search, Filter, ChevronDown, ChevronUp } from "lucide-react";
@@ -18,15 +19,15 @@ import { useRouter, useSearchParams } from "next/navigation";
 
 export default function Orders() {
   const [salesUsers, setSalesUsers] = useState([]);
-  const [spareParts, setSpareParts] = useState([]);
   const [vendors, setVendors] = useState([]);
   const [vendorSearch, setVendorSearch] = useState("");
-  const [chairModels, setChairModels] = useState([]);
-  const [chairSearch, setChairSearch] = useState("");
-  const [showChairDropdown, setShowChairDropdown] = useState(false);
   const [showVendorDropdown, setShowVendorDropdown] = useState(false);
+  const [chairModels, setChairModels] = useState([]);
+  const [spareParts, setSpareParts] = useState([]);
   const [orderTypeFilter, setOrderTypeFilter] = useState("ALL");
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [itemSearches, setItemSearches] = useState([""]);
+  const [showItemDropdowns, setShowItemDropdowns] = useState([false]);
 
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -48,13 +49,12 @@ export default function Orders() {
 
   const initialFormData = {
     dispatchedTo: "",
-    chairModel: "",
-    partname: "",
+    remark: "",
     orderType: "FULL",
     orderDate: "",
     deliveryDate: "",
-    quantity: "",
     salesPerson: "",
+    items: [{ chairModel: "", quantity: "" }],
   };
 
   const today = new Date();
@@ -72,12 +72,14 @@ export default function Orders() {
     return orders.filter((o) => {
       if (orderTypeFilter !== "ALL" && o.orderType !== orderTypeFilter) return false;
 
+      const vendorName =
+        typeof o.dispatchedTo === "string"
+          ? o.dispatchedTo
+          : o.dispatchedTo?.name || "";
+
       const matchesSearch =
         o.orderId?.toLowerCase().includes(q) ||
-        (typeof o.dispatchedTo === "string"
-          ? o.dispatchedTo
-          : o.dispatchedTo?.name
-        )?.toLowerCase().includes(q) ||
+        vendorName.toLowerCase().includes(q) ||
         o.chairModel?.toLowerCase().includes(q);
 
       if (!matchesSearch) return false;
@@ -150,78 +152,158 @@ export default function Orders() {
   const fetchVendors = async () => {
     try {
       const res = await axios.get(`${API}/vendors`, { headers });
-      console.log("VENDORS:", res.data.vendors || res.data);
       setVendors(res.data.vendors || res.data);
     } catch (err) {
       console.error("Fetch vendors failed", err);
     }
   };
 
-  useEffect(() => { console.log("Highlight ID from URL:", highlightId); }, [highlightId]);
-  useEffect(() => { console.log("Order IDs:", orders.map((o) => o._id)); }, [orders]);
-  useEffect(() => { console.log("Highlight ID:", highlightId); }, [highlightId]);
-
   const fetchChairModels = async () => {
-    const res = await axios.get(`${API}/inventory`, { headers });
-    const inventory = res.data.inventory || [];
-    const fullChairs = inventory.filter((i) => i.type === "FULL").map((i) => i.chairType);
-    const spare = inventory.filter((i) => i.type === "SPARE").map((i) => i.partName);
-    setChairModels([...new Set(fullChairs)]);
-    setSpareParts([...new Set(spare)]);
+    try {
+      const res = await axios.get(`${API}/inventory/chair-models`, { headers });
+      setChairModels(res.data.models || []);
+    } catch (err) {
+      // fallback to inventory endpoint
+      try {
+        const res = await axios.get(`${API}/inventory`, { headers });
+        const inventory = res.data.inventory || [];
+        const fullChairs = inventory.filter((i) => i.type === "FULL").map((i) => i.chairType);
+        setChairModels([...new Set(fullChairs)]);
+      } catch {}
+    }
+  };
+
+  const fetchSpareParts = async () => {
+    try {
+      const res = await axios.get(`${API}/inventory/spare-part-names`, { headers });
+      setSpareParts(res.data.parts || []);
+    } catch (err) {
+      // fallback to inventory endpoint
+      try {
+        const res = await axios.get(`${API}/inventory`, { headers });
+        const inventory = res.data.inventory || [];
+        const spare = inventory.filter((i) => i.type === "SPARE").map((i) => i.partName);
+        setSpareParts([...new Set(spare)]);
+      } catch {}
+    }
   };
 
   useEffect(() => {
     fetchOrders();
     fetchVendors();
     fetchChairModels();
+    fetchSpareParts();
   }, []);
 
   /* ── EDIT ── */
   const handleEditOrder = (order) => {
     setEditingOrderId(order._id);
+
+    const items =
+      order.items && order.items.length > 0
+        ? order.items.map((i) => ({ chairModel: i.name, quantity: i.quantity }))
+        : [{ chairModel: order.chairModel, quantity: order.quantity }];
+
     setFormData({
       dispatchedTo: order.dispatchedTo?._id || order.dispatchedTo,
-      chairModel: order.chairModel,
-      orderType: order.orderType || "FULL",
+      remark: order.remark || "",
       orderDate: order.orderDate?.split("T")[0],
       deliveryDate: order.deliveryDate?.split("T")[0] || "",
-      quantity: order.quantity,
+      orderType: order.orderType || "FULL",
+      salesPerson: order.salesPerson?._id || order.salesPerson || "",
+      items,
     });
+
     setVendorSearch(order.dispatchedTo?.name || "");
+    setItemSearches(items.map((i) => i.chairModel));
+    setShowItemDropdowns(items.map(() => false));
     setShowForm(true);
   };
 
   const handleFormChange = (e) => {
     const { name, value } = e.target;
+    if (name === "orderType") {
+      setFormData((prev) => ({
+        ...prev,
+        orderType: value,
+        items: [{ chairModel: "", quantity: "" }],
+      }));
+      return;
+    }
     setFormData((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const addItem = () => {
+    setFormData((prev) => ({
+      ...prev,
+      items: [...prev.items, { chairModel: "", quantity: "" }],
+    }));
+    setItemSearches((prev) => [...prev, ""]);
+    setShowItemDropdowns((prev) => [...prev, false]);
+  };
+
+  const removeItem = (index) => {
+    setFormData((prev) => ({
+      ...prev,
+      items: prev.items.filter((_, i) => i !== index),
+    }));
+    setItemSearches((prev) => prev.filter((_, i) => i !== index));
+    setShowItemDropdowns((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const updateItem = (index, field, value) => {
+    setFormData((prev) => ({
+      ...prev,
+      items: prev.items.map((item, i) =>
+        i === index ? { ...item, [field]: value } : item
+      ),
+    }));
   };
 
   /* ── CREATE / UPDATE ── */
   const handleCreateOrder = async (e) => {
-    if (!formData.dispatchedTo) { alert("Please select or create a vendor"); return; }
-    if (user?.role === "admin" && !formData.salesPerson) { alert("Please assign a sales person"); return; }
     e.preventDefault();
+    if (!formData.dispatchedTo) { alert("Please select a vendor"); return; }
+    if (user?.role === "admin" && !formData.salesPerson) { alert("Please assign a sales person"); return; }
+
+    const validItems = formData.items.filter(
+      (item) => item.chairModel && Number(item.quantity) > 0
+    );
+    if (!validItems.length) {
+      alert("Add at least one valid item with model and quantity");
+      return;
+    }
+
+    const basePayload = {
+      dispatchedTo: formData.dispatchedTo,
+      remark: formData.remark || "",
+      orderType: formData.orderType,
+      orderDate: formData.orderDate || new Date().toISOString().split("T")[0],
+      deliveryDate: formData.deliveryDate,
+      salesPerson: formData.salesPerson,
+    };
+
     try {
-      const payload = {
-        dispatchedTo: formData.dispatchedTo,
-        chairModel: formData.orderType === "FULL" ? formData.chairModel : formData.partname,
-        orderType: formData.orderType,
-        orderDate: formData.orderDate || new Date().toISOString().split("T")[0],
-        deliveryDate: formData.deliveryDate,
-        quantity: Number(formData.quantity),
-        salesPerson: formData.salesPerson,
-        progress: "ORDER_PLACED",
-      };
+      const itemsPayload = validItems.map((item) => ({
+        name: item.chairModel,
+        quantity: Number(item.quantity),
+      }));
+
       if (editingOrderId) {
-        await axios.put(`${API}/orders/${editingOrderId}`, payload, { headers });
+        await axios.put(`${API}/orders/${editingOrderId}`, { ...basePayload, items: itemsPayload }, { headers });
       } else {
-        await axios.post(`${API}/orders`, payload, { headers });
+        await axios.post(`${API}/orders`, { ...basePayload, items: itemsPayload }, { headers });
       }
+
       setShowForm(false);
       setEditingOrderId(null);
       setFormData(initialFormData);
+      setItemSearches([""]);
+      setShowItemDropdowns([false]);
       await fetchOrders();
       await fetchVendors();
+      await fetchChairModels();
+      await fetchSpareParts();
     } catch (err) {
       console.error("Save failed", err?.response?.data || err);
       alert(err?.response?.data?.message || "Failed to save order");
@@ -261,16 +343,26 @@ export default function Orders() {
   /* ── EXPORT CSV ── */
   const handleExportCSV = () => {
     if (!orders.length) { alert("No orders to export"); return; }
-    const hdrs = ["Order ID", "Vendor", "Product", "Order Type", "Quantity", "Order Date", "Delivery Date", "Status"];
-    const rows = orders.map((o) => [
-      o.orderId,
-      typeof o.dispatchedTo === "string" ? o.dispatchedTo : o.dispatchedTo?.name || "",
-      o.chairModel, o.orderType, o.quantity,
-      o.orderDate ? new Date(o.orderDate).toLocaleDateString() : "",
-      o.deliveryDate ? new Date(o.deliveryDate).toLocaleDateString() : "",
-      o.progress,
-    ]);
-    const csvContent = hdrs.join(",") + "\n" + rows.map((r) => r.map((v) => `"${v}"`).join(",")).join("\n");
+
+    const hdrs = ["Order ID", "Vendor", "Product", "Remarks", "Order Type", "Quantity", "Order Date", "Delivery Date", "Status"];
+    const rows = [];
+
+    orders.forEach((o) => {
+      const vendorName =
+        typeof o.dispatchedTo === "string" ? o.dispatchedTo : o.dispatchedTo?.name || "";
+      const orderDate = o.orderDate ? new Date(o.orderDate).toLocaleDateString() : "";
+      const deliveryDate = o.deliveryDate ? new Date(o.deliveryDate).toLocaleDateString() : "";
+
+      if (o.items && o.items.length > 0) {
+        o.items.forEach((item) => {
+          rows.push([o.orderId, vendorName, item.name, o.remark || "", o.orderType, item.quantity, orderDate, deliveryDate, o.progress]);
+        });
+      } else {
+        rows.push([o.orderId, vendorName, o.chairModel, o.remark || "", o.orderType, o.quantity, orderDate, deliveryDate, o.progress]);
+      }
+    });
+
+    const csvContent = hdrs.join(",") + "\n" + rows.map((r) => r.map((v) => `"${v ?? ""}"`).join(",")).join("\n");
     const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
@@ -283,7 +375,6 @@ export default function Orders() {
   };
 
   /* ── STATS ── */
-  // Stats always from raw orders — unaffected by tab/search/status filters
   const totalOrders = orders.length;
   const delayed = orders.filter(isDelayed).length;
   const readyToDispatch = orders.filter((o) => o.progress === "READY_FOR_DISPATCH").length;
@@ -292,12 +383,10 @@ export default function Orders() {
     (o) => !["DISPATCHED", "PARTIAL"].includes(o.progress) && !isDelayed(o)
   ).length;
 
-  // Tab counts (also from raw orders)
   const allOrdersCount = orders.length;
   const fullChairCount = orders.filter((o) => o.orderType === "FULL").length;
   const sparePartCount = orders.filter((o) => o.orderType === "SPARE").length;
 
-  // Reset page on filter changes
   useEffect(() => { setCurrentPage(1); }, [search, statusFilter, orderTypeFilter]);
 
   const totalPages = Math.max(1, Math.ceil(filteredOrders.length / PAGE_SIZE));
@@ -324,11 +413,7 @@ export default function Orders() {
     { key: "DISPATCHED", label: "Dispatched" },
   ];
 
-  const isOrderLocked = (progress) => {
-    return ["WAREHOUSE_COLLECTED", "FITTING_IN_PROGRESS", "FITTING_COMPLETED", "READY_FOR_DISPATCH", "DISPATCHED", "PARTIAL"].includes(progress);
-  };
-
-  const ProgressTracker = ({ progress, orderType }) => {
+  const ProgressBadge = ({ progress, orderType }) => {
     const steps = orderType === "FULL" ? FULL_ORDER_STEPS : SPARE_ORDER_STEPS;
     if (progress === "PARTIAL") {
       return <StatusPill variant="warning" label="Partial / On Hold" />;
@@ -363,14 +448,12 @@ export default function Orders() {
     <div className="flex h-screen bg-[#f8f7f5] text-gray-900">
       {/* Hidden Upload */}
       <input
-        type="file"
-        id="orderUploadInput"
-        webkitdirectory="true"
-        directory=""
-        multiple
-        hidden
-        onChange={(e) => handleUploadOrders(e.target.files)}
-      />
+  type="file"
+  id="orderUploadInput"
+  accept=".csv,.xlsx"
+  hidden
+  onChange={(e) => handleUploadOrders(e.target.files)}
+/>
 
       {/* Mobile Sidebar Overlay */}
       {sidebarOpen && (
@@ -406,7 +489,14 @@ export default function Orders() {
             <h1 className="text-base font-bold text-gray-900">Orders</h1>
           </div>
           <button
-            onClick={() => { setVendorSearch(""); setFormData(initialFormData); setEditingOrderId(null); setShowForm(true); }}
+            onClick={() => {
+              setVendorSearch("");
+              setFormData(initialFormData);
+              setEditingOrderId(null);
+              setItemSearches([""]);
+              setShowItemDropdowns([false]);
+              setShowForm(true);
+            }}
             className="bg-[#c62d23] hover:bg-[#a8241c] text-white p-2 rounded-lg transition-colors active:scale-95"
           >
             <Plus size={18} />
@@ -437,7 +527,16 @@ export default function Orders() {
                 </button>
 
                 <button
-                  onClick={() => { setVendorSearch(""); setFormData(initialFormData); setEditingOrderId(null); setShowForm(true); }}
+                  onClick={() => {
+                    setVendorSearch("");
+                    setFormData(initialFormData);
+                    setEditingOrderId(null);
+                    setItemSearches([""]);
+                    setShowItemDropdowns([false]);
+                    fetchChairModels();
+                    fetchSpareParts();
+                    setShowForm(true);
+                  }}
                   className="flex items-center gap-1.5 px-3 xl:px-4 py-2 rounded-xl text-sm font-semibold bg-[#c62d23] hover:bg-[#b02620] text-white shadow-sm transition-all active:scale-95"
                 >
                   <Plus size={15} />
@@ -492,7 +591,7 @@ export default function Orders() {
             </div>
           )}
 
-          {/* ── TOOLBAR: Search + active filter ── */}
+          {/* ── TOOLBAR ── */}
           <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center">
             <div className="relative flex-1">
               <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
@@ -566,7 +665,7 @@ export default function Orders() {
                   <table className="w-full text-sm">
                     <thead>
                       <tr className="bg-gray-50 border-b border-gray-200">
-                        {["Order ID", "Dispatched To", "Chair / Part", "Order Date", "Delivery Date", "Qty", "Stage", "Status", "Actions"].map((h) => (
+                        {["Order ID", "Dispatched To", "Chair / Part", "Remark", "Order Date", "Delivery Date", "Qty", "Stage", "Status", "Actions"].map((h) => (
                           <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap">
                             {h}
                           </th>
@@ -577,7 +676,6 @@ export default function Orders() {
                       {paginatedOrders.map((o) => {
                         const status = getOrderStatus(o);
                         const isExpanded = expandedOrderId === o._id;
-                        const locked = isOrderLocked(o.progress);
                         return (
                           <React.Fragment key={o._id}>
                             <tr
@@ -602,8 +700,28 @@ export default function Orders() {
                               <td className="px-4 py-3.5 whitespace-nowrap text-sm font-medium text-gray-800">
                                 {o.dispatchedTo?.name || o.dispatchedTo}
                               </td>
-                              <td className="px-4 py-3.5 whitespace-nowrap text-sm font-medium text-gray-900">
-                                {o.chairModel}
+                              <td className="px-4 py-3.5 text-sm font-medium text-gray-900">
+                                {o.items && o.items.length > 1 ? (
+                                  <details onClick={(e) => e.stopPropagation()} className="relative cursor-pointer">
+                                    <summary className="list-none flex items-center gap-1 text-[#c62d23] font-semibold">
+                                      {o.items.length} items
+                                      <ChevronDown size={12} />
+                                    </summary>
+                                    <div className="absolute z-20 mt-2 w-48 bg-white border border-gray-200 rounded-xl shadow-lg p-2 space-y-1">
+                                      {o.items.map((item, idx) => (
+                                        <div key={idx} className="flex justify-between text-sm px-2 py-1 rounded hover:bg-gray-50">
+                                          <span>{item.name}</span>
+                                          <span className="font-semibold">× {item.quantity}</span>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </details>
+                                ) : (
+                                  <span>{(o.items && o.items[0]?.name) || o.chairModel}</span>
+                                )}
+                              </td>
+                              <td className="px-4 py-3.5 whitespace-nowrap text-sm text-gray-600 max-w-[180px] truncate">
+                                {o.remark ? o.remark : "—"}
                               </td>
                               <td className="px-4 py-3.5 whitespace-nowrap text-sm text-gray-600">
                                 {new Date(o.orderDate).toLocaleDateString()}
@@ -612,10 +730,10 @@ export default function Orders() {
                                 {o.deliveryDate ? new Date(o.deliveryDate).toLocaleDateString() : "—"}
                               </td>
                               <td className="px-4 py-3.5 whitespace-nowrap text-sm font-bold text-gray-900">
-                                {o.quantity}
+                                {o.items ? o.items.reduce((sum, i) => sum + i.quantity, 0) : o.quantity}
                               </td>
                               <td className="px-4 py-3.5 whitespace-nowrap">
-                                <ProgressTracker progress={o.progress} orderType={o.orderType} />
+                                <ProgressBadge progress={o.progress} orderType={o.orderType} />
                               </td>
                               <td className="px-4 py-3.5 whitespace-nowrap">
                                 <StatusPill variant={status.variant} label={status.label} />
@@ -643,7 +761,7 @@ export default function Orders() {
                             {/* Expanded Progress */}
                             {isExpanded && o.progress !== "PARTIAL" && (
                               <tr>
-                                <td colSpan={9} className="px-4 py-0 bg-gray-50">
+                                <td colSpan={10} className="px-4 py-0 bg-gray-50">
                                   <div className="my-3 p-5 bg-white rounded-xl border border-gray-100">
                                     <ExpandedProgress order={o} FULL_ORDER_STEPS={FULL_ORDER_STEPS} SPARE_ORDER_STEPS={SPARE_ORDER_STEPS} />
                                   </div>
@@ -672,7 +790,6 @@ export default function Orders() {
                             : "bg-white"
                         }`}
                       >
-                        {/* Card top row */}
                         <div className="flex items-start justify-between gap-2">
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2 flex-wrap mb-1">
@@ -684,7 +801,11 @@ export default function Orders() {
                             <p className="text-sm font-semibold text-gray-900">
                               {o.dispatchedTo?.name || o.dispatchedTo}
                             </p>
-                            <p className="text-xs text-gray-500 mt-0.5">{o.chairModel}</p>
+                            <p className="text-xs text-gray-500 mt-0.5">
+                              {o.items && o.items.length > 1
+                                ? `${o.items.length} items`
+                                : (o.items && o.items[0]?.name) || o.chairModel}
+                            </p>
                           </div>
                           <div className="flex items-center gap-1 shrink-0">
                             <button onClick={(e) => { e.stopPropagation(); handleEditOrder(o); }} className="p-1.5 hover:bg-gray-100 rounded-lg">
@@ -696,7 +817,6 @@ export default function Orders() {
                           </div>
                         </div>
 
-                        {/* Details grid */}
                         <div className="mt-3 grid grid-cols-3 gap-2 text-xs">
                           <div>
                             <p className="text-gray-400 font-semibold uppercase tracking-wide mb-0.5">Order Date</p>
@@ -710,13 +830,14 @@ export default function Orders() {
                           </div>
                           <div>
                             <p className="text-gray-400 font-semibold uppercase tracking-wide mb-0.5">Qty</p>
-                            <p className="text-gray-900 font-bold">{o.quantity}</p>
+                            <p className="text-gray-900 font-bold">
+                              {o.items ? o.items.reduce((sum, i) => sum + i.quantity, 0) : o.quantity}
+                            </p>
                           </div>
                         </div>
 
-                        {/* Stage + toggle */}
                         <div className="mt-3 flex items-center justify-between">
-                          <ProgressTracker progress={o.progress} orderType={o.orderType} />
+                          <ProgressBadge progress={o.progress} orderType={o.orderType} />
                           <button
                             onClick={() => handleRowClick(o._id)}
                             className="text-xs text-[#c62d23] font-medium"
@@ -725,7 +846,6 @@ export default function Orders() {
                           </button>
                         </div>
 
-                        {/* Expanded mobile progress */}
                         {isExpanded && o.progress !== "PARTIAL" && (
                           <div className="mt-3 pt-3 border-t border-gray-100">
                             {(() => {
@@ -836,7 +956,7 @@ export default function Orders() {
                 </h2>
               </div>
               <button
-                onClick={() => { setShowForm(false); setEditingOrderId(null); setFormData(initialFormData); }}
+                onClick={() => { setShowForm(false); setEditingOrderId(null); setFormData(initialFormData); setItemSearches([""]); setShowItemDropdowns([false]); }}
                 className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
               >
                 <X size={18} />
@@ -845,6 +965,7 @@ export default function Orders() {
 
             {/* Body */}
             <div className="px-6 py-5 overflow-y-auto flex-1 space-y-4">
+
               {/* Vendor */}
               <FormField label="Dispatched To">
                 <div className="relative">
@@ -852,23 +973,32 @@ export default function Orders() {
                     placeholder="Search or type vendor name"
                     value={vendorSearch}
                     onFocus={() => setShowVendorDropdown(true)}
-                    onChange={(e) => setVendorSearch(e.target.value)}
+                    onBlur={() => setTimeout(() => setShowVendorDropdown(false), 150)}
+                    onChange={(e) => { setVendorSearch(e.target.value); setShowVendorDropdown(true); }}
                     className="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-xl text-sm outline-none focus:border-[#c62d23] focus:ring-2 focus:ring-[#c62d23]/15 transition-all"
                   />
                   {showVendorDropdown && (
                     <div className="absolute z-10 left-0 right-0 bg-white border border-gray-200 mt-1 rounded-xl max-h-44 overflow-auto shadow-xl">
-                      {vendors.map((v) => (
-                        <div
-                          key={v._id}
-                          onClick={() => { setFormData({ ...formData, dispatchedTo: v._id }); setVendorSearch(v.name); setShowVendorDropdown(false); }}
-                          className="px-4 py-2.5 text-sm hover:bg-gray-50 cursor-pointer border-b border-gray-50 last:border-0 transition-colors"
-                        >
-                          {v.name}
-                        </div>
-                      ))}
+                      {vendors
+                        .filter((v) => v.name.toLowerCase().includes(vendorSearch.toLowerCase()))
+                        .map((v) => (
+                          <div
+                            key={v._id}
+                            onMouseDown={() => { setFormData({ ...formData, dispatchedTo: v._id }); setVendorSearch(v.name); setShowVendorDropdown(false); }}
+                            className="px-4 py-2.5 text-sm hover:bg-gray-50 cursor-pointer border-b border-gray-50 last:border-0 transition-colors"
+                          >
+                            {v.name}
+                          </div>
+                        ))}
                       {vendorSearch && !vendors.some((v) => v.name.toLowerCase() === vendorSearch.toLowerCase()) && (
                         <div
-                          onClick={() => { setFormData({ ...formData, dispatchedTo: vendorSearch.trim() }); setVendorSearch(vendorSearch.trim()); setShowVendorDropdown(false); }}
+                          onMouseDown={() => {
+                            const newName = vendorSearch.trim();
+                            setFormData({ ...formData, dispatchedTo: newName });
+                            setVendorSearch(newName);
+                            setVendors((prev) => [...prev, { _id: newName, name: newName.toUpperCase() }]);
+                            setShowVendorDropdown(false);
+                          }}
                           className="px-4 py-2.5 bg-gray-50 hover:bg-green-50 cursor-pointer text-green-700 font-medium text-sm transition-colors"
                         >
                           ➕ Add "{vendorSearch}" as new vendor
@@ -880,29 +1010,27 @@ export default function Orders() {
               </FormField>
 
               {/* Assign Sales Person (admin only) */}
-              {user?.role === "admin" && (
-                <FormField label="Assign Sales Person">
-                  <select
-                    value={formData.salesPerson || ""}
-                    onChange={(e) => setFormData({ ...formData, salesPerson: e.target.value })}
-                    className="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-xl text-sm outline-none focus:border-[#c62d23] focus:ring-2 focus:ring-[#c62d23]/15 transition-all"
-                  >
-                    <option value="">Select Sales Person</option>
-                    {salesUsers.map((u) => (
-                      <option key={u._id} value={u._id}>{u.name}</option>
-                    ))}
-                  </select>
-                </FormField>
-              )}
+              <FormField label="Assign Sales Person">
+                <select
+                  value={formData.salesPerson || ""}
+                  onChange={(e) => setFormData({ ...formData, salesPerson: e.target.value })}
+                  className="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-xl text-sm outline-none focus:border-[#c62d23] focus:ring-2 focus:ring-[#c62d23]/15 transition-all"
+                >
+                  <option value="">Select Sales Person</option>
+                  {salesUsers.map((u) => (
+                    <option key={u._id} value={u._id}>{u.name}</option>
+                  ))}
+                </select>
+              </FormField>
 
-              {/* Order Type toggle */}
+              {/* Order Type */}
               <FormField label="Order Type">
                 <div className="grid grid-cols-2 gap-2">
                   {["FULL", "SPARE"].map((type) => (
                     <button
                       key={type}
                       type="button"
-                      onClick={() => setFormData((prev) => ({ ...prev, orderType: type, chairModel: "", partname: "" }))}
+                      onClick={() => setFormData((prev) => ({ ...prev, orderType: type, items: [{ chairModel: "", quantity: "" }] }))}
                       className={`py-2.5 rounded-xl text-sm font-medium border transition-all ${
                         formData.orderType === type
                           ? "bg-[#c62d23] text-white border-[#c62d23] shadow-sm"
@@ -915,53 +1043,137 @@ export default function Orders() {
                 </div>
               </FormField>
 
-              {/* Full Chair model */}
-              {formData.orderType === "FULL" && (
-                <FormField label="Chair Model">
-                  <select
-                    value={formData.chairModel}
-                    onChange={(e) => setFormData({ ...formData, chairModel: e.target.value })}
-                    className="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-xl text-sm outline-none focus:border-[#c62d23] focus:ring-2 focus:ring-[#c62d23]/15 transition-all"
-                    required
-                  >
-                    <option value="">Select Chair Model…</option>
-                    {chairModels.map((m) => <option key={m} value={m}>{m}</option>)}
-                  </select>
-                </FormField>
-              )}
+              {/* Remark */}
+              <FormField label="Remark (Optional)">
+                <textarea
+                  name="remark"
+                  value={formData.remark}
+                  onChange={handleFormChange}
+                  placeholder="Any special instructions or client changes…"
+                  rows={3}
+                  className="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-xl text-sm outline-none focus:border-[#c62d23] focus:ring-2 focus:ring-[#c62d23]/15 transition-all resize-none"
+                />
+              </FormField>
 
-              {/* Spare Part */}
-              {formData.orderType === "SPARE" && (
-                <FormField label="Spare Part">
-                  <select
-                    value={formData.partname}
-                    onChange={(e) => setFormData({ ...formData, partname: e.target.value })}
-                    className="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-xl text-sm outline-none focus:border-[#c62d23] focus:ring-2 focus:ring-[#c62d23]/15 transition-all"
-                    required
+              {/* Dynamic Items */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wide">
+                    {formData.orderType === "FULL" ? "Chair Models" : "Spare Parts"}
+                  </label>
+                  <button
+                    type="button"
+                    onClick={addItem}
+                    className="flex items-center gap-1 text-xs font-semibold text-[#c62d23] hover:underline"
                   >
-                    <option value="">Select Spare Part…</option>
-                    {spareParts.map((p) => <option key={p} value={p}>{p}</option>)}
-                  </select>
-                </FormField>
-              )}
+                    <Plus size={12} /> Add Row
+                  </button>
+                </div>
+
+                {formData.items.map((item, index) => (
+                  <div key={index} className="flex gap-2 items-center">
+                    <div className="relative flex-1">
+                      <input
+                        placeholder={formData.orderType === "FULL" ? "Search chair model…" : "Search spare part…"}
+                        value={itemSearches[index] || ""}
+                        onFocus={() => {
+                          const updated = [...showItemDropdowns];
+                          updated[index] = true;
+                          setShowItemDropdowns(updated);
+                        }}
+                        onBlur={() => {
+                          setTimeout(() => {
+                            const updated = [...showItemDropdowns];
+                            updated[index] = false;
+                            setShowItemDropdowns(updated);
+                          }, 150);
+                        }}
+                        onChange={(e) => {
+                          const updated = [...itemSearches];
+                          updated[index] = e.target.value;
+                          setItemSearches(updated);
+                          updateItem(index, "chairModel", e.target.value);
+                        }}
+                        className="w-full px-3 py-2 bg-white border border-gray-200 rounded-xl text-sm outline-none focus:border-[#c62d23] focus:ring-2 focus:ring-[#c62d23]/15 transition-all"
+                      />
+                      {showItemDropdowns[index] && (
+                        <div className="absolute z-10 left-0 right-0 bg-white border border-gray-200 mt-1 rounded-xl max-h-44 overflow-auto shadow-xl">
+                          {(formData.orderType === "FULL" ? chairModels : spareParts)
+                            .filter((m) => m.toLowerCase().includes((itemSearches[index] || "").toLowerCase()))
+                            .map((m) => (
+                              <div
+                                key={m}
+                                onMouseDown={() => {
+                                  updateItem(index, "chairModel", m);
+                                  const searches = [...itemSearches];
+                                  searches[index] = m;
+                                  setItemSearches(searches);
+                                  const dropdowns = [...showItemDropdowns];
+                                  dropdowns[index] = false;
+                                  setShowItemDropdowns(dropdowns);
+                                }}
+                                className="px-4 py-2.5 text-sm hover:bg-gray-50 cursor-pointer border-b border-gray-50 last:border-0"
+                              >
+                                {m}
+                              </div>
+                            ))}
+                          {itemSearches[index] &&
+                            !(formData.orderType === "FULL" ? chairModels : spareParts).some(
+                              (m) => m.toLowerCase() === (itemSearches[index] || "").toLowerCase()
+                            ) && (
+                              <div
+                                onMouseDown={async () => {
+                                  const newName = itemSearches[index].trim();
+                                  try {
+                                    if (formData.orderType === "FULL") {
+                                      await axios.post(`${API}/inventory/chair-models`, { name: newName }, { headers });
+                                      setChairModels((prev) => [...prev, newName]);
+                                    } else {
+                                      await axios.post(`${API}/inventory/spare-part-names`, { name: newName }, { headers });
+                                      setSpareParts((prev) => [...prev, newName]);
+                                    }
+                                  } catch {}
+                                  updateItem(index, "chairModel", newName);
+                                  const dropdowns = [...showItemDropdowns];
+                                  dropdowns[index] = false;
+                                  setShowItemDropdowns(dropdowns);
+                                }}
+                                className="px-4 py-2.5 bg-gray-50 hover:bg-green-50 cursor-pointer text-green-700 font-medium text-sm"
+                              >
+                                ➕ Add "{itemSearches[index]}" as new {formData.orderType === "FULL" ? "model" : "part"}
+                              </div>
+                            )}
+                        </div>
+                      )}
+                    </div>
+
+                    <input
+                      type="number"
+                      min="1"
+                      placeholder="Qty"
+                      value={item.quantity}
+                      onChange={(e) => updateItem(index, "quantity", e.target.value)}
+                      className="w-20 px-3 py-2 bg-white border border-gray-200 rounded-xl text-sm outline-none focus:border-[#c62d23] focus:ring-2 focus:ring-[#c62d23]/15 transition-all"
+                    />
+
+                    {formData.items.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={() => removeItem(index)}
+                        className="p-1.5 text-gray-400 hover:text-red-500 transition-colors rounded-lg hover:bg-red-50"
+                      >
+                        <X size={14} />
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
 
               {/* Order Date (readonly) */}
               <FormField label="Order Date">
                 <div className="w-full px-4 py-2.5 bg-gray-50 border border-gray-100 rounded-xl text-sm text-gray-500 select-none">
                   {formData.orderDate || new Date().toISOString().split("T")[0]}
                 </div>
-              </FormField>
-
-              {/* Quantity */}
-              <FormField label="Quantity">
-                <input
-                  type="number"
-                  name="quantity"
-                  value={formData.quantity}
-                  onChange={handleFormChange}
-                  min="1"
-                  className="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-xl text-sm outline-none focus:border-[#c62d23] focus:ring-2 focus:ring-[#c62d23]/15 transition-all"
-                />
               </FormField>
 
               {/* Delivery Date */}
@@ -980,7 +1192,7 @@ export default function Orders() {
             <div className="flex justify-end gap-2 px-6 py-4 border-t border-gray-100">
               <button
                 type="button"
-                onClick={() => { setShowForm(false); setEditingOrderId(null); setFormData(initialFormData); }}
+                onClick={() => { setShowForm(false); setEditingOrderId(null); setFormData(initialFormData); setItemSearches([""]); setShowItemDropdowns([false]); }}
                 className="px-5 py-2.5 text-sm text-gray-600 hover:bg-gray-100 rounded-xl transition-all font-medium border border-gray-200"
               >
                 Cancel
@@ -1012,6 +1224,19 @@ function ExpandedProgress({ order, FULL_ORDER_STEPS, SPARE_ORDER_STEPS }) {
 
   return (
     <div className="space-y-4">
+      {order.items && order.items.length > 0 && (
+        <div className="mb-5">
+          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Items</p>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+            {order.items.map((item, idx) => (
+              <div key={idx} className="flex justify-between items-center px-3 py-2 rounded-lg border border-gray-100 bg-gray-50 text-sm">
+                <span className="font-medium text-gray-800">{item.name}</span>
+                <span className="font-semibold text-gray-900">× {item.quantity}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
       <div className="flex items-center justify-between">
         <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Order Progress</p>
         <span className="text-xs text-gray-500">Step {safeIndex + 1} of {steps.length}</span>

@@ -13,6 +13,7 @@ import {
   ClipboardCheck,
   Activity,
   LogOut,
+  History,
 } from "lucide-react";
 import LanguageToggle from "@/components/LanguageToggle";
 
@@ -67,6 +68,10 @@ const menuItem = (href) =>
         <Link href="/superadmin/ClientReport" className={menuItem("/superadmin/ClientReport")}>
           <Users size={18} />
           Client List
+        </Link>
+        <Link href="/superadmin/order-history" className={menuItem("/superadmin/order-history")}>
+          <History size={18} />
+          Order History
         </Link>
 
         <Link href="/superadmin/staff" className={menuItem("/superadmin/staff")}>

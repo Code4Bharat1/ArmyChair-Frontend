@@ -17,7 +17,6 @@ import {
   X,
   Send,
   ChevronDown,
-  ChevronUp,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 
@@ -27,20 +26,31 @@ const WORKERS = ["Mintoo", "Sajid", "Jamshed", "Ehtram"];
 const ALL_TABS = ["All", "Pending", "In Progress", "Completed"];
 
 /* ============ HELPERS ============ */
-const token = () => (typeof window !== "undefined" ? localStorage.getItem("token") : null);
+const token = () =>
+  typeof window !== "undefined" ? localStorage.getItem("token") : null;
 const hdrs = () => ({ Authorization: `Bearer ${token()}` });
+
+const getOrderItemLabel = (order) => {
+  if (order.items && order.items.length > 1) return `${order.items.length} items`;
+  if (order.items && order.items.length === 1) return order.items[0].name;
+  return order.chairModel;
+};
+
+const getOrderTotalQty = (order) => {
+  if (order.items && order.items.length > 0)
+    return order.items.reduce((sum, item) => sum + (item.quantity || 0), 0);
+  return order.quantity;
+};
 
 /* ============ MAIN PAGE ============ */
 export default function ProductionOrdersPage() {
   const router = useRouter();
 
-  /* ─── state ─── */
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedWorkers, setSelectedWorkers] = useState({});
   const [workerInventory, setWorkerInventory] = useState({});
   const [expandedOrder, setExpandedOrder] = useState(null);
-  const [acceptedOrders, setAcceptedOrders] = useState({});
   const [acceptQty, setAcceptQty] = useState({});
   const [requestData, setRequestData] = useState({});
   const [actionLoading, setActionLoading] = useState({});
@@ -58,8 +68,31 @@ export default function ProductionOrdersPage() {
   const fetchOrders = useCallback(async () => {
     try {
       const res = await axios.get(`${API}/orders`, { headers: hdrs() });
-      const valid = ["PRODUCTION_PENDING", "PRODUCTION_IN_PROGRESS", "PRODUCTION_COMPLETED"];
-      setOrders((res.data.orders || []).filter((o) => o.orderType === "FULL" && valid.includes(o.progress)));
+
+      // Statuses that are still "active" in production workflow
+      const activeInProduction = [
+        "PRODUCTION_PENDING",
+        "PRODUCTION_IN_PROGRESS",
+      ];
+
+      // Statuses that mean production is done — keep these forever in the
+      // Completed tab even after the order moves to fitting / dispatch
+      const productionDone = [
+        "PRODUCTION_COMPLETED",
+        "FITTING_IN_PROGRESS",
+        "FITTING_COMPLETED",
+        "DISPATCHED",
+        "DELIVERED",
+      ];
+
+      setOrders(
+        (res.data.orders || []).filter(
+          (o) =>
+            o.orderType === "FULL" &&
+            (activeInProduction.includes(o.progress) ||
+              productionDone.includes(o.progress)),
+        ),
+      );
     } catch (e) {
       console.error(e);
     } finally {
@@ -76,7 +109,9 @@ export default function ProductionOrdersPage() {
     try {
       const res = await axios.get(`${API}/inventory`, { headers: hdrs() });
       setWorkerInventory({
-        ALL_PRODUCTION: (res.data.inventory || []).filter((i) => i.location.startsWith("PROD_")),
+        ALL_PRODUCTION: (res.data.inventory || []).filter((i) =>
+          i.location.startsWith("PROD_"),
+        ),
       });
     } catch (e) {
       console.error(e);
@@ -101,7 +136,7 @@ export default function ProductionOrdersPage() {
           quantity: d.quantity,
           location: `PROD_${selectedWorkers[orderId] || "Mintoo"}`,
         },
-        { headers: hdrs() }
+        { headers: hdrs() },
       );
       toast.success("Material request sent to warehouse successfully");
       setRequestData((p) => ({ ...p, [orderId]: { partName: "", quantity: "" } }));
@@ -119,7 +154,7 @@ export default function ProductionOrdersPage() {
       await axios.put(
         `${API}/orders/${orderId}/assign-production`,
         { workerName: selectedWorkers[orderId] },
-        { headers: hdrs() }
+        { headers: hdrs() },
       );
       toast.success(`Worker ${selectedWorkers[orderId]} assigned successfully`);
       setExpandedOrder(orderId);
@@ -145,10 +180,11 @@ export default function ProductionOrdersPage() {
       return;
     }
 
-    const invalidParts = Object.entries(partsToValidate).filter(([name, qty]) => qty !== order.quantity);
+    const invalidParts = Object.entries(partsToValidate).filter(
+      ([name, qty]) => qty !== order.quantity,
+    );
 
     if (invalidParts.length > 0) {
-      const message = invalidParts.map(([name, qty]) => `${name}: ${qty} (required: ${order.quantity})`).join("\n");
       toast.error(
         <div>
           <p className="font-semibold mb-1">Quantity mismatch detected</p>
@@ -161,22 +197,25 @@ export default function ProductionOrdersPage() {
             ))}
           </div>
         </div>,
-        { duration: 5000 }
+        { duration: 5000 },
       );
       return;
     }
 
     setLoad(orderId + "_accept", true);
     try {
-      await axios.post(`${API}/orders/${orderId}/production-accept`, { parts }, { headers: hdrs() });
-      setAcceptedOrders((p) => ({ ...p, [orderId]: true }));
+      await axios.post(
+        `${API}/orders/${orderId}/production-accept`,
+        { parts },
+        { headers: hdrs() },
+      );
       setAddedItems((prev) => {
         const updated = { ...prev };
         delete updated[orderId];
         return updated;
       });
       toast.success("Order accepted successfully!");
-      fetchOrders();
+      fetchOrders(); // ← after this, order.progress becomes PRODUCTION_IN_PROGRESS
     } catch (e) {
       toast.error(e.response?.data?.message || "Failed to accept order. Please try again.");
     } finally {
@@ -187,7 +226,11 @@ export default function ProductionOrdersPage() {
   const markCompleted = async (orderId) => {
     setLoad(orderId + "_complete", true);
     try {
-      await axios.patch(`${API}/orders/${orderId}/progress`, { progress: "PRODUCTION_COMPLETED" }, { headers: hdrs() });
+      await axios.patch(
+        `${API}/orders/${orderId}/progress`,
+        { progress: "PRODUCTION_COMPLETED" },
+        { headers: hdrs() },
+      );
       toast.success("Production completed successfully!");
       setAddedItems((prev) => {
         const updated = { ...prev };
@@ -202,7 +245,6 @@ export default function ProductionOrdersPage() {
     }
   };
 
-  /* ─── handle adding item to selection ─── */
   const addItemToSelection = (orderId, partName, totalQty) => {
     const qty = acceptQty[partName] || 0;
     const order = orders.find((o) => o._id === orderId);
@@ -236,47 +278,58 @@ export default function ProductionOrdersPage() {
     toast.success(`Added ${qty} × ${partName} to production`);
   };
 
-  /* ─── remove item from selection ─── */
   const removeItemFromSelection = (orderId, partName) => {
     setAddedItems((prev) => {
       const updated = { ...prev };
       if (updated[orderId]) {
         const removedQty = updated[orderId][partName];
         delete updated[orderId][partName];
-        if (Object.keys(updated[orderId]).length === 0) {
-          delete updated[orderId];
-        }
-        if (removedQty) {
-          toast.success(`Removed ${removedQty} × ${partName} from production`);
-        }
+        if (Object.keys(updated[orderId]).length === 0) delete updated[orderId];
+        if (removedQty) toast.success(`Removed ${removedQty} × ${partName} from production`);
       }
       return updated;
     });
   };
 
   /* ─── grouping ─── */
-  const pending = orders.filter((o) => o.progress === "PRODUCTION_PENDING" && !o.productionWorker);
-  const inProgress = orders.filter(
-    (o) => (o.progress === "PRODUCTION_PENDING" && o.productionWorker) || o.progress === "PRODUCTION_IN_PROGRESS"
+  const PRODUCTION_DONE = [
+    "PRODUCTION_COMPLETED",
+    "FITTING_IN_PROGRESS",
+    "FITTING_COMPLETED",
+    "DISPATCHED",
+    "DELIVERED",
+  ];
+
+  const pending = orders.filter(
+    (o) => o.progress === "PRODUCTION_PENDING" && !o.productionWorker,
   );
-  const completed = orders.filter((o) => o.progress === "PRODUCTION_COMPLETED");
+  const inProgress = orders.filter(
+    (o) =>
+      (o.progress === "PRODUCTION_PENDING" && o.productionWorker) ||
+      o.progress === "PRODUCTION_IN_PROGRESS",
+  );
+  const completed = orders.filter((o) => PRODUCTION_DONE.includes(o.progress));
 
-  /* ─── filtered list (tab) ─── */
   const visibleOrders =
-    activeTab === "All" ? orders : activeTab === "Pending" ? pending : activeTab === "In Progress" ? inProgress : completed;
+    activeTab === "All"
+      ? orders
+      : activeTab === "Pending"
+        ? pending
+        : activeTab === "In Progress"
+          ? inProgress
+          : completed;
 
-  /* ─── status helpers per order ─── */
   const getStatus = (order) => {
-    if (order.progress === "PRODUCTION_COMPLETED") return "completed";
-    if (order.progress === "PRODUCTION_IN_PROGRESS" || order.productionWorker) return "inProgress";
+    if (PRODUCTION_DONE.includes(order.progress)) return "completed";
+    if (order.progress === "PRODUCTION_IN_PROGRESS" || order.productionWorker)
+      return "inProgress";
     return "pending";
   };
 
   const handleRowClick = (orderId) => {
     const order = orders.find((o) => o._id === orderId);
     const status = getStatus(order);
-
-    if (status === "inProgress") {
+    if (status === "inProgress" || (status === "completed" && order.items?.length > 0)) {
       setExpandedOrder((prev) => (prev === orderId ? null : orderId));
     }
   };
@@ -284,64 +337,55 @@ export default function ProductionOrdersPage() {
   const getMergedParts = (order) => {
     const backendParts = order.productionParts || {};
     const localParts = addedItems[order._id] || {};
-
     const merged = { ...backendParts };
-
     Object.entries(localParts).forEach(([key, val]) => {
       merged[key] = (merged[key] || 0) + val;
     });
-
     return merged;
   };
 
   const getTotalAddedQty = (order) => {
     const merged = getMergedParts(order);
     const quantities = Object.values(merged);
-
     if (!quantities.length) return 0;
-
     return Math.min(...quantities);
   };
 
-  /* ═══════ RENDER ═══════ */
+  /* ─── KEY FIX: derive accepted state from order.progress, not memory ─── */
+  // An order is "accepted" (parts confirmed, ready to mark complete) when
+  // progress === PRODUCTION_IN_PROGRESS  (set by the production-accept API)
+  // OR already moved past production entirely
+  const isOrderAccepted = (order) =>
+    order.progress === "PRODUCTION_IN_PROGRESS" ||
+    PRODUCTION_DONE.includes(order.progress);
+
   return (
     <div className="flex min-h-screen bg-gray-50 text-gray-900">
-      {/* Toast Notifications */}
       <Toaster
         position="top-right"
         toastOptions={{
           duration: 3000,
           style: {
-            background: '#fff',
-            color: '#1f2937',
-            border: '1px solid #e5e7eb',
-            padding: '12px 16px',
-            borderRadius: '12px',
-            fontSize: '14px',
-            boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)',
+            background: "#fff",
+            color: "#1f2937",
+            border: "1px solid #e5e7eb",
+            padding: "12px 16px",
+            borderRadius: "12px",
+            fontSize: "14px",
+            boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)",
           },
-          success: {
-            iconTheme: {
-              primary: '#10b981',
-              secondary: '#fff',
-            },
-          },
+          success: { iconTheme: { primary: "#10b981", secondary: "#fff" } },
           error: {
-            iconTheme: {
-              primary: '#ef4444',
-              secondary: '#fff',
-            },
-            style: {
-              border: '1px solid #fecaca',
-            },
+            iconTheme: { primary: "#ef4444", secondary: "#fff" },
+            style: { border: "1px solid #fecaca" },
           },
         }}
       />
-      
+
       <div className="flex-1 overflow-auto">
         {/* HEADER */}
         <div className="sticky top-0 z-10 bg-white/80 backdrop-blur border-b border-gray-200 shadow-sm">
-          {/* Desktop Header */}
+          {/* Desktop */}
           <div className="hidden md:block p-6">
             <div className="flex items-center justify-between">
               <div>
@@ -349,9 +393,10 @@ export default function ProductionOrdersPage() {
                   <Package size={32} className="text-[#c62d23]" />
                   <span>Production Management</span>
                 </h1>
-                <p className="text-sm text-gray-600 mt-1">Manage production workflow and inventory</p>
+                <p className="text-sm text-gray-600 mt-1">
+                  Manage production workflow and inventory
+                </p>
               </div>
-
               <button
                 onClick={() => router.push("/profile")}
                 title="My Profile"
@@ -362,7 +407,7 @@ export default function ProductionOrdersPage() {
             </div>
           </div>
 
-          {/* Mobile Header */}
+          {/* Mobile */}
           <div className="md:hidden p-4">
             <div className="flex items-center justify-between mb-3">
               <h1 className="text-xl font-bold text-gray-900 flex items-center gap-2">
@@ -376,8 +421,6 @@ export default function ProductionOrdersPage() {
                 <UserCircle size={28} />
               </button>
             </div>
-            
-            {/* Mobile Stats Row */}
             <div className="grid grid-cols-3 gap-2">
               <div className="bg-red-50 border border-red-200 p-2 rounded-lg text-center">
                 <div className="text-xs text-red-600 font-medium">Pending</div>
@@ -413,7 +456,6 @@ export default function ProductionOrdersPage() {
                   onClick={() => setActiveTab("Pending")}
                   active={activeTab === "Pending"}
                 />
-
                 <StatCard
                   title="In Progress"
                   value={inProgress.length}
@@ -421,7 +463,6 @@ export default function ProductionOrdersPage() {
                   onClick={() => setActiveTab("In Progress")}
                   active={activeTab === "In Progress"}
                 />
-
                 <StatCard
                   title="Completed"
                   value={completed.length}
@@ -440,7 +481,9 @@ export default function ProductionOrdersPage() {
                       key={tab}
                       onClick={() => setActiveTab(tab)}
                       className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all whitespace-nowrap ${
-                        active ? "bg-[#c62d23] text-white shadow-sm" : "text-gray-600 hover:bg-gray-50"
+                        active
+                          ? "bg-[#c62d23] text-white shadow-sm"
+                          : "text-gray-600 hover:bg-gray-50"
                       }`}
                     >
                       {tab}
@@ -449,7 +492,7 @@ export default function ProductionOrdersPage() {
                 })}
               </div>
 
-              {/* ORDERS CONTAINER */}
+              {/* ORDERS */}
               {visibleOrders.length === 0 ? (
                 <div className="text-center text-gray-500 py-16">
                   <Package size={48} className="mx-auto mb-4 text-gray-300" />
@@ -479,7 +522,6 @@ export default function ProductionOrdersPage() {
                         onAssign={() => assignWorker(order._id)}
                         assignLoading={actionLoading[order._id + "_assign"]}
                         index={index}
-                        // Expanded section props
                         workerInventory={workerInventory}
                         addedItems={addedItems[order._id]}
                         inventorySearch={inventorySearch[order._id]}
@@ -499,7 +541,8 @@ export default function ProductionOrdersPage() {
                         onSendRequest={() => sendInventoryRequest(order._id)}
                         requestLoading={actionLoading[order._id + "_req"]}
                         onRefreshInventory={fetchProductionInventory}
-                        acceptedOrders={acceptedOrders}
+                        // ✅ FIX: derive from order.progress, not in-memory state
+                        isOrderAccepted={isOrderAccepted(order)}
                         onAccept={() => acceptOrder(order._id, addedItems[order._id] || {})}
                         acceptLoading={actionLoading[order._id + "_accept"]}
                         onComplete={() => markCompleted(order._id)}
@@ -519,16 +562,14 @@ export default function ProductionOrdersPage() {
   );
 }
 
-/* ================= STAT CARD COMPONENT ================= */
+/* ================= STAT CARD ================= */
 const StatCard = ({ title, value, icon, onClick, active }) => (
   <div
     onClick={onClick}
     className={`bg-white border rounded-2xl p-6 transition-all duration-200 shadow-sm hover:shadow-md flex flex-col justify-between h-full cursor-pointer ${
       active ? "ring-2 ring-[#c62d23]" : ""
     } hover:border-[#c62d23]`}
-    style={{
-      borderLeft: "4px solid #c62d23",
-    }}
+    style={{ borderLeft: "4px solid #c62d23" }}
   >
     <div className="flex justify-between items-start mb-4">
       <p className="text-sm text-gray-600 font-medium">{title}</p>
@@ -542,7 +583,7 @@ const StatCard = ({ title, value, icon, onClick, active }) => (
   </div>
 );
 
-/* ================= ORDER CARD COMPONENT ================= */
+/* ================= ORDER CARD ================= */
 const OrderCard = ({
   order,
   status,
@@ -568,7 +609,7 @@ const OrderCard = ({
   onSendRequest,
   requestLoading,
   onRefreshInventory,
-  acceptedOrders,
+  isOrderAccepted,      // ✅ renamed from acceptedOrders
   onAccept,
   acceptLoading,
   onComplete,
@@ -578,85 +619,88 @@ const OrderCard = ({
 }) => {
   return (
     <>
-      {/* MOBILE CARD VIEW */}
+      {/* MOBILE */}
       <div className="md:hidden bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-        <div className="p-4">
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs text-gray-500 font-medium">Order ID</p>
-                <p className="font-bold text-gray-900">{order.orderId}</p>
-              </div>
-              <span className={`px-3 py-1 rounded-full text-xs font-medium ${
-                status === "completed" ? "bg-green-50 text-green-700 border border-green-200" :
-                status === "inProgress" ? "bg-blue-50 text-blue-700 border border-blue-200" :
-                "bg-red-50 text-red-700 border border-red-200"
-              }`}>
-                {status === "completed" ? "Completed" : status === "inProgress" ? "In Progress" : "Pending"}
-              </span>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <p className="text-xs text-gray-500 font-medium">Chair Model</p>
-                <p className="font-medium text-gray-900 truncate">{order.chairModel}</p>
-              </div>
-              <div>
-                <p className="text-xs text-gray-500 font-medium">Quantity</p>
-                <p className="font-bold text-gray-900">{order.quantity}</p>
-              </div>
-            </div>
-
+        <div className="p-4 space-y-3">
+          <div className="flex items-center justify-between">
             <div>
-              <p className="text-xs text-gray-500 font-medium mb-1">Worker</p>
-              {order.productionWorker ? (
-                <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium bg-blue-50 text-blue-700 border border-blue-200">
-                  <UserCircle size={12} />
-                  {order.productionWorker}
-                </span>
-              ) : (
-                <span className="text-gray-400 text-xs">Not assigned</span>
-              )}
+              <p className="text-xs text-gray-500 font-medium">Order ID</p>
+              <p className="font-bold text-gray-900">{order.orderId}</p>
             </div>
+            <span
+              className={`px-3 py-1 rounded-full text-xs font-medium ${
+                status === "completed"
+                  ? "bg-green-50 text-green-700 border border-green-200"
+                  : status === "inProgress"
+                    ? "bg-blue-50 text-blue-700 border border-blue-200"
+                    : "bg-red-50 text-red-700 border border-red-200"
+              }`}
+            >
+              {status === "completed" ? "Completed" : status === "inProgress" ? "In Progress" : "Pending"}
+            </span>
+          </div>
 
-            {isPending && (
-              <div className="flex gap-2">
-                <select
-                  value={selectedWorker || ""}
-                  onChange={(e) => onWorkerChange(e.target.value)}
-                  className="flex-1 px-3 py-2 text-sm border border-gray-200 rounded-lg bg-white text-gray-700 focus:border-[#c62d23] focus:ring-2 focus:ring-[#c62d23]/20 transition-all outline-none"
-                >
-                  <option value="">Select Worker</option>
-                  {WORKERS.map((w) => (
-                    <option key={w} value={w}>{w}</option>
-                  ))}
-                </select>
-                <button
-                  onClick={onAssign}
-                  disabled={!selectedWorker || assignLoading}
-                  className="bg-[#c62d23] hover:bg-[#a82419] disabled:bg-gray-300 text-white px-4 py-2 rounded-lg text-sm font-semibold transition-all disabled:cursor-not-allowed"
-                >
-                  {assignLoading ? <Loader2 size={16} className="animate-spin" /> : "Assign"}
-                </button>
-              </div>
-            )}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <p className="text-xs text-gray-500 font-medium">Chair Model</p>
+              <p className="font-medium text-gray-900 truncate">{getOrderItemLabel(order)}</p>
+            </div>
+            <div>
+              <p className="text-xs text-gray-500 font-medium">Quantity</p>
+              <p className="font-bold text-gray-900">{getOrderTotalQty(order)}</p>
+            </div>
+          </div>
 
-            {isInProg && (
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onToggle();
-                }}
-                className="w-full flex items-center justify-center gap-2 text-[#c62d23] hover:bg-red-50 py-2 rounded-lg text-sm font-semibold transition-all"
-              >
-                {isOpen ? "Close Details" : "View Details"}
-                <ChevronDown size={16} className={`transition-transform ${isOpen ? "rotate-180" : ""}`} />
-              </button>
+          <div>
+            <p className="text-xs text-gray-500 font-medium mb-1">Worker</p>
+            {order.productionWorker ? (
+              <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium bg-blue-50 text-blue-700 border border-blue-200">
+                <UserCircle size={12} />
+                {order.productionWorker}
+              </span>
+            ) : (
+              <span className="text-gray-400 text-xs">Not assigned</span>
             )}
           </div>
+
+          <div>
+            <p className="text-xs text-gray-500 font-medium">Remark</p>
+            <p className="text-sm text-gray-800 truncate">{order.remark || "—"}</p>
+          </div>
+
+          {isPending && (
+            <div className="flex gap-2">
+              <select
+                value={selectedWorker || ""}
+                onChange={(e) => onWorkerChange(e.target.value)}
+                className="flex-1 px-3 py-2 text-sm border border-gray-200 rounded-lg bg-white text-gray-700 focus:border-[#c62d23] focus:ring-2 focus:ring-[#c62d23]/20 transition-all outline-none"
+              >
+                <option value="">Select Worker</option>
+                {WORKERS.map((w) => (
+                  <option key={w} value={w}>{w}</option>
+                ))}
+              </select>
+              <button
+                onClick={onAssign}
+                disabled={!selectedWorker || assignLoading}
+                className="bg-[#c62d23] hover:bg-[#a82419] disabled:bg-gray-300 text-white px-4 py-2 rounded-lg text-sm font-semibold transition-all disabled:cursor-not-allowed"
+              >
+                {assignLoading ? <Loader2 size={16} className="animate-spin" /> : "Assign"}
+              </button>
+            </div>
+          )}
+
+          {(isInProg || status === "completed") && order.items?.length > 0 && (
+            <button
+              onClick={(e) => { e.stopPropagation(); onToggle(); }}
+              className="w-full flex items-center justify-center gap-2 text-[#c62d23] hover:bg-red-50 py-2 rounded-lg text-sm font-semibold transition-all"
+            >
+              {isOpen ? "Close Details" : "View Items"}
+              <ChevronDown size={16} className={`transition-transform ${isOpen ? "rotate-180" : ""}`} />
+            </button>
+          )}
         </div>
 
-        {/* EXPANDED SECTION - MOBILE */}
         {isInProg && isOpen && (
           <div className="border-t border-gray-200 p-4 bg-gray-50">
             <ExpandedOrderDetails
@@ -674,7 +718,7 @@ const OrderCard = ({
               onSendRequest={onSendRequest}
               requestLoading={requestLoading}
               onRefreshInventory={onRefreshInventory}
-              acceptedOrders={acceptedOrders}
+              isOrderAccepted={isOrderAccepted}
               onAccept={onAccept}
               acceptLoading={acceptLoading}
               onComplete={onComplete}
@@ -684,29 +728,37 @@ const OrderCard = ({
             />
           </div>
         )}
+
+        {status === "completed" && isOpen && order.items?.length > 0 && (
+          <div className="border-t border-gray-200 p-4 bg-gray-50">
+            <CompletedOrderItems order={order} />
+          </div>
+        )}
       </div>
 
-      {/* DESKTOP TABLE ROW - Hidden on mobile */}
+      {/* DESKTOP */}
       <div className="hidden md:block">
-        <div className={`bg-white border border-gray-200 shadow-sm rounded-2xl overflow-hidden ${
-          index === 0 ? "" : ""
-        }`}>
+        <div className="bg-white border border-gray-200 shadow-sm rounded-2xl overflow-hidden">
           <div
-            onClick={isInProg ? onToggle : undefined}
-            className={`${isInProg ? "cursor-pointer hover:bg-gray-50" : ""} transition-colors`}
+            onClick={(isInProg || (status === "completed" && order.items?.length > 0)) ? onToggle : undefined}
+            className={`${(isInProg || (status === "completed" && order.items?.length > 0)) ? "cursor-pointer hover:bg-gray-50" : ""} transition-colors`}
           >
-            <div className="grid grid-cols-6 gap-4 p-4 items-center">
+            <div className="grid grid-cols-8 gap-4 p-4 items-center">
               <div>
                 <p className="text-xs text-gray-500 font-medium mb-1">Order ID</p>
-                <p className="font-semibold text-gray-900">{order.orderId}</p>
+                <p className="text-sm font-semibold text-gray-900">{order.orderId}</p>
               </div>
               <div>
                 <p className="text-xs text-gray-500 font-medium mb-1">Chair Model</p>
-                <p className="font-medium text-gray-900">{order.chairModel}</p>
+                <p className="font-medium text-gray-900">{getOrderItemLabel(order)}</p>
+              </div>
+              <div>
+                <p className="text-xs text-gray-500 font-medium mb-1">Remark</p>
+                <p className="text-sm text-gray-800 truncate max-w-[160px]">{order.remark || "—"}</p>
               </div>
               <div>
                 <p className="text-xs text-gray-500 font-medium mb-1">Quantity</p>
-                <p className="font-semibold text-gray-900">{order.quantity}</p>
+                <p className="font-semibold text-gray-900">{getOrderTotalQty(order)}</p>
               </div>
               <div>
                 <p className="text-xs text-gray-500 font-medium mb-1">Worker</p>
@@ -721,11 +773,15 @@ const OrderCard = ({
               </div>
               <div>
                 <p className="text-xs text-gray-500 font-medium mb-1">Status</p>
-                <span className={`px-3 py-1 rounded-full text-xs font-medium ${
-                  status === "completed" ? "bg-green-50 text-green-700 border border-green-200" :
-                  status === "inProgress" ? "bg-blue-50 text-blue-700 border border-blue-200" :
-                  "bg-red-50 text-red-700 border border-red-200"
-                }`}>
+                <span
+                  className={`px-3 py-1 rounded-full text-xs font-medium ${
+                    status === "completed"
+                      ? "bg-green-50 text-green-700 border border-green-200"
+                      : status === "inProgress"
+                        ? "bg-blue-50 text-blue-700 border border-blue-200"
+                        : "bg-red-50 text-red-700 border border-red-200"
+                  }`}
+                >
                   {status === "completed" ? "Completed" : status === "inProgress" ? "In Progress" : "Pending"}
                 </span>
               </div>
@@ -751,12 +807,12 @@ const OrderCard = ({
                     </button>
                   </div>
                 )}
-                {isInProg && (
+                {(isInProg || status === "completed") && order.items?.length > 0 && (
                   <button
                     onClick={onToggle}
                     className="text-[#c62d23] hover:bg-red-50 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all inline-flex items-center gap-1"
                   >
-                    {isOpen ? "Close" : "View Details"}
+                    {isOpen ? "Close" : "View Items"}
                     <ChevronDown size={14} className={`transition-transform ${isOpen ? "rotate-180" : ""}`} />
                   </button>
                 )}
@@ -764,7 +820,6 @@ const OrderCard = ({
             </div>
           </div>
 
-          {/* EXPANDED SECTION - DESKTOP */}
           {isInProg && isOpen && (
             <div className="border-t border-gray-200 p-6 bg-gray-50">
               <ExpandedOrderDetails
@@ -782,7 +837,7 @@ const OrderCard = ({
                 onSendRequest={onSendRequest}
                 requestLoading={requestLoading}
                 onRefreshInventory={onRefreshInventory}
-                acceptedOrders={acceptedOrders}
+                isOrderAccepted={isOrderAccepted}
                 onAccept={onAccept}
                 acceptLoading={acceptLoading}
                 onComplete={onComplete}
@@ -790,6 +845,12 @@ const OrderCard = ({
                 getTotalAddedQty={getTotalAddedQty}
                 getMergedParts={getMergedParts}
               />
+            </div>
+          )}
+
+          {status === "completed" && isOpen && order.items?.length > 0 && (
+            <div className="border-t border-gray-200 p-6 bg-gray-50">
+              <CompletedOrderItems order={order} />
             </div>
           )}
         </div>
@@ -814,7 +875,7 @@ const ExpandedOrderDetails = ({
   onSendRequest,
   requestLoading,
   onRefreshInventory,
-  acceptedOrders,
+  isOrderAccepted,      // ✅ boolean derived from order.progress
   onAccept,
   acceptLoading,
   onComplete,
@@ -824,7 +885,27 @@ const ExpandedOrderDetails = ({
 }) => {
   return (
     <div className="space-y-6">
-      {/* HEADER */}
+      {/* ORDER ITEMS SUMMARY */}
+      {order.items && order.items.length > 0 && (
+        <div className="bg-white border border-gray-200 rounded-xl p-4">
+          <p className="text-sm font-semibold text-gray-700 mb-3 uppercase tracking-wide">
+            Order Items
+          </p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            {order.items.map((item, idx) => (
+              <div
+                key={idx}
+                className="flex justify-between items-center bg-gray-50 border border-gray-200 rounded-lg px-3 py-2"
+              >
+                <span className="text-sm font-medium text-gray-800">{item.name}</span>
+                <span className="text-sm font-bold text-gray-900">× {item.quantity}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* HEADER ROW */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div className="flex flex-wrap items-center gap-3">
           <div className="flex items-center gap-2">
@@ -846,15 +927,14 @@ const ExpandedOrderDetails = ({
               const totalAdded = getTotalAddedQty(order);
               const isComplete = totalAdded === order.quantity;
               const isOver = totalAdded > order.quantity;
-
               return (
                 <span
                   className={`px-3 py-1 rounded-full text-xs font-medium ${
                     isComplete
                       ? "bg-green-50 text-green-700 border border-green-200"
                       : isOver
-                      ? "bg-red-50 text-red-700 border border-red-200"
-                      : "bg-yellow-50 text-yellow-700 border border-yellow-200"
+                        ? "bg-red-50 text-red-700 border border-red-200"
+                        : "bg-yellow-50 text-yellow-700 border border-yellow-200"
                   }`}
                 >
                   {totalAdded}
@@ -869,46 +949,36 @@ const ExpandedOrderDetails = ({
           className="bg-white hover:bg-gray-50 border border-gray-200 px-4 py-2 rounded-xl text-sm font-semibold text-gray-700 transition-all inline-flex items-center gap-2 w-full md:w-auto justify-center"
         >
           <Layers size={16} className="text-[#c62d23]" />
-          <span className="hidden sm:inline">Refresh Inventory</span>
+          <span className="hidden sm:inline">Expand Inventory</span>
           <span className="sm:hidden">Refresh</span>
         </button>
       </div>
 
-      {/* QUANTITY PROGRESS BAR */}
+      {/* PROGRESS BAR */}
       {(() => {
         const totalAdded = getTotalAddedQty(order);
         const percentage = Math.min((totalAdded / order.quantity) * 100, 100);
         const isComplete = totalAdded === order.quantity;
         const isOver = totalAdded > order.quantity;
-
         return (
           <div className="bg-white border border-gray-200 rounded-xl p-4">
             <div className="flex justify-between items-center mb-2">
               <span className="text-xs font-semibold text-gray-700">Quantity Progress</span>
-              <span
-                className={`text-xs font-bold ${
-                  isComplete ? "text-green-600" : isOver ? "text-red-600" : "text-yellow-600"
-                }`}
-              >
+              <span className={`text-xs font-bold ${isComplete ? "text-green-600" : isOver ? "text-red-600" : "text-yellow-600"}`}>
                 {totalAdded} / {order.quantity}
               </span>
             </div>
-
             <div className="w-full bg-gray-200 rounded-full h-2.5">
               <div
-                className={`h-2.5 rounded-full transition-all ${
-                  isComplete ? "bg-green-500" : isOver ? "bg-red-500" : "bg-yellow-500"
-                }`}
+                className={`h-2.5 rounded-full transition-all ${isComplete ? "bg-green-500" : isOver ? "bg-red-500" : "bg-yellow-500"}`}
                 style={{ width: `${percentage}%` }}
               />
             </div>
-
             {isOver && (
               <p className="text-xs text-red-600 mt-2 font-medium">
                 ⚠️ Excess quantity! Remove {totalAdded - order.quantity} units.
               </p>
             )}
-
             {!isComplete && !isOver && totalAdded > 0 && (
               <p className="text-xs text-yellow-600 mt-2 font-medium">
                 Add {order.quantity - totalAdded} more units to complete.
@@ -937,7 +1007,6 @@ const ExpandedOrderDetails = ({
                 <button
                   onClick={() => onRemoveItem(name)}
                   className="text-red-600 hover:bg-red-100 p-1.5 rounded-lg transition-colors"
-                  title="Remove"
                 >
                   <X size={14} />
                 </button>
@@ -947,21 +1016,16 @@ const ExpandedOrderDetails = ({
         </div>
       )}
 
-      {/* SEARCH BAR */}
-      <div>
-        <div className="relative">
-          <Search
-            size={16}
-            className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"
-          />
-          <input
-            type="text"
-            placeholder="Search products..."
-            value={inventorySearch || ""}
-            onChange={(e) => onSearchChange(e.target.value)}
-            className="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-xl bg-white text-sm focus:border-[#c62d23] focus:ring-2 focus:ring-[#c62d23]/20 transition-all outline-none"
-          />
-        </div>
+      {/* SEARCH */}
+      <div className="relative">
+        <Search size={16} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+        <input
+          type="text"
+          placeholder="Search products..."
+          value={inventorySearch || ""}
+          onChange={(e) => onSearchChange(e.target.value)}
+          className="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-xl bg-white text-sm focus:border-[#c62d23] focus:ring-2 focus:ring-[#c62d23]/20 transition-all outline-none"
+        />
       </div>
 
       {/* INVENTORY GRID */}
@@ -982,16 +1046,10 @@ const ExpandedOrderDetails = ({
               const searchTerm = (inventorySearch || "").toLowerCase();
               const filtered = Object.entries(grouped)
                 .map(([name, qty]) => {
-                  // Calculate remaining quantity after subtracting added items
                   const addedQty = addedItems?.[name.toLowerCase()] || 0;
-                  const remainingQty = qty - addedQty;
-                  return [name, remainingQty];
+                  return [name, qty - addedQty];
                 })
-                .filter(([name, remainingQty]) => {
-                  // Only show items with remaining quantity > 0 and matching search
-                  if (remainingQty <= 0) return false;
-                  return name.toLowerCase().includes(searchTerm);
-                })
+                .filter(([name, remainingQty]) => remainingQty > 0 && name.toLowerCase().includes(searchTerm))
                 .slice(0, 8);
 
               if (filtered.length === 0) {
@@ -1008,9 +1066,7 @@ const ExpandedOrderDetails = ({
                   className="bg-white border border-gray-200 rounded-xl p-3 hover:border-[#c62d23] transition-all"
                 >
                   <div className="flex items-center justify-between mb-2">
-                    <span className="text-xs font-semibold text-gray-700 capitalize truncate">
-                      {name}
-                    </span>
+                    <span className="text-xs font-semibold text-gray-700 capitalize truncate">{name}</span>
                     <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600">
                       {remainingQty}
                     </span>
@@ -1050,18 +1106,14 @@ const ExpandedOrderDetails = ({
             type="text"
             value={requestData?.partName || ""}
             placeholder="Part name"
-            onChange={(e) =>
-              onRequestDataChange({ ...requestData, partName: e.target.value })
-            }
+            onChange={(e) => onRequestDataChange({ ...requestData, partName: e.target.value })}
             className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:border-[#c62d23] focus:ring-2 focus:ring-[#c62d23]/20 transition-all outline-none"
           />
           <input
             type="number"
             value={requestData?.quantity || ""}
             placeholder="Qty"
-            onChange={(e) =>
-              onRequestDataChange({ ...requestData, quantity: Number(e.target.value) })
-            }
+            onChange={(e) => onRequestDataChange({ ...requestData, quantity: Number(e.target.value) })}
             className="w-full sm:w-24 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:border-[#c62d23] focus:ring-2 focus:ring-[#c62d23]/20 transition-all outline-none"
           />
           <button
@@ -1081,9 +1133,9 @@ const ExpandedOrderDetails = ({
         </div>
       </div>
 
-      {/* ACTION BUTTONS */}
+      {/* ✅ ACTION BUTTONS — driven by order.progress, not in-memory state */}
       <div className="flex gap-3 pt-2">
-        {!acceptedOrders[order._id] ? (
+        {!isOrderAccepted ? (
           <button
             onClick={onAccept}
             disabled={acceptLoading}
@@ -1118,3 +1170,32 @@ const ExpandedOrderDetails = ({
     </div>
   );
 };
+
+/* ================= COMPLETED ORDER ITEMS (read-only) ================= */
+const CompletedOrderItems = ({ order }) => (
+  <div className="space-y-4">
+    <p className="text-sm font-semibold text-gray-700 uppercase tracking-wide flex items-center gap-2">
+      <CheckCircle size={14} className="text-green-600" />
+      Order Items
+    </p>
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+      {order.items.map((item, idx) => (
+        <div
+          key={idx}
+          className="flex justify-between items-center bg-white border border-green-200 rounded-xl px-4 py-3"
+        >
+          <span className="text-sm font-medium text-gray-800">{item.name}</span>
+          <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-green-50 text-green-700 border border-green-200">
+            × {item.quantity}
+          </span>
+        </div>
+      ))}
+    </div>
+    {order.productionWorker && (
+      <p className="text-xs text-gray-500 flex items-center gap-1">
+        <UserCircle size={12} />
+        Produced by <span className="font-semibold text-gray-700 ml-1">{order.productionWorker}</span>
+      </p>
+    )}
+  </div>
+);
