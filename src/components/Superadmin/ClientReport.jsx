@@ -14,7 +14,7 @@ import Sidebar from "./sidebar";
 const normalise = (s = "") => s.trim().toLowerCase();
 
 export default function ClientsPage() {
-  const [orders, setOrders] = useState([]);
+  const [orders, setOrders] = useState([]); 
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [selectedProduct, setSelectedProduct] = useState("ALL");

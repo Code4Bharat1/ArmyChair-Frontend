@@ -17,6 +17,7 @@ import {
   X,
   Send,
   ChevronDown,
+  AlertCircle,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 
@@ -57,6 +58,7 @@ export default function ProductionOrdersPage() {
   const [activeTab, setActiveTab] = useState("All");
   const [inventorySearch, setInventorySearch] = useState({});
   const [addedItems, setAddedItems] = useState({});
+  const [itemWorkers, setItemWorkers] = useState({});
 
   /* ─── auth ─── */
   useEffect(() => {
@@ -68,15 +70,7 @@ export default function ProductionOrdersPage() {
   const fetchOrders = useCallback(async () => {
     try {
       const res = await axios.get(`${API}/orders`, { headers: hdrs() });
-
-      // Statuses that are still "active" in production workflow
-      const activeInProduction = [
-        "PRODUCTION_PENDING",
-        "PRODUCTION_IN_PROGRESS",
-      ];
-
-      // Statuses that mean production is done — keep these forever in the
-      // Completed tab even after the order moves to fitting / dispatch
+      const activeInProduction = ["PRODUCTION_PENDING", "PRODUCTION_IN_PROGRESS"];
       const productionDone = [
         "PRODUCTION_COMPLETED",
         "FITTING_IN_PROGRESS",
@@ -84,14 +78,12 @@ export default function ProductionOrdersPage() {
         "DISPATCHED",
         "DELIVERED",
       ];
-
       setOrders(
         (res.data.orders || []).filter(
           (o) =>
             o.orderType === "FULL" &&
-            (activeInProduction.includes(o.progress) ||
-              productionDone.includes(o.progress)),
-        ),
+            (activeInProduction.includes(o.progress) || productionDone.includes(o.progress))
+        )
       );
     } catch (e) {
       console.error(e);
@@ -105,18 +97,21 @@ export default function ProductionOrdersPage() {
   }, [fetchOrders]);
 
   /* ─── inventory ─── */
-  const fetchProductionInventory = async () => {
-    try {
-      const res = await axios.get(`${API}/inventory`, { headers: hdrs() });
-      setWorkerInventory({
-        ALL_PRODUCTION: (res.data.inventory || []).filter((i) =>
-          i.location.startsWith("PROD_"),
-        ),
-      });
-    } catch (e) {
-      console.error(e);
-    }
-  };
+ const fetchProductionInventory = async () => {
+  try {
+    const user = JSON.parse(localStorage.getItem("user") || "{}");
+    // ✅ Use the dedicated production endpoint
+    const res = await axios.get(
+      `${API}/inventory/production-stock?location=PROD_${user.name}`,
+      { headers: hdrs() }
+    );
+    setWorkerInventory({
+      ALL_PRODUCTION: res.data.inventory || [],
+    });
+  } catch (e) {
+    console.error(e);
+  }
+};
 
   /* ─── actions ─── */
   const setLoad = (key, val) => setActionLoading((p) => ({ ...p, [key]: val }));
@@ -136,7 +131,7 @@ export default function ProductionOrdersPage() {
           quantity: d.quantity,
           location: `PROD_${selectedWorkers[orderId] || "Mintoo"}`,
         },
-        { headers: hdrs() },
+        { headers: hdrs() }
       );
       toast.success("Material request sent to warehouse successfully");
       setRequestData((p) => ({ ...p, [orderId]: { partName: "", quantity: "" } }));
@@ -147,20 +142,47 @@ export default function ProductionOrdersPage() {
     }
   };
 
+  /* ─── 🔥 FIXED: assignWorker — no throw inside, proper try/catch ─── */
   const assignWorker = async (orderId) => {
-    if (!selectedWorkers[orderId]) return;
+    const order = orders.find((o) => o._id === orderId);
+    const map = itemWorkers[orderId];
+
+    if (!order) {
+      toast.error("Order not found");
+      return;
+    }
+
+    // Validate all items have a worker selected
+    if (!order.items || order.items.length === 0) {
+      toast.error("No items found in this order");
+      return;
+    }
+
+    const missingWorkers = order.items.filter((item) => !map?.[item.name]);
+    if (missingWorkers.length > 0) {
+      toast.error(
+        `Please assign workers to: ${missingWorkers.map((i) => i.name).join(", ")}`
+      );
+      return;
+    }
+
+    const assignments = order.items.map((item) => ({
+      product: item.name,
+      quantity: item.quantity,
+      worker: map[item.name],
+    }));
+
     setLoad(orderId + "_assign", true);
     try {
-      await axios.put(
-        `${API}/orders/${orderId}/assign-production`,
-        { workerName: selectedWorkers[orderId] },
-        { headers: hdrs() },
+      await axios.post(
+        `${API}/orders/${orderId}/assign-production-items`,
+        { assignments },
+        { headers: hdrs() }
       );
-      toast.success(`Worker ${selectedWorkers[orderId]} assigned successfully`);
-      setExpandedOrder(orderId);
+      toast.success("Workers assigned successfully!");
       fetchOrders();
     } catch (e) {
-      toast.error(e.response?.data?.message || "Failed to assign worker. Please try again.");
+      toast.error(e.response?.data?.message || "Assignment failed. Please try again.");
     } finally {
       setLoad(orderId + "_assign", false);
     }
@@ -181,7 +203,7 @@ export default function ProductionOrdersPage() {
     }
 
     const invalidParts = Object.entries(partsToValidate).filter(
-      ([name, qty]) => qty !== order.quantity,
+      ([name, qty]) => qty !== order.quantity
     );
 
     if (invalidParts.length > 0) {
@@ -197,7 +219,7 @@ export default function ProductionOrdersPage() {
             ))}
           </div>
         </div>,
-        { duration: 5000 },
+        { duration: 5000 }
       );
       return;
     }
@@ -207,7 +229,7 @@ export default function ProductionOrdersPage() {
       await axios.post(
         `${API}/orders/${orderId}/production-accept`,
         { parts },
-        { headers: hdrs() },
+        { headers: hdrs() }
       );
       setAddedItems((prev) => {
         const updated = { ...prev };
@@ -215,7 +237,7 @@ export default function ProductionOrdersPage() {
         return updated;
       });
       toast.success("Order accepted successfully!");
-      fetchOrders(); // ← after this, order.progress becomes PRODUCTION_IN_PROGRESS
+      fetchOrders();
     } catch (e) {
       toast.error(e.response?.data?.message || "Failed to accept order. Please try again.");
     } finally {
@@ -229,7 +251,7 @@ export default function ProductionOrdersPage() {
       await axios.patch(
         `${API}/orders/${orderId}/progress`,
         { progress: "PRODUCTION_COMPLETED" },
-        { headers: hdrs() },
+        { headers: hdrs() }
       );
       toast.success("Production completed successfully!");
       setAddedItems((prev) => {
@@ -285,7 +307,7 @@ export default function ProductionOrdersPage() {
         const removedQty = updated[orderId][partName];
         delete updated[orderId][partName];
         if (Object.keys(updated[orderId]).length === 0) delete updated[orderId];
-        if (removedQty) toast.success(`Removed ${removedQty} × ${partName} from production`);
+        if (removedQty) toast.success(`Removed ${removedQty} × ${partName}`);
       }
       return updated;
     });
@@ -300,13 +322,15 @@ export default function ProductionOrdersPage() {
     "DELIVERED",
   ];
 
+  const hasAssignment = (o) => o.productionAssignments?.length || o.productionWorker;
+
   const pending = orders.filter(
-    (o) => o.progress === "PRODUCTION_PENDING" && !o.productionWorker,
+    (o) => o.progress === "PRODUCTION_PENDING" && !hasAssignment(o)
   );
   const inProgress = orders.filter(
     (o) =>
-      (o.progress === "PRODUCTION_PENDING" && o.productionWorker) ||
-      o.progress === "PRODUCTION_IN_PROGRESS",
+      (o.progress === "PRODUCTION_PENDING" && hasAssignment(o)) ||
+      o.progress === "PRODUCTION_IN_PROGRESS"
   );
   const completed = orders.filter((o) => PRODUCTION_DONE.includes(o.progress));
 
@@ -314,25 +338,29 @@ export default function ProductionOrdersPage() {
     activeTab === "All"
       ? orders
       : activeTab === "Pending"
-        ? pending
-        : activeTab === "In Progress"
-          ? inProgress
-          : completed;
+      ? pending
+      : activeTab === "In Progress"
+      ? inProgress
+      : completed;
 
   const getStatus = (order) => {
     if (PRODUCTION_DONE.includes(order.progress)) return "completed";
-    if (order.progress === "PRODUCTION_IN_PROGRESS" || order.productionWorker)
-      return "inProgress";
+    if (order.progress === "PRODUCTION_IN_PROGRESS" || hasAssignment(order)) return "inProgress";
     return "pending";
   };
 
   const handleRowClick = (orderId) => {
-    const order = orders.find((o) => o._id === orderId);
-    const status = getStatus(order);
-    if (status === "inProgress" || (status === "completed" && order.items?.length > 0)) {
-      setExpandedOrder((prev) => (prev === orderId ? null : orderId));
-    }
-  };
+  const order = orders.find((o) => o._id === orderId);
+  if (order?.items && order.items.length > 0) {
+    setExpandedOrder((prev) => {
+      const isOpening = prev !== orderId;
+      if (isOpening) {
+        fetchProductionInventory(); // ✅ auto-fetch on expand
+      }
+      return isOpening ? orderId : null;
+    });
+  }
+};
 
   const getMergedParts = (order) => {
     const backendParts = order.productionParts || {};
@@ -351,16 +379,11 @@ export default function ProductionOrdersPage() {
     return Math.min(...quantities);
   };
 
-  /* ─── KEY FIX: derive accepted state from order.progress, not memory ─── */
-  // An order is "accepted" (parts confirmed, ready to mark complete) when
-  // progress === PRODUCTION_IN_PROGRESS  (set by the production-accept API)
-  // OR already moved past production entirely
   const isOrderAccepted = (order) =>
-    order.progress === "PRODUCTION_IN_PROGRESS" ||
-    PRODUCTION_DONE.includes(order.progress);
+    order.progress === "PRODUCTION_IN_PROGRESS" || PRODUCTION_DONE.includes(order.progress);
 
   return (
-    <div className="flex min-h-screen bg-gray-50 text-gray-900">
+    <div className="flex min-h-screen bg-[#f5f5f5] text-gray-900">
       <Toaster
         position="top-right"
         toastOptions={{
@@ -372,7 +395,7 @@ export default function ProductionOrdersPage() {
             padding: "12px 16px",
             borderRadius: "12px",
             fontSize: "14px",
-            boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)",
+            boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1)",
           },
           success: { iconTheme: { primary: "#10b981", secondary: "#fff" } },
           error: {
@@ -383,124 +406,144 @@ export default function ProductionOrdersPage() {
       />
 
       <div className="flex-1 overflow-auto">
-        {/* HEADER */}
-        <div className="sticky top-0 z-10 bg-white/80 backdrop-blur border-b border-gray-200 shadow-sm">
+        {/* ═══════════════ HEADER ═══════════════ */}
+        <div className="sticky top-0 z-20 bg-white border-b border-gray-200 shadow-sm">
           {/* Desktop */}
-          <div className="hidden md:block p-6">
+          <div className="hidden md:block px-8 py-5">
             <div className="flex items-center justify-between">
-              <div>
-                <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-2">
-                  <Package size={32} className="text-[#c62d23]" />
-                  <span>Production Management</span>
-                </h1>
-                <p className="text-sm text-gray-600 mt-1">
-                  Manage production workflow and inventory
-                </p>
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-[#c62d23] rounded-xl flex items-center justify-center">
+                  <Package size={20} className="text-white" />
+                </div>
+                <div>
+                  <h1 className="text-xl font-bold text-gray-900 leading-tight">
+                    Production Management
+                  </h1>
+                  <p className="text-xs text-gray-500">Manage workflow and inventory</p>
+                </div>
               </div>
               <button
                 onClick={() => router.push("/profile")}
-                title="My Profile"
-                className="text-gray-600 hover:text-[#c62d23] transition"
+                className="w-9 h-9 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-gray-600 hover:text-[#c62d23] transition"
               >
-                <UserCircle size={34} />
+                <UserCircle size={20} />
               </button>
             </div>
           </div>
 
-          {/* Mobile */}
-          <div className="md:hidden p-4">
-            <div className="flex items-center justify-between mb-3">
-              <h1 className="text-xl font-bold text-gray-900 flex items-center gap-2">
-                <Package size={24} className="text-[#c62d23]" />
-                <span>Production</span>
-              </h1>
+          {/* ─── Mobile Header ─── */}
+          <div className="md:hidden">
+            {/* Top bar */}
+            <div className="flex items-center justify-between px-4 pt-4 pb-3">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 bg-[#c62d23] rounded-lg flex items-center justify-center">
+                  <Package size={15} className="text-white" />
+                </div>
+                <span className="text-base font-bold text-gray-900 tracking-tight">
+                  Production
+                </span>
+              </div>
               <button
                 onClick={() => router.push("/profile")}
-                className="text-gray-600 hover:text-[#c62d23] transition p-2"
+                className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-gray-500"
               >
-                <UserCircle size={28} />
+                <UserCircle size={17} />
               </button>
             </div>
-            <div className="grid grid-cols-3 gap-2">
-              <div className="bg-red-50 border border-red-200 p-2 rounded-lg text-center">
-                <div className="text-xs text-red-600 font-medium">Pending</div>
-                <div className="text-lg font-bold text-red-700">{pending.length}</div>
-              </div>
-              <div className="bg-blue-50 border border-blue-200 p-2 rounded-lg text-center">
-                <div className="text-xs text-blue-600 font-medium">Progress</div>
-                <div className="text-lg font-bold text-blue-700">{inProgress.length}</div>
-              </div>
-              <div className="bg-green-50 border border-green-200 p-2 rounded-lg text-center">
-                <div className="text-xs text-green-600 font-medium">Done</div>
-                <div className="text-lg font-bold text-green-700">{completed.length}</div>
-              </div>
+
+            {/* Stat chips */}
+            <div className="flex gap-2 px-4 pb-3 overflow-x-auto">
+              {[
+                { label: "Pending", count: pending.length, color: "red", tab: "Pending" },
+                { label: "In Progress", count: inProgress.length, color: "blue", tab: "In Progress" },
+                { label: "Completed", count: completed.length, color: "green", tab: "Completed" },
+              ].map(({ label, count, color, tab }) => {
+                const colorMap = {
+                  red: activeTab === tab
+                    ? "bg-red-600 text-white"
+                    : "bg-red-50 text-red-700 border border-red-200",
+                  blue: activeTab === tab
+                    ? "bg-blue-600 text-white"
+                    : "bg-blue-50 text-blue-700 border border-blue-200",
+                  green: activeTab === tab
+                    ? "bg-green-600 text-white"
+                    : "bg-green-50 text-green-700 border border-green-200",
+                };
+                return (
+                  <button
+                    key={tab}
+                    onClick={() => setActiveTab(tab)}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-all ${colorMap[color]}`}
+                  >
+                    <span className="font-bold">{count}</span>
+                    <span>{label}</span>
+                  </button>
+                );
+              })}
             </div>
           </div>
         </div>
 
-        {/* BODY */}
-        <div className="p-4 md:p-8 space-y-4 md:space-y-8">
+        {/* ═══════════════ BODY ═══════════════ */}
+        <div className="p-4 md:p-8 space-y-4 md:space-y-6">
           {loading ? (
-            <div className="p-8 text-center">
-              <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-[#c62d23]"></div>
-              <p className="mt-2 text-gray-500">Loading orders...</p>
+            <div className="flex flex-col items-center justify-center py-20 gap-3">
+              <div className="w-10 h-10 border-2 border-[#c62d23] border-t-transparent rounded-full animate-spin" />
+              <p className="text-sm text-gray-500 font-medium">Loading orders...</p>
             </div>
           ) : (
             <>
-              {/* STATS - Desktop Only */}
-              <div className="hidden md:grid grid-cols-1 md:grid-cols-3 gap-6">
-                <StatCard
-                  title="Pending"
-                  value={pending.length}
-                  icon={<Clock className="text-[#c62d23]" />}
-                  onClick={() => setActiveTab("Pending")}
-                  active={activeTab === "Pending"}
-                />
-                <StatCard
-                  title="In Progress"
-                  value={inProgress.length}
-                  icon={<TrendingUp className="text-[#c62d23]" />}
-                  onClick={() => setActiveTab("In Progress")}
-                  active={activeTab === "In Progress"}
-                />
-                <StatCard
-                  title="Completed"
-                  value={completed.length}
-                  icon={<Scissors className="text-[#c62d23]" />}
-                  onClick={() => setActiveTab("Completed")}
-                  active={activeTab === "Completed"}
-                />
+              {/* Desktop Stats */}
+              <div className="hidden md:grid grid-cols-3 gap-4">
+                {[
+                  { title: "Pending", value: pending.length, icon: <Clock size={18} />, tab: "Pending", color: "#ef4444" },
+                  { title: "In Progress", value: inProgress.length, icon: <TrendingUp size={18} />, tab: "In Progress", color: "#3b82f6" },
+                  { title: "Completed", value: completed.length, icon: <Scissors size={18} />, tab: "Completed", color: "#10b981" },
+                ].map(({ title, value, icon, tab, color }) => (
+                  <button
+                    key={tab}
+                    onClick={() => setActiveTab(tab)}
+                    className={`bg-white border rounded-2xl p-5 text-left transition-all hover:shadow-md ${
+                      activeTab === tab ? "ring-2 ring-[#c62d23] border-transparent" : "border-gray-200"
+                    }`}
+                  >
+                    <div className="flex items-center justify-between mb-3">
+                      <span className="text-sm font-semibold text-gray-600">{title}</span>
+                      <span style={{ color }}>{icon}</span>
+                    </div>
+                    <p className="text-3xl font-bold text-gray-900">{value}</p>
+                  </button>
+                ))}
               </div>
 
-              {/* FILTER TABS */}
-              <div className="flex gap-2 bg-white rounded-xl p-1 border border-gray-200 shadow-sm overflow-x-auto">
-                {ALL_TABS.map((tab) => {
-                  const active = activeTab === tab;
-                  return (
-                    <button
-                      key={tab}
-                      onClick={() => setActiveTab(tab)}
-                      className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all whitespace-nowrap ${
-                        active
-                          ? "bg-[#c62d23] text-white shadow-sm"
-                          : "text-gray-600 hover:bg-gray-50"
-                      }`}
-                    >
-                      {tab}
-                    </button>
-                  );
-                })}
+              {/* Tab Bar */}
+              <div className="flex gap-1.5 bg-white rounded-xl p-1 border border-gray-200 shadow-sm overflow-x-auto">
+                {ALL_TABS.map((tab) => (
+                  <button
+                    key={tab}
+                    onClick={() => setActiveTab(tab)}
+                    className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all whitespace-nowrap flex-shrink-0 ${
+                      activeTab === tab
+                        ? "bg-[#c62d23] text-white shadow-sm"
+                        : "text-gray-500 hover:bg-gray-50"
+                    }`}
+                  >
+                    {tab}
+                  </button>
+                ))}
               </div>
 
-              {/* ORDERS */}
+              {/* Orders */}
               {visibleOrders.length === 0 ? (
-                <div className="text-center text-gray-500 py-16">
-                  <Package size={48} className="mx-auto mb-4 text-gray-300" />
-                  <p className="text-lg font-medium">No orders in this category</p>
+                <div className="flex flex-col items-center justify-center py-16 gap-3">
+                  <div className="w-14 h-14 bg-gray-100 rounded-2xl flex items-center justify-center">
+                    <Package size={24} className="text-gray-400" />
+                  </div>
+                  <p className="text-sm font-semibold text-gray-500">No orders in this category</p>
                 </div>
               ) : (
                 <div className="space-y-3">
-                  {visibleOrders.map((order, index) => {
+                  {visibleOrders.map((order) => {
                     const status = getStatus(order);
                     const isOpen = expandedOrder === order._id;
                     const isPending = status === "pending";
@@ -521,7 +564,6 @@ export default function ProductionOrdersPage() {
                         }
                         onAssign={() => assignWorker(order._id)}
                         assignLoading={actionLoading[order._id + "_assign"]}
-                        index={index}
                         workerInventory={workerInventory}
                         addedItems={addedItems[order._id]}
                         inventorySearch={inventorySearch[order._id]}
@@ -541,7 +583,6 @@ export default function ProductionOrdersPage() {
                         onSendRequest={() => sendInventoryRequest(order._id)}
                         requestLoading={actionLoading[order._id + "_req"]}
                         onRefreshInventory={fetchProductionInventory}
-                        // ✅ FIX: derive from order.progress, not in-memory state
                         isOrderAccepted={isOrderAccepted(order)}
                         onAccept={() => acceptOrder(order._id, addedItems[order._id] || {})}
                         acceptLoading={actionLoading[order._id + "_accept"]}
@@ -549,6 +590,8 @@ export default function ProductionOrdersPage() {
                         completeLoading={actionLoading[order._id + "_complete"]}
                         getTotalAddedQty={getTotalAddedQty}
                         getMergedParts={getMergedParts}
+                        itemWorkers={itemWorkers}
+                        setItemWorkers={setItemWorkers}
                       />
                     );
                   })}
@@ -562,147 +605,174 @@ export default function ProductionOrdersPage() {
   );
 }
 
-/* ================= STAT CARD ================= */
-const StatCard = ({ title, value, icon, onClick, active }) => (
-  <div
-    onClick={onClick}
-    className={`bg-white border rounded-2xl p-6 transition-all duration-200 shadow-sm hover:shadow-md flex flex-col justify-between h-full cursor-pointer ${
-      active ? "ring-2 ring-[#c62d23]" : ""
-    } hover:border-[#c62d23]`}
-    style={{ borderLeft: "4px solid #c62d23" }}
-  >
-    <div className="flex justify-between items-start mb-4">
-      <p className="text-sm text-gray-600 font-medium">{title}</p>
-      {React.cloneElement(icon, { size: 24 })}
-    </div>
-    <p className="text-3xl font-bold text-gray-900 mb-1">{value}</p>
-    <div className="mt-2 text-xs text-gray-500 flex items-center gap-1">
-      <span>{active ? "Click to show all" : "Click to view details"}</span>
-      <span className="text-[#c62d23]">→</span>
-    </div>
-  </div>
-);
+/* ═══════════════════════════════════════════
+   STATUS BADGE
+═══════════════════════════════════════════ */
+const StatusBadge = ({ status }) => {
+  const styles = {
+    completed: "bg-emerald-50 text-emerald-700 border border-emerald-200",
+    inProgress: "bg-blue-50 text-blue-700 border border-blue-200",
+    pending: "bg-orange-50 text-orange-700 border border-orange-200",
+  };
+  const labels = {
+    completed: "Completed",
+    inProgress: "In Progress",
+    pending: "Pending",
+  };
+  return (
+    <span className={`px-2.5 py-1 rounded-full text-xs font-semibold tracking-wide ${styles[status]}`}>
+      {labels[status]}
+    </span>
+  );
+};
 
-/* ================= ORDER CARD ================= */
+/* ═══════════════════════════════════════════
+   ORDER CARD
+═══════════════════════════════════════════ */
 const OrderCard = ({
-  order,
-  status,
-  isOpen,
-  isPending,
-  isInProg,
-  onToggle,
-  selectedWorker,
-  onWorkerChange,
-  onAssign,
-  assignLoading,
-  index,
-  workerInventory,
-  addedItems,
-  inventorySearch,
-  onSearchChange,
-  acceptQty,
-  onQtyChange,
-  onAddItem,
-  onRemoveItem,
-  requestData,
-  onRequestDataChange,
-  onSendRequest,
-  requestLoading,
-  onRefreshInventory,
-  isOrderAccepted,      // ✅ renamed from acceptedOrders
-  onAccept,
-  acceptLoading,
-  onComplete,
-  completeLoading,
-  getTotalAddedQty,
-  getMergedParts,
+  order, status, isOpen, isPending, isInProg, onToggle,
+  selectedWorker, onWorkerChange, onAssign, assignLoading,
+  workerInventory, addedItems, inventorySearch, onSearchChange,
+  acceptQty, onQtyChange, onAddItem, onRemoveItem,
+  requestData, onRequestDataChange, onSendRequest, requestLoading,
+  onRefreshInventory, isOrderAccepted, onAccept, acceptLoading,
+  onComplete, completeLoading, getTotalAddedQty, getMergedParts,
+  itemWorkers, setItemWorkers,
 }) => {
+  const workerDisplay = order.productionAssignments?.length
+    ? [...new Set(order.productionAssignments.map((a) => a.worker))].join(", ")
+    : order.productionWorker || null;
+
   return (
     <>
-      {/* MOBILE */}
-      <div className="md:hidden bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-        <div className="p-4 space-y-3">
+      {/* ─── MOBILE ─── */}
+      <div className="md:hidden bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+        {/* Card Header */}
+        <div className="px-4 pt-4 pb-3 space-y-3">
+          {/* Row 1: Order ID + Status */}
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-xs text-gray-500 font-medium">Order ID</p>
-              <p className="font-bold text-gray-900">{order.orderId}</p>
+              <p className="text-[10px] text-gray-400 font-semibold uppercase tracking-wider mb-0.5">
+                Order ID
+              </p>
+              <p className="text-sm font-bold text-gray-900">{order.orderId}</p>
             </div>
-            <span
-              className={`px-3 py-1 rounded-full text-xs font-medium ${
-                status === "completed"
-                  ? "bg-green-50 text-green-700 border border-green-200"
-                  : status === "inProgress"
-                    ? "bg-blue-50 text-blue-700 border border-blue-200"
-                    : "bg-red-50 text-red-700 border border-red-200"
-              }`}
-            >
-              {status === "completed" ? "Completed" : status === "inProgress" ? "In Progress" : "Pending"}
-            </span>
+            <StatusBadge status={status} />
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <p className="text-xs text-gray-500 font-medium">Chair Model</p>
-              <p className="font-medium text-gray-900 truncate">{getOrderItemLabel(order)}</p>
+          {/* Row 2: Product + Qty */}
+          <div className="flex items-start justify-between gap-3 bg-gray-50 rounded-xl px-3 py-2.5">
+            <div className="flex-1 min-w-0">
+              <p className="text-[10px] text-gray-400 font-semibold uppercase tracking-wider mb-0.5">
+                Product
+              </p>
+              <p className="text-sm font-semibold text-gray-900 truncate">
+                {getOrderItemLabel(order)}
+              </p>
             </div>
-            <div>
-              <p className="text-xs text-gray-500 font-medium">Quantity</p>
-              <p className="font-bold text-gray-900">{getOrderTotalQty(order)}</p>
+            <div className="text-right flex-shrink-0">
+              <p className="text-[10px] text-gray-400 font-semibold uppercase tracking-wider mb-0.5">
+                Qty
+              </p>
+              <p className="text-sm font-bold text-[#c62d23]">
+                {getOrderTotalQty(order)}
+              </p>
             </div>
           </div>
 
-          <div>
-            <p className="text-xs text-gray-500 font-medium mb-1">Worker</p>
-            {order.productionWorker ? (
-              <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium bg-blue-50 text-blue-700 border border-blue-200">
-                <UserCircle size={12} />
-                {order.productionWorker}
-              </span>
-            ) : (
-              <span className="text-gray-400 text-xs">Not assigned</span>
+          {/* Row 3: Worker */}
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-[10px] text-gray-400 font-semibold uppercase tracking-wider mb-0.5">
+                Worker
+              </p>
+              {workerDisplay ? (
+                <span className="inline-flex items-center gap-1 text-xs font-semibold text-blue-700">
+                  <UserCircle size={12} />
+                  {workerDisplay}
+                </span>
+              ) : (
+                <span className="text-xs text-gray-400 italic">Not assigned</span>
+              )}
+            </div>
+            {order.remark && (
+              <div className="text-right max-w-[55%]">
+                <p className="text-[10px] text-gray-400 font-semibold uppercase tracking-wider mb-0.5">
+                  Remark
+                </p>
+                <p className="text-xs text-gray-600 truncate">{order.remark}</p>
+              </div>
             )}
           </div>
 
-          <div>
-            <p className="text-xs text-gray-500 font-medium">Remark</p>
-            <p className="text-sm text-gray-800 truncate">{order.remark || "—"}</p>
-          </div>
-
-          {isPending && (
-            <div className="flex gap-2">
-              <select
-                value={selectedWorker || ""}
-                onChange={(e) => onWorkerChange(e.target.value)}
-                className="flex-1 px-3 py-2 text-sm border border-gray-200 rounded-lg bg-white text-gray-700 focus:border-[#c62d23] focus:ring-2 focus:ring-[#c62d23]/20 transition-all outline-none"
-              >
-                <option value="">Select Worker</option>
-                {WORKERS.map((w) => (
-                  <option key={w} value={w}>{w}</option>
-                ))}
-              </select>
+          {/* ─── Pending: assign workers per item ─── */}
+          {isPending && order.items?.length > 0 && (
+            <div className="border border-orange-200 bg-orange-50 rounded-xl p-3 space-y-2">
+              <p className="text-xs font-bold text-orange-800 uppercase tracking-wide flex items-center gap-1.5">
+                <AlertCircle size={12} />
+                Assign Workers to Each Product
+              </p>
+              {order.items.map((item) => (
+                <div key={item.name} className="flex items-center gap-2">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-semibold text-gray-800 truncate">{item.name}</p>
+                    <p className="text-[10px] text-gray-500">Qty: {item.quantity}</p>
+                  </div>
+                  <select
+                    value={itemWorkers?.[order._id]?.[item.name] || ""}
+                    onChange={(e) =>
+                      setItemWorkers((prev) => ({
+                        ...prev,
+                        [order._id]: {
+                          ...(prev[order._id] || {}),
+                          [item.name]: e.target.value,
+                        },
+                      }))
+                    }
+                    className="w-28 px-2 py-1.5 text-xs border border-gray-200 rounded-lg bg-white focus:border-[#c62d23] outline-none"
+                  >
+                    <option value="">Worker</option>
+                    {WORKERS.map((w) => (
+                      <option key={w} value={w}>{w}</option>
+                    ))}
+                  </select>
+                </div>
+              ))}
               <button
                 onClick={onAssign}
-                disabled={!selectedWorker || assignLoading}
-                className="bg-[#c62d23] hover:bg-[#a82419] disabled:bg-gray-300 text-white px-4 py-2 rounded-lg text-sm font-semibold transition-all disabled:cursor-not-allowed"
+                disabled={assignLoading}
+                className="w-full mt-1 bg-[#c62d23] hover:bg-[#a82419] disabled:bg-gray-300 text-white py-2 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5"
               >
-                {assignLoading ? <Loader2 size={16} className="animate-spin" /> : "Assign"}
+                {assignLoading ? (
+                  <Loader2 size={13} className="animate-spin" />
+                ) : (
+                  <>
+                    <CheckCircle size={13} />
+                    Confirm Assignment
+                  </>
+                )}
               </button>
             </div>
           )}
 
-          {(isInProg || status === "completed") && order.items?.length > 0 && (
+          {/* View Items Button */}
+          {order.items?.length > 0 && (
             <button
               onClick={(e) => { e.stopPropagation(); onToggle(); }}
-              className="w-full flex items-center justify-center gap-2 text-[#c62d23] hover:bg-red-50 py-2 rounded-lg text-sm font-semibold transition-all"
+              className="w-full flex items-center justify-center gap-1.5 text-[#c62d23] bg-red-50 hover:bg-red-100 py-2 rounded-xl text-xs font-bold transition-all"
             >
-              {isOpen ? "Close Details" : "View Items"}
-              <ChevronDown size={16} className={`transition-transform ${isOpen ? "rotate-180" : ""}`} />
+              {isOpen ? "Hide Details" : "View Details"}
+              <ChevronDown
+                size={14}
+                className={`transition-transform duration-200 ${isOpen ? "rotate-180" : ""}`}
+              />
             </button>
           )}
         </div>
 
-        {isInProg && isOpen && (
-          <div className="border-t border-gray-200 p-4 bg-gray-50">
+        {/* Expanded Panel */}
+        {isOpen && (
+          <div className="border-t border-gray-100 p-4 bg-gray-50">
             <ExpandedOrderDetails
               order={order}
               workerInventory={workerInventory}
@@ -725,466 +795,365 @@ const OrderCard = ({
               completeLoading={completeLoading}
               getTotalAddedQty={getTotalAddedQty}
               getMergedParts={getMergedParts}
+              itemWorkers={itemWorkers}
+              setItemWorkers={setItemWorkers}
             />
-          </div>
-        )}
-
-        {status === "completed" && isOpen && order.items?.length > 0 && (
-          <div className="border-t border-gray-200 p-4 bg-gray-50">
-            <CompletedOrderItems order={order} />
           </div>
         )}
       </div>
 
-      {/* DESKTOP */}
-      <div className="hidden md:block">
-        <div className="bg-white border border-gray-200 shadow-sm rounded-2xl overflow-hidden">
-          <div
-            onClick={(isInProg || (status === "completed" && order.items?.length > 0)) ? onToggle : undefined}
-            className={`${(isInProg || (status === "completed" && order.items?.length > 0)) ? "cursor-pointer hover:bg-gray-50" : ""} transition-colors`}
-          >
-            <div className="grid grid-cols-8 gap-4 p-4 items-center">
-              <div>
-                <p className="text-xs text-gray-500 font-medium mb-1">Order ID</p>
-                <p className="text-sm font-semibold text-gray-900">{order.orderId}</p>
-              </div>
-              <div>
-                <p className="text-xs text-gray-500 font-medium mb-1">Chair Model</p>
-                <p className="font-medium text-gray-900">{getOrderItemLabel(order)}</p>
-              </div>
-              <div>
-                <p className="text-xs text-gray-500 font-medium mb-1">Remark</p>
-                <p className="text-sm text-gray-800 truncate max-w-[160px]">{order.remark || "—"}</p>
-              </div>
-              <div>
-                <p className="text-xs text-gray-500 font-medium mb-1">Quantity</p>
-                <p className="font-semibold text-gray-900">{getOrderTotalQty(order)}</p>
-              </div>
-              <div>
-                <p className="text-xs text-gray-500 font-medium mb-1">Worker</p>
-                {order.productionWorker ? (
-                  <span className="px-3 py-1 rounded-full text-xs font-medium bg-blue-50 text-blue-700 border border-blue-200 inline-flex items-center gap-1">
-                    <UserCircle size={12} />
-                    {order.productionWorker}
-                  </span>
-                ) : (
-                  <span className="text-gray-400 text-xs">Not assigned</span>
-                )}
-              </div>
-              <div>
-                <p className="text-xs text-gray-500 font-medium mb-1">Status</p>
-                <span
-                  className={`px-3 py-1 rounded-full text-xs font-medium ${
-                    status === "completed"
-                      ? "bg-green-50 text-green-700 border border-green-200"
-                      : status === "inProgress"
-                        ? "bg-blue-50 text-blue-700 border border-blue-200"
-                        : "bg-red-50 text-red-700 border border-red-200"
-                  }`}
-                >
-                  {status === "completed" ? "Completed" : status === "inProgress" ? "In Progress" : "Pending"}
-                </span>
-              </div>
-              <div onClick={(e) => e.stopPropagation()}>
-                {isPending && (
-                  <div className="flex gap-2">
+      {/* ─── DESKTOP ─── */}
+      <div className="hidden md:block bg-white border border-gray-200 shadow-sm rounded-2xl overflow-hidden">
+        <div
+          onClick={order.items?.length > 0 ? onToggle : undefined}
+          className={`grid grid-cols-8 gap-4 p-4 items-center transition-colors ${
+            order.items?.length > 0 ? "cursor-pointer hover:bg-gray-50" : ""
+          }`}
+        >
+          <div>
+            <p className="text-[10px] text-gray-400 font-semibold uppercase tracking-wider mb-1">Order ID</p>
+            <p className="text-sm font-semibold text-gray-900">{order.orderId}</p>
+          </div>
+          <div>
+            <p className="text-[10px] text-gray-400 font-semibold uppercase tracking-wider mb-1">Chair Model</p>
+            <p className="text-sm font-medium text-gray-900">{getOrderItemLabel(order)}</p>
+          </div>
+          <div>
+            <p className="text-[10px] text-gray-400 font-semibold uppercase tracking-wider mb-1">Remark</p>
+            <p className="text-sm text-gray-700 truncate max-w-[160px]">{order.remark || "—"}</p>
+          </div>
+          <div>
+            <p className="text-[10px] text-gray-400 font-semibold uppercase tracking-wider mb-1">Quantity</p>
+            <p className="text-sm font-bold text-gray-900">{getOrderTotalQty(order)}</p>
+          </div>
+          <div>
+            <p className="text-[10px] text-gray-400 font-semibold uppercase tracking-wider mb-1">Worker</p>
+            {workerDisplay ? (
+              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-200">
+                <UserCircle size={11} />
+                {workerDisplay}
+              </span>
+            ) : (
+              <span className="text-gray-400 text-xs italic">Not assigned</span>
+            )}
+          </div>
+          <div>
+            <p className="text-[10px] text-gray-400 font-semibold uppercase tracking-wider mb-1">Status</p>
+            <StatusBadge status={status} />
+          </div>
+
+          <div className="col-span-2" onClick={(e) => e.stopPropagation()}>
+            {isPending && order.items?.length > 0 && (
+              <div className="space-y-2 border border-orange-200 bg-orange-50 rounded-xl p-3">
+                <p className="text-[10px] font-bold text-orange-700 uppercase tracking-wide">
+                  Assign Workers
+                </p>
+                {order.items.map((item) => (
+                  <div key={item.name} className="flex items-center gap-2">
+                    <span className="text-xs text-gray-700 truncate flex-1">{item.name}</span>
                     <select
-                      value={selectedWorker || ""}
-                      onChange={(e) => onWorkerChange(e.target.value)}
-                      className="flex-1 px-3 py-1.5 text-xs border border-gray-200 rounded-lg bg-white text-gray-700 focus:border-[#c62d23] focus:ring-2 focus:ring-[#c62d23]/20 transition-all outline-none"
+                      value={itemWorkers?.[order._id]?.[item.name] || ""}
+                      onChange={(e) =>
+                        setItemWorkers((prev) => ({
+                          ...prev,
+                          [order._id]: {
+                            ...(prev[order._id] || {}),
+                            [item.name]: e.target.value,
+                          },
+                        }))
+                      }
+                      className="px-2 py-1 text-xs border border-gray-200 rounded-lg bg-white focus:border-[#c62d23] outline-none"
                     >
-                      <option value="">Select Worker</option>
+                      <option value="">Worker</option>
                       {WORKERS.map((w) => (
                         <option key={w} value={w}>{w}</option>
                       ))}
                     </select>
-                    <button
-                      onClick={onAssign}
-                      disabled={!selectedWorker || assignLoading}
-                      className="bg-[#c62d23] hover:bg-[#a82419] disabled:bg-gray-300 text-white px-4 py-1.5 rounded-lg text-xs font-semibold transition-all disabled:cursor-not-allowed"
-                    >
-                      {assignLoading ? <Loader2 size={14} className="animate-spin" /> : "Assign"}
-                    </button>
                   </div>
-                )}
-                {(isInProg || status === "completed") && order.items?.length > 0 && (
-                  <button
-                    onClick={onToggle}
-                    className="text-[#c62d23] hover:bg-red-50 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all inline-flex items-center gap-1"
-                  >
-                    {isOpen ? "Close" : "View Items"}
-                    <ChevronDown size={14} className={`transition-transform ${isOpen ? "rotate-180" : ""}`} />
-                  </button>
-                )}
+                ))}
+                <button
+                  onClick={onAssign}
+                  disabled={assignLoading}
+                  className="w-full bg-[#c62d23] hover:bg-[#a82419] disabled:bg-gray-300 text-white py-1.5 rounded-lg text-xs font-bold transition-all"
+                >
+                  {assignLoading ? <Loader2 size={12} className="animate-spin mx-auto" /> : "Assign All"}
+                </button>
               </div>
-            </div>
+            )}
+            {order.items?.length > 0 && (
+              <button
+                onClick={onToggle}
+                className="mt-2 w-full text-[#c62d23] hover:bg-red-50 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all inline-flex items-center justify-center gap-1"
+              >
+                {isOpen ? "Close" : "View Items"}
+                <ChevronDown size={13} className={`transition-transform ${isOpen ? "rotate-180" : ""}`} />
+              </button>
+            )}
           </div>
-
-          {isInProg && isOpen && (
-            <div className="border-t border-gray-200 p-6 bg-gray-50">
-              <ExpandedOrderDetails
-                order={order}
-                workerInventory={workerInventory}
-                addedItems={addedItems}
-                inventorySearch={inventorySearch}
-                onSearchChange={onSearchChange}
-                acceptQty={acceptQty}
-                onQtyChange={onQtyChange}
-                onAddItem={onAddItem}
-                onRemoveItem={onRemoveItem}
-                requestData={requestData}
-                onRequestDataChange={onRequestDataChange}
-                onSendRequest={onSendRequest}
-                requestLoading={requestLoading}
-                onRefreshInventory={onRefreshInventory}
-                isOrderAccepted={isOrderAccepted}
-                onAccept={onAccept}
-                acceptLoading={acceptLoading}
-                onComplete={onComplete}
-                completeLoading={completeLoading}
-                getTotalAddedQty={getTotalAddedQty}
-                getMergedParts={getMergedParts}
-              />
-            </div>
-          )}
-
-          {status === "completed" && isOpen && order.items?.length > 0 && (
-            <div className="border-t border-gray-200 p-6 bg-gray-50">
-              <CompletedOrderItems order={order} />
-            </div>
-          )}
         </div>
+
+        {isOpen && (
+          <div className="border-t border-gray-200 p-6 bg-gray-50">
+            <ExpandedOrderDetails
+              order={order}
+              workerInventory={workerInventory}
+              addedItems={addedItems}
+              inventorySearch={inventorySearch}
+              onSearchChange={onSearchChange}
+              acceptQty={acceptQty}
+              onQtyChange={onQtyChange}
+              onAddItem={onAddItem}
+              onRemoveItem={onRemoveItem}
+              requestData={requestData}
+              onRequestDataChange={onRequestDataChange}
+              onSendRequest={onSendRequest}
+              requestLoading={requestLoading}
+              onRefreshInventory={onRefreshInventory}
+              isOrderAccepted={isOrderAccepted}
+              onAccept={onAccept}
+              acceptLoading={acceptLoading}
+              onComplete={onComplete}
+              completeLoading={completeLoading}
+              getTotalAddedQty={getTotalAddedQty}
+              getMergedParts={getMergedParts}
+              itemWorkers={itemWorkers}
+              setItemWorkers={setItemWorkers}
+            />
+          </div>
+        )}
       </div>
     </>
   );
 };
 
-/* ================= EXPANDED ORDER DETAILS ================= */
+/* ═══════════════════════════════════════════
+   EXPANDED ORDER DETAILS
+═══════════════════════════════════════════ */
 const ExpandedOrderDetails = ({
-  order,
-  workerInventory,
-  addedItems,
-  inventorySearch,
-  onSearchChange,
-  acceptQty,
-  onQtyChange,
-  onAddItem,
-  onRemoveItem,
-  requestData,
-  onRequestDataChange,
-  onSendRequest,
-  requestLoading,
-  onRefreshInventory,
-  isOrderAccepted,      // ✅ boolean derived from order.progress
-  onAccept,
-  acceptLoading,
-  onComplete,
-  completeLoading,
-  getTotalAddedQty,
-  getMergedParts,
+  order, workerInventory, addedItems, inventorySearch, onSearchChange,
+  acceptQty, onQtyChange, onAddItem, onRemoveItem,
+  requestData, onRequestDataChange, onSendRequest, requestLoading,
+  onRefreshInventory, isOrderAccepted, onAccept, acceptLoading,
+  onComplete, completeLoading, getTotalAddedQty, getMergedParts,
+  itemWorkers, setItemWorkers,
 }) => {
+
+  const PRODUCTION_DONE = [
+    "PRODUCTION_COMPLETED", "FITTING_IN_PROGRESS", "FITTING_COMPLETED",
+    "DISPATCHED", "DELIVERED",
+  ];
+  const isFullyDone = PRODUCTION_DONE.includes(order.progress);
+
   return (
-    <div className="space-y-6">
-      {/* ORDER ITEMS SUMMARY */}
-      {order.items && order.items.length > 0 && (
+    <div className="space-y-5">
+      {/* Order Items Summary — always visible */}
+      {order.items?.length > 0 && (
         <div className="bg-white border border-gray-200 rounded-xl p-4">
-          <p className="text-sm font-semibold text-gray-700 mb-3 uppercase tracking-wide">
+          <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-3">
             Order Items
           </p>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-            {order.items.map((item, idx) => (
-              <div
-                key={idx}
-                className="flex justify-between items-center bg-gray-50 border border-gray-200 rounded-lg px-3 py-2"
-              >
-                <span className="text-sm font-medium text-gray-800">{item.name}</span>
-                <span className="text-sm font-bold text-gray-900">× {item.quantity}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* HEADER ROW */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-        <div className="flex flex-wrap items-center gap-3">
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-gray-700 font-semibold">Worker:</span>
-            <span className="px-3 py-1 rounded-full text-xs font-medium bg-blue-50 text-blue-700 border border-blue-200 inline-flex items-center gap-1">
-              <UserCircle size={12} />
-              {order.productionWorker}
-            </span>
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-gray-700 font-semibold">Required:</span>
-            <span className="px-3 py-1 rounded-full text-xs font-medium bg-red-50 text-red-700 border border-red-200">
-              {order.quantity}
-            </span>
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-gray-700 font-semibold">Added:</span>
-            {(() => {
-              const totalAdded = getTotalAddedQty(order);
-              const isComplete = totalAdded === order.quantity;
-              const isOver = totalAdded > order.quantity;
+          <div className="space-y-2">
+            {order.items.map((item) => {
+              const assignedWorker = order.productionAssignments?.find(
+                (a) => a.product?.toLowerCase() === item.name?.toLowerCase()
+              )?.worker;
               return (
-                <span
-                  className={`px-3 py-1 rounded-full text-xs font-medium ${
-                    isComplete
-                      ? "bg-green-50 text-green-700 border border-green-200"
-                      : isOver
-                        ? "bg-red-50 text-red-700 border border-red-200"
-                        : "bg-yellow-50 text-yellow-700 border border-yellow-200"
-                  }`}
+                <div
+                  key={item.name}
+                  className="flex items-center justify-between bg-gray-50 rounded-xl px-3 py-2.5"
                 >
-                  {totalAdded}
-                </span>
-              );
-            })()}
-          </div>
-        </div>
-
-        <button
-          onClick={onRefreshInventory}
-          className="bg-white hover:bg-gray-50 border border-gray-200 px-4 py-2 rounded-xl text-sm font-semibold text-gray-700 transition-all inline-flex items-center gap-2 w-full md:w-auto justify-center"
-        >
-          <Layers size={16} className="text-[#c62d23]" />
-          <span className="hidden sm:inline">Expand Inventory</span>
-          <span className="sm:hidden">Refresh</span>
-        </button>
-      </div>
-
-      {/* PROGRESS BAR */}
-      {(() => {
-        const totalAdded = getTotalAddedQty(order);
-        const percentage = Math.min((totalAdded / order.quantity) * 100, 100);
-        const isComplete = totalAdded === order.quantity;
-        const isOver = totalAdded > order.quantity;
-        return (
-          <div className="bg-white border border-gray-200 rounded-xl p-4">
-            <div className="flex justify-between items-center mb-2">
-              <span className="text-xs font-semibold text-gray-700">Quantity Progress</span>
-              <span className={`text-xs font-bold ${isComplete ? "text-green-600" : isOver ? "text-red-600" : "text-yellow-600"}`}>
-                {totalAdded} / {order.quantity}
-              </span>
-            </div>
-            <div className="w-full bg-gray-200 rounded-full h-2.5">
-              <div
-                className={`h-2.5 rounded-full transition-all ${isComplete ? "bg-green-500" : isOver ? "bg-red-500" : "bg-yellow-500"}`}
-                style={{ width: `${percentage}%` }}
-              />
-            </div>
-            {isOver && (
-              <p className="text-xs text-red-600 mt-2 font-medium">
-                ⚠️ Excess quantity! Remove {totalAdded - order.quantity} units.
-              </p>
-            )}
-            {!isComplete && !isOver && totalAdded > 0 && (
-              <p className="text-xs text-yellow-600 mt-2 font-medium">
-                Add {order.quantity - totalAdded} more units to complete.
-              </p>
-            )}
-          </div>
-        );
-      })()}
-
-      {/* ADDED ITEMS */}
-      {addedItems && Object.keys(addedItems).length > 0 && (
-        <div>
-          <p className="text-sm font-semibold text-green-700 mb-3 uppercase tracking-wide">
-            Added to Production
-          </p>
-          <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-3">
-            {Object.entries(addedItems).map(([name, qty]) => (
-              <div
-                key={name}
-                className="bg-green-50 border border-green-200 rounded-xl p-3 flex items-center justify-between"
-              >
-                <div>
-                  <div className="text-xs font-semibold text-green-800 capitalize">{name}</div>
-                  <div className="text-sm font-bold text-green-700">Qty: {qty}</div>
+                  <div>
+                    <p className="text-sm font-semibold text-gray-800">{item.name}</p>
+                    {assignedWorker && (
+                      <p className="text-[10px] text-blue-600 font-medium flex items-center gap-1 mt-0.5">
+                        <UserCircle size={10} /> {assignedWorker}
+                      </p>
+                    )}
+                  </div>
+                  <span className="text-sm font-bold text-gray-700">× {item.quantity}</span>
                 </div>
-                <button
-                  onClick={() => onRemoveItem(name)}
-                  className="text-red-600 hover:bg-red-100 p-1.5 rounded-lg transition-colors"
-                >
-                  <X size={14} />
-                </button>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       )}
 
-      {/* SEARCH */}
-      <div className="relative">
-        <Search size={16} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
-        <input
-          type="text"
-          placeholder="Search products..."
-          value={inventorySearch || ""}
-          onChange={(e) => onSearchChange(e.target.value)}
-          className="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-xl bg-white text-sm focus:border-[#c62d23] focus:ring-2 focus:ring-[#c62d23]/20 transition-all outline-none"
-        />
-      </div>
+      {/* ✅ COMPLETED: show only a done banner, nothing else */}
+      {isFullyDone ? (
+        <div className="flex items-center justify-center gap-2 px-6 py-4 rounded-xl bg-green-50 border border-green-200 text-green-700 font-bold">
+          <CheckCircle size={18} />
+          Production Completed ✓
+        </div>
+      ) : (
+        <>
+          {/* Stats Row */}
+          <div className="flex flex-wrap gap-2">
+            {[
+              { label: "Worker", value: order.productionWorker || "—", style: "bg-blue-50 text-blue-700 border-blue-200" },
+              { label: "Required", value: order.quantity, style: "bg-red-50 text-red-700 border-red-200" },
+              {
+                label: "Added",
+                value: getTotalAddedQty(order),
+                style: getTotalAddedQty(order) === order.quantity
+                  ? "bg-green-50 text-green-700 border-green-200"
+                  : getTotalAddedQty(order) > order.quantity
+                  ? "bg-red-50 text-red-700 border-red-200"
+                  : "bg-yellow-50 text-yellow-700 border-yellow-200",
+              },
+            ].map(({ label, value, style }) => (
+              <div key={label} className={`px-3 py-1.5 rounded-full border text-xs font-semibold ${style}`}>
+                <span className="opacity-70">{label}: </span>{value}
+              </div>
+            ))}
+            <button
+              onClick={onRefreshInventory}
+              className="ml-auto bg-white hover:bg-gray-50 border border-gray-200 px-3 py-1.5 rounded-full text-xs font-semibold text-gray-700 transition-all inline-flex items-center gap-1.5"
+            >
+              <Layers size={13} className="text-[#c62d23]" />
+              Load Inventory
+            </button>
+          </div>
 
-      {/* INVENTORY GRID */}
-      {workerInventory.ALL_PRODUCTION && (
-        <div>
-          <p className="text-sm font-semibold text-gray-700 mb-3 uppercase tracking-wide">
-            Available Inventory
-          </p>
-          <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-3">
-            {(() => {
-              const grouped = (workerInventory.ALL_PRODUCTION || [])
-                .filter((i) => i.type === "SPARE")
-                .reduce((a, i) => {
-                  a[i.partName] = (a[i.partName] || 0) + i.quantity;
-                  return a;
-                }, {});
+          {/* Progress Bar */}
+          {(() => {
+            const total = getTotalAddedQty(order);
+            const pct = Math.min((total / order.quantity) * 100, 100);
+            const isOk = total === order.quantity;
+            const isOver = total > order.quantity;
+            return (
+              <div className="bg-white border border-gray-200 rounded-xl p-4">
+                <div className="flex justify-between items-center mb-2">
+                  <span className="text-xs font-semibold text-gray-600">Quantity Progress</span>
+                  <span className={`text-xs font-bold ${isOk ? "text-green-600" : isOver ? "text-red-600" : "text-yellow-600"}`}>
+                    {total} / {order.quantity}
+                  </span>
+                </div>
+                <div className="w-full bg-gray-100 rounded-full h-2">
+                  <div
+                    className={`h-2 rounded-full transition-all duration-500 ${isOk ? "bg-green-500" : isOver ? "bg-red-500" : "bg-yellow-400"}`}
+                    style={{ width: `${pct}%` }}
+                  />
+                </div>
+                {isOver && <p className="text-xs text-red-600 mt-2 font-medium">⚠️ Remove {total - order.quantity} excess units</p>}
+                {!isOk && !isOver && total > 0 && <p className="text-xs text-yellow-600 mt-2 font-medium">Add {order.quantity - total} more to complete</p>}
+              </div>
+            );
+          })()}
 
-              const searchTerm = (inventorySearch || "").toLowerCase();
-              const filtered = Object.entries(grouped)
-                .map(([name, qty]) => {
-                  const addedQty = addedItems?.[name.toLowerCase()] || 0;
-                  return [name, qty - addedQty];
-                })
-                .filter(([name, remainingQty]) => remainingQty > 0 && name.toLowerCase().includes(searchTerm))
-                .slice(0, 8);
-
-              if (filtered.length === 0) {
-                return (
-                  <div className="col-span-full text-center py-8 text-gray-500 text-sm">
-                    {searchTerm ? "No matching products" : "No products available"}
-                  </div>
-                );
-              }
-
-              return filtered.map(([name, remainingQty]) => (
-                <div
-                  key={name}
-                  className="bg-white border border-gray-200 rounded-xl p-3 hover:border-[#c62d23] transition-all"
-                >
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-xs font-semibold text-gray-700 capitalize truncate">{name}</span>
-                    <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600">
-                      {remainingQty}
-                    </span>
-                  </div>
-                  <div className="flex gap-2">
-                    <input
-                      type="number"
-                      min="0"
-                      max={remainingQty}
-                      placeholder="Qty"
-                      value={acceptQty[name] || ""}
-                      onChange={(e) => onQtyChange(name, Number(e.target.value))}
-                      className="flex-1 px-2 py-1.5 border border-gray-200 rounded-lg text-xs focus:border-[#c62d23] focus:ring-2 focus:ring-[#c62d23]/20 transition-all outline-none"
-                    />
-                    <button
-                      onClick={() => onAddItem(name, remainingQty)}
-                      className="bg-green-600 hover:bg-green-700 text-white px-3 py-1.5 rounded-lg text-xs font-semibold transition-all"
-                    >
-                      Add
+          {/* Added Items */}
+          {addedItems && Object.keys(addedItems).length > 0 && (
+            <div>
+              <p className="text-[10px] font-bold text-green-700 uppercase tracking-wider mb-2">Added to Production</p>
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
+                {Object.entries(addedItems).map(([name, qty]) => (
+                  <div key={name} className="bg-green-50 border border-green-200 rounded-xl px-3 py-2.5 flex items-center justify-between">
+                    <div>
+                      <p className="text-xs font-semibold text-green-800 capitalize leading-tight">{name}</p>
+                      <p className="text-xs text-green-600 font-bold">{qty} pcs</p>
+                    </div>
+                    <button onClick={() => onRemoveItem(name)} className="text-red-500 hover:bg-red-100 p-1 rounded-lg transition-colors">
+                      <X size={13} />
                     </button>
                   </div>
-                </div>
-              ));
-            })()}
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Search */}
+          <div className="relative">
+            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+            <input
+              type="text"
+              placeholder="Search inventory..."
+              value={inventorySearch || ""}
+              onChange={(e) => onSearchChange(e.target.value)}
+              className="w-full pl-9 pr-4 py-2.5 border border-gray-200 rounded-xl bg-white text-sm focus:border-[#c62d23] focus:ring-2 focus:ring-[#c62d23]/20 transition-all outline-none"
+            />
           </div>
-        </div>
+
+          {/* Inventory Grid */}
+          {workerInventory.ALL_PRODUCTION && (
+            <div>
+              <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-2">Available Inventory</p>
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
+                {(() => {
+                  const grouped = (workerInventory.ALL_PRODUCTION || [])
+                    .filter((i) => i.type === "SPARE")
+                    .reduce((a, i) => { a[i.partName] = (a[i.partName] || 0) + i.quantity; return a; }, {});
+                  const searchTerm = (inventorySearch || "").toLowerCase();
+                  const filtered = Object.entries(grouped)
+                    .map(([name, qty]) => [name, qty - (addedItems?.[name.toLowerCase()] || 0)])
+                    .filter(([name, rem]) => rem > 0 && name.toLowerCase().includes(searchTerm))
+                    .slice(0, 8);
+                  if (!filtered.length)
+                    return <div className="col-span-full text-center py-6 text-gray-400 text-sm">{inventorySearch ? "No matching items" : "No inventory available"}</div>;
+                  return filtered.map(([name, rem]) => (
+                    <div key={name} className="bg-white border border-gray-200 rounded-xl p-3 hover:border-[#c62d23] transition-all">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-xs font-semibold text-gray-700 capitalize truncate">{name}</span>
+                        <span className="text-xs font-bold text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded-md">{rem}</span>
+                      </div>
+                      <div className="flex gap-1.5">
+                        <input type="number" min="0" max={rem} placeholder="Qty" value={acceptQty[name] || ""} onChange={(e) => onQtyChange(name, Number(e.target.value))} className="flex-1 px-2 py-1.5 border border-gray-200 rounded-lg text-xs focus:border-[#c62d23] outline-none" />
+                        <button onClick={() => onAddItem(name, rem)} className="bg-emerald-600 hover:bg-emerald-700 text-white px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all">Add</button>
+                      </div>
+                    </div>
+                  ));
+                })()}
+              </div>
+            </div>
+          )}
+
+          {/* Request More */}
+          <div className="bg-white border border-gray-200 rounded-xl p-4">
+            <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-3 flex items-center gap-1.5">
+              <Plus size={12} className="text-[#c62d23]" />
+              Request Additional Inventory
+            </p>
+            <div className="flex flex-col sm:flex-row gap-2">
+              <input type="text" value={requestData?.partName || ""} placeholder="Part name" onChange={(e) => onRequestDataChange({ ...requestData, partName: e.target.value })} className="flex-1 px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:border-[#c62d23] outline-none" />
+              <input type="number" value={requestData?.quantity || ""} placeholder="Qty" onChange={(e) => onRequestDataChange({ ...requestData, quantity: Number(e.target.value) })} className="w-full sm:w-20 px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:border-[#c62d23] outline-none" />
+              <button onClick={onSendRequest} disabled={requestLoading} className="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 text-white px-4 py-2.5 rounded-xl text-sm font-bold transition-all inline-flex items-center gap-1.5 justify-center">
+                {requestLoading ? <Loader2 size={14} className="animate-spin" /> : <><Send size={13} /> Send</>}
+              </button>
+            </div>
+          </div>
+
+          {/* Action Button */}
+          <div className="flex gap-3 pt-1">
+            {!isOrderAccepted ? (
+              <button onClick={onAccept} disabled={acceptLoading} className="flex-1 bg-green-600 hover:bg-green-700 disabled:bg-gray-300 text-white px-6 py-3.5 rounded-xl font-bold transition-all disabled:cursor-not-allowed inline-flex items-center justify-center gap-2">
+                {acceptLoading ? <Loader2 size={16} className="animate-spin" /> : <><CheckCircle size={16} /> Confirm Acceptance</>}
+              </button>
+            ) : (
+              <button onClick={onComplete} disabled={completeLoading} className="flex-1 bg-emerald-600 hover:bg-emerald-700 disabled:bg-gray-300 text-white px-6 py-3.5 rounded-xl font-bold transition-all disabled:cursor-not-allowed inline-flex items-center justify-center gap-2">
+                {completeLoading ? <Loader2 size={16} className="animate-spin" /> : <><CheckCircle size={16} /> Mark Completed</>}
+              </button>
+            )}
+          </div>
+        </>
       )}
-
-      {/* REQUEST MORE */}
-      <div className="bg-white border border-gray-200 rounded-xl p-4">
-        <p className="text-sm font-semibold text-gray-700 mb-3 uppercase tracking-wide flex items-center gap-2">
-          <Plus size={14} className="text-[#c62d23]" />
-          Request Additional Inventory
-        </p>
-        <div className="flex flex-col sm:flex-row gap-3">
-          <input
-            type="text"
-            value={requestData?.partName || ""}
-            placeholder="Part name"
-            onChange={(e) => onRequestDataChange({ ...requestData, partName: e.target.value })}
-            className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:border-[#c62d23] focus:ring-2 focus:ring-[#c62d23]/20 transition-all outline-none"
-          />
-          <input
-            type="number"
-            value={requestData?.quantity || ""}
-            placeholder="Qty"
-            onChange={(e) => onRequestDataChange({ ...requestData, quantity: Number(e.target.value) })}
-            className="w-full sm:w-24 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:border-[#c62d23] focus:ring-2 focus:ring-[#c62d23]/20 transition-all outline-none"
-          />
-          <button
-            onClick={onSendRequest}
-            disabled={requestLoading}
-            className="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 text-white px-4 py-2 rounded-lg text-sm font-semibold transition-all disabled:cursor-not-allowed inline-flex items-center gap-2 justify-center"
-          >
-            {requestLoading ? (
-              <Loader2 size={14} className="animate-spin" />
-            ) : (
-              <>
-                <Send size={14} />
-                Send Request
-              </>
-            )}
-          </button>
-        </div>
-      </div>
-
-      {/* ✅ ACTION BUTTONS — driven by order.progress, not in-memory state */}
-      <div className="flex gap-3 pt-2">
-        {!isOrderAccepted ? (
-          <button
-            onClick={onAccept}
-            disabled={acceptLoading}
-            className="flex-1 bg-green-600 hover:bg-green-700 disabled:bg-gray-300 text-white px-6 py-3 rounded-xl font-semibold transition-all disabled:cursor-not-allowed inline-flex items-center justify-center gap-2"
-          >
-            {acceptLoading ? (
-              <Loader2 size={16} className="animate-spin" />
-            ) : (
-              <>
-                <CheckCircle size={16} />
-                Confirm Acceptance
-              </>
-            )}
-          </button>
-        ) : (
-          <button
-            onClick={onComplete}
-            disabled={completeLoading}
-            className="flex-1 bg-emerald-600 hover:bg-emerald-700 disabled:bg-gray-300 text-white px-6 py-3 rounded-xl font-semibold transition-all disabled:cursor-not-allowed inline-flex items-center justify-center gap-2"
-          >
-            {completeLoading ? (
-              <Loader2 size={16} className="animate-spin" />
-            ) : (
-              <>
-                <CheckCircle size={16} />
-                Mark Completed
-              </>
-            )}
-          </button>
-        )}
-      </div>
     </div>
   );
 };
 
-/* ================= COMPLETED ORDER ITEMS (read-only) ================= */
+/* ═══════════════════════════════════════════
+   COMPLETED ORDER ITEMS
+═══════════════════════════════════════════ */
 const CompletedOrderItems = ({ order }) => (
-  <div className="space-y-4">
-    <p className="text-sm font-semibold text-gray-700 uppercase tracking-wide flex items-center gap-2">
-      <CheckCircle size={14} className="text-green-600" />
-      Order Items
+  <div className="space-y-3">
+    <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider flex items-center gap-1.5">
+      <CheckCircle size={12} className="text-green-600" />
+      Completed Items
     </p>
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
       {order.items.map((item, idx) => (
         <div
           key={idx}
           className="flex justify-between items-center bg-white border border-green-200 rounded-xl px-4 py-3"
         >
-          <span className="text-sm font-medium text-gray-800">{item.name}</span>
+          <span className="text-sm font-semibold text-gray-800">{item.name}</span>
           <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-green-50 text-green-700 border border-green-200">
             × {item.quantity}
           </span>
@@ -1192,8 +1161,8 @@ const CompletedOrderItems = ({ order }) => (
       ))}
     </div>
     {order.productionWorker && (
-      <p className="text-xs text-gray-500 flex items-center gap-1">
-        <UserCircle size={12} />
+      <p className="text-xs text-gray-500 flex items-center gap-1 mt-1">
+        <UserCircle size={11} />
         Produced by <span className="font-semibold text-gray-700 ml-1">{order.productionWorker}</span>
       </p>
     )}

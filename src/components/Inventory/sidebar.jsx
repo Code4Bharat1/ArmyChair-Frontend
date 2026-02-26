@@ -12,6 +12,7 @@ import {
   ClipboardList,
   FileCheck,
   X,
+  RotateCcw,
 } from "lucide-react";
 import LanguageToggle from "@/components/LanguageToggle";
 
@@ -100,6 +101,14 @@ export default function InventorySidebar({ onClose }) {
         >
           <ArrowLeftRight size={18} className="flex-shrink-0" />
           <span className="truncate">Transfer</span>
+        </Link>
+        <Link 
+          href="/inventory/return" 
+          className={menuItem("/inventory/return")}
+          onClick={handleLinkClick}
+        >
+          <RotateCcw size={18} className="flex-shrink-0" />
+          <span className="truncate">Returns</span>
         </Link>
 
         <Link 

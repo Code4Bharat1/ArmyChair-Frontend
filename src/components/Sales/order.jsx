@@ -1,5 +1,3 @@
-//sales orders page
-
 "use client";
 import React, { useEffect, useMemo, useState } from "react";
 import { Upload, Download, X } from "lucide-react";
@@ -36,7 +34,7 @@ export default function Orders() {
   const [search, setSearch] = useState("");
   const [showForm, setShowForm] = useState(false);
   const [editingOrderId, setEditingOrderId] = useState(null);
-  const [orderTypeTab, setOrderTypeTab] = useState("ALL"); // "ALL" | "FULL" | "SPARE"
+  const [orderTypeTab, setOrderTypeTab] = useState("ALL");
   const [currentPage, setCurrentPage] = useState(1);
   const [itemSearches, setItemSearches] = useState([""]);
   const [showItemDropdowns, setShowItemDropdowns] = useState([false]);
@@ -76,7 +74,6 @@ export default function Orders() {
         o.chairModel?.toLowerCase().includes(q);
       if (!matchesSearch) return false;
 
-      // 🔀 Type tab filter
       if (orderTypeTab !== "ALL" && o.orderType !== orderTypeTab) return false;
 
       switch (statusFilter) {
@@ -124,14 +121,39 @@ export default function Orders() {
     }
   };
 
+  // Fetches inventory items and builds "Product Name (Color)" strings
   const fetchChairModels = async () => {
-    try {
-      const res = await axios.get(`${API}/inventory/chair-models`, { headers });
-      setChairModels(res.data.models || []);
-    } catch (err) {
-      console.error("Fetch chair models failed", err);
-    }
-  };
+  try {
+    const [modelsRes, inventoryRes] = await Promise.all([
+      axios.get(`${API}/inventory/chair-models`, { headers }),
+      axios.get(`${API}/inventory`, { headers }),
+    ]);
+
+    const models = modelsRes.data.models || [];
+    const inventoryItems = inventoryRes.data.inventory || []; // ✅ "inventory" not "items"
+
+    const combined = [];
+    models.forEach((modelName) => {
+      const matches = inventoryItems.filter(
+        (item) => item.chairType === modelName // ✅ "chairType" not "product"
+      );
+      if (matches.length === 0) {
+        combined.push(modelName);
+      } else {
+        matches.forEach((item) => {
+          const label = item.colour  // ✅ "colour" not "color"
+            ? `${modelName} (${item.colour})`
+            : modelName;
+          combined.push(label);
+        });
+      }
+    });
+
+    setChairModels([...new Set(combined)]);
+  } catch (err) {
+    console.error("Fetch chair models failed", err);
+  }
+};
 
   const fetchSpareParts = async () => {
     try {
@@ -152,35 +174,35 @@ export default function Orders() {
   }, []);
 
   const handleEditOrder = (order) => {
-  setEditingOrderId(order._id);
+    setEditingOrderId(order._id);
 
-  const items =
-    order.items && order.items.length > 0
-      ? order.items.map((i) => ({
-          chairModel: i.name,
-          quantity: i.quantity,
-        }))
-      : [
-          {
-            chairModel: order.chairModel,
-            quantity: order.quantity,
-          },
-        ];
+    const items =
+      order.items && order.items.length > 0
+        ? order.items.map((i) => ({
+            chairModel: i.name,
+            quantity: i.quantity,
+          }))
+        : [
+            {
+              chairModel: order.chairModel,
+              quantity: order.quantity,
+            },
+          ];
 
-  setFormData({
-    dispatchedTo: order.dispatchedTo?._id || order.dispatchedTo,
-    remark: order.remark || "",
-    orderDate: order.orderDate?.split("T")[0],
-    deliveryDate: order.deliveryDate?.split("T")[0] || "",
-    orderType: order.orderType || "FULL",
-    items,
-  });
+    setFormData({
+      dispatchedTo: order.dispatchedTo?._id || order.dispatchedTo,
+      remark: order.remark || "",
+      orderDate: order.orderDate?.split("T")[0],
+      deliveryDate: order.deliveryDate?.split("T")[0] || "",
+      orderType: order.orderType || "FULL",
+      items,
+    });
 
-  setVendorSearch(order.dispatchedTo?.name || "");
-  setItemSearches(items.map((i) => i.chairModel));
-  setShowItemDropdowns(items.map(() => false));
-  setShowForm(true);
-};
+    setVendorSearch(order.dispatchedTo?.name || "");
+    setItemSearches(items.map((i) => i.chairModel));
+    setShowItemDropdowns(items.map(() => false));
+    setShowForm(true);
+  };
 
   const handleFormChange = (e) => {
     const { name, value } = e.target;
@@ -188,7 +210,7 @@ export default function Orders() {
       setFormData((prev) => ({
         ...prev,
         orderType: value,
-        items: [{ chairModel: "", quantity: "" }], // reset items on type change
+        items: [{ chairModel: "", quantity: "" }],
       }));
       return;
     }
@@ -246,32 +268,26 @@ export default function Orders() {
       deliveryDate: formData.deliveryDate,
     };
 
+    // chairModel already contains "Name (Color)" from dropdown selection
+    const itemsPayload = validItems.map((item) => ({
+      name: item.chairModel,
+      quantity: Number(item.quantity),
+    }));
+
     try {
       if (editingOrderId) {
-  await axios.put(
-    `${API}/orders/${editingOrderId}`,
-    {
-      ...basePayload,
-      items: validItems.map((item) => ({
-        name: item.chairModel,
-        quantity: Number(item.quantity),
-      })),
-    },
-    { headers },
-  );
-}else {
-  await axios.post(
-    `${API}/orders`,
-    {
-      ...basePayload,
-      items: validItems.map((item) => ({
-        name: item.chairModel,
-        quantity: Number(item.quantity),
-      })),
-    },
-    { headers },
-  );
-}
+        await axios.put(
+          `${API}/orders/${editingOrderId}`,
+          { ...basePayload, items: itemsPayload },
+          { headers },
+        );
+      } else {
+        await axios.post(
+          `${API}/orders`,
+          { ...basePayload, items: itemsPayload },
+          { headers },
+        );
+      }
 
       setShowForm(false);
       setEditingOrderId(null);
@@ -310,12 +326,10 @@ export default function Orders() {
     (o) => !["DISPATCHED", "PARTIAL"].includes(o.progress) && !isDelayed(o),
   ).length;
 
-  // Counts for toggle tabs (not affected by tab filter, so use raw orders)
   const allOrdersCount = orders.length;
   const fullChairCount = orders.filter((o) => o.orderType === "FULL").length;
   const sparePartCount = orders.filter((o) => o.orderType === "SPARE").length;
 
-  // Reset to page 1 whenever filters change
   useEffect(() => {
     setCurrentPage(1);
   }, [search, statusFilter, orderTypeTab]);
@@ -344,10 +358,13 @@ export default function Orders() {
   ];
 
   const ProgressBadge = ({ progress, orderType }) => {
-    const steps = orderType === "FULL" ? FULL_ORDER_STEPS : SPARE_ORDER_STEPS;
     if (progress === "PARTIAL") {
       return <StatusPill variant="warning" label="Partial / On Hold" />;
     }
+    if (orderType === "FULL" && progress === "WAREHOUSE_COLLECTED") {
+      return <StatusPill variant="info" label="Stock Reserved" />;
+    }
+    const steps = orderType === "FULL" ? FULL_ORDER_STEPS : SPARE_ORDER_STEPS;
     const currentIndex = steps.findIndex((s) => s.key === progress);
     const safeIndex = currentIndex === -1 ? steps.length - 1 : currentIndex;
     const isCompleted = progress === "DISPATCHED";
@@ -381,91 +398,81 @@ export default function Orders() {
   };
 
   const handleExportCSV = () => {
-  if (!orders.length) {
-    alert("No orders to export");
-    return;
-  }
+    if (!orders.length) {
+      alert("No orders to export");
+      return;
+    }
 
-  const headers = [
-    "Order ID",
-    "Vendor",
-    "Product",
-    "Remarks",
-    "Order Type",
-    "Quantity",
-    "Order Date",
-    "Delivery Date",
-    "Status",
-  ];
+    const csvHeaders = [
+      "Order ID",
+      "Vendor",
+      "Product",
+      "Remarks",
+      "Order Type",
+      "Quantity",
+      "Order Date",
+      "Delivery Date",
+      "Status",
+    ];
 
-  const rows = [];
+    const rows = [];
 
-  orders.forEach((o) => {
-    const vendorName =
-      typeof o.dispatchedTo === "string"
-        ? o.dispatchedTo
-        : o.dispatchedTo?.name || "";
+    orders.forEach((o) => {
+      const vendorName =
+        typeof o.dispatchedTo === "string"
+          ? o.dispatchedTo
+          : o.dispatchedTo?.name || "";
+      const orderDate = o.orderDate
+        ? new Date(o.orderDate).toLocaleDateString()
+        : "";
+      const deliveryDate = o.deliveryDate
+        ? new Date(o.deliveryDate).toLocaleDateString()
+        : "";
 
-    const orderDate = o.orderDate
-      ? new Date(o.orderDate).toLocaleDateString()
-      : "";
-
-    const deliveryDate = o.deliveryDate
-      ? new Date(o.deliveryDate).toLocaleDateString()
-      : "";
-
-    // 🔥 MULTI ITEM SUPPORT
-    if (o.items && o.items.length > 0) {
-      o.items.forEach((item) => {
+      if (o.items && o.items.length > 0) {
+        o.items.forEach((item) => {
+          rows.push([
+            o.orderId,
+            vendorName,
+            item.name,
+            o.remark || "",
+            o.orderType,
+            item.quantity,
+            orderDate,
+            deliveryDate,
+            o.progress,
+          ]);
+        });
+      } else {
         rows.push([
           o.orderId,
           vendorName,
-          item.name,
+          o.chairModel,
           o.remark || "",
           o.orderType,
-          item.quantity,
+          o.quantity,
           orderDate,
           deliveryDate,
           o.progress,
         ]);
-      });
-    } else {
-      // fallback for legacy single-item orders
-      rows.push([
-        o.orderId,
-        vendorName,
-        o.chairModel,
-        o.remark || "",
-        o.orderType,
-        o.quantity,
-        orderDate,
-        deliveryDate,
-        o.progress,
-      ]);
-    }
-  });
+      }
+    });
 
-  const csvContent =
-    headers.join(",") +
-    "\n" +
-    rows.map((r) => r.map((v) => `"${v ?? ""}"`).join(",")).join("\n");
+    const csvContent =
+      csvHeaders.join(",") +
+      "\n" +
+      rows.map((r) => r.map((v) => `"${v ?? ""}"`).join(",")).join("\n");
 
-  const blob = new Blob([csvContent], {
-    type: "text/csv;charset=utf-8;",
-  });
-
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-
-  link.href = url;
-  link.download = `orders_${new Date().toISOString().slice(0, 10)}.csv`;
-
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-
-  URL.revokeObjectURL(url);
-};
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `orders_${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
 
   const getOrderStatus = (o) => {
     if (isDelayed(o)) return { variant: "danger", label: "Delayed" };
@@ -475,6 +482,8 @@ export default function Orders() {
       return { variant: "ready", label: "Ready" };
     if (o.progress === "DISPATCHED")
       return { variant: "success", label: "Dispatched" };
+    if (o.orderType === "FULL" && o.progress === "WAREHOUSE_COLLECTED")
+      return { variant: "ready", label: "At Warehouse" };
     return { variant: "info", label: "Processing" };
   };
 
@@ -494,7 +503,6 @@ export default function Orders() {
         <header className="sticky top-0 z-20 bg-white border-b border-gray-100 shadow-sm">
           <div className="px-4 sm:px-6 lg:px-8 py-4">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-              {/* Title */}
               <div className="flex items-center gap-3">
                 <div className="p-2.5 bg-[#c62d23]/10 rounded-xl">
                   <Package size={24} className="text-[#c62d23]" />
@@ -509,7 +517,6 @@ export default function Orders() {
                 </div>
               </div>
 
-              {/* Actions */}
               <div className="flex items-center gap-2 flex-wrap">
                 <ActionButton
                   icon={<Upload size={15} />}
@@ -529,8 +536,8 @@ export default function Orders() {
                     setShowForm(true);
                     setItemSearches([""]);
                     setShowItemDropdowns([false]);
-                    fetchChairModels(); // ✅ refresh models list
-                    fetchSpareParts(); // ✅ refresh spare parts list
+                    fetchChairModels();
+                    fetchSpareParts();
                   }}
                   variant="primary"
                 />
@@ -600,7 +607,6 @@ export default function Orders() {
 
           {/* ── TOOLBAR ── */}
           <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center">
-            {/* Search */}
             <div className="relative flex-1">
               <Search
                 size={16}
@@ -614,7 +620,6 @@ export default function Orders() {
               />
             </div>
 
-            {/* Active filter pill */}
             {statusFilter !== "ALL" && (
               <div className="flex items-center gap-2 bg-white border border-gray-200 rounded-xl px-3 py-2 shadow-sm">
                 <Filter size={14} className="text-[#c62d23]" />
@@ -633,84 +638,48 @@ export default function Orders() {
 
           {/* ── ORDER TYPE TABS ── */}
           <div className="flex rounded-xl overflow-hidden border border-gray-200 bg-white shadow-sm w-full">
-            {/* All Orders */}
             <button
-              onClick={() => {
-                setOrderTypeTab("ALL");
-                setExpandedOrderId(null);
-              }}
+              onClick={() => { setOrderTypeTab("ALL"); setExpandedOrderId(null); }}
               className={`flex-1 flex items-center justify-center gap-2 py-3 px-3 sm:px-4 text-sm font-semibold transition-all duration-200 ${
-                orderTypeTab === "ALL"
-                  ? "bg-[#c62d23] text-white shadow-inner"
-                  : "text-gray-500 hover:bg-gray-50"
+                orderTypeTab === "ALL" ? "bg-[#c62d23] text-white shadow-inner" : "text-gray-500 hover:bg-gray-50"
               }`}
             >
               <Package size={15} className="shrink-0" />
               <span className="hidden sm:inline">All Orders</span>
               <span className="sm:hidden">All</span>
-              <span
-                className={`ml-0.5 px-2 py-0.5 rounded-full text-xs font-bold shrink-0 ${
-                  orderTypeTab === "ALL"
-                    ? "bg-white/20 text-white"
-                    : "bg-gray-100 text-gray-600"
-                }`}
-              >
+              <span className={`ml-0.5 px-2 py-0.5 rounded-full text-xs font-bold shrink-0 ${orderTypeTab === "ALL" ? "bg-white/20 text-white" : "bg-gray-100 text-gray-600"}`}>
                 {allOrdersCount}
               </span>
             </button>
 
             <div className="w-px bg-gray-200" />
 
-            {/* Full Chair */}
             <button
-              onClick={() => {
-                setOrderTypeTab("FULL");
-                setExpandedOrderId(null);
-              }}
+              onClick={() => { setOrderTypeTab("FULL"); setExpandedOrderId(null); }}
               className={`flex-1 flex items-center justify-center gap-2 py-3 px-3 sm:px-4 text-sm font-semibold transition-all duration-200 ${
-                orderTypeTab === "FULL"
-                  ? "bg-[#c62d23] text-white shadow-inner"
-                  : "text-gray-500 hover:bg-gray-50"
+                orderTypeTab === "FULL" ? "bg-[#c62d23] text-white shadow-inner" : "text-gray-500 hover:bg-gray-50"
               }`}
             >
               <Package size={15} className="shrink-0" />
               <span className="hidden sm:inline">Full Chair Orders</span>
               <span className="sm:hidden">Full</span>
-              <span
-                className={`ml-0.5 px-2 py-0.5 rounded-full text-xs font-bold shrink-0 ${
-                  orderTypeTab === "FULL"
-                    ? "bg-white/20 text-white"
-                    : "bg-gray-100 text-gray-600"
-                }`}
-              >
+              <span className={`ml-0.5 px-2 py-0.5 rounded-full text-xs font-bold shrink-0 ${orderTypeTab === "FULL" ? "bg-white/20 text-white" : "bg-gray-100 text-gray-600"}`}>
                 {fullChairCount}
               </span>
             </button>
 
             <div className="w-px bg-gray-200" />
 
-            {/* Spare Part */}
             <button
-              onClick={() => {
-                setOrderTypeTab("SPARE");
-                setExpandedOrderId(null);
-              }}
+              onClick={() => { setOrderTypeTab("SPARE"); setExpandedOrderId(null); }}
               className={`flex-1 flex items-center justify-center gap-2 py-3 px-3 sm:px-4 text-sm font-semibold transition-all duration-200 ${
-                orderTypeTab === "SPARE"
-                  ? "bg-[#c62d23] text-white shadow-inner"
-                  : "text-gray-500 hover:bg-gray-50"
+                orderTypeTab === "SPARE" ? "bg-[#c62d23] text-white shadow-inner" : "text-gray-500 hover:bg-gray-50"
               }`}
             >
               <Truck size={15} className="shrink-0" />
               <span className="hidden sm:inline">Spare Part Orders</span>
               <span className="sm:hidden">Spare</span>
-              <span
-                className={`ml-0.5 px-2 py-0.5 rounded-full text-xs font-bold shrink-0 ${
-                  orderTypeTab === "SPARE"
-                    ? "bg-white/20 text-white"
-                    : "bg-gray-100 text-gray-600"
-                }`}
-              >
+              <span className={`ml-0.5 px-2 py-0.5 rounded-full text-xs font-bold shrink-0 ${orderTypeTab === "SPARE" ? "bg-white/20 text-white" : "bg-gray-100 text-gray-600"}`}>
                 {sparePartCount}
               </span>
             </button>
@@ -775,15 +744,9 @@ export default function Orders() {
                                     {o.orderId}
                                   </span>
                                   {isExpanded ? (
-                                    <ChevronUp
-                                      size={12}
-                                      className="text-gray-400 shrink-0"
-                                    />
+                                    <ChevronUp size={12} className="text-gray-400 shrink-0" />
                                   ) : (
-                                    <ChevronDown
-                                      size={12}
-                                      className="text-gray-300 group-hover:text-gray-400 shrink-0"
-                                    />
+                                    <ChevronDown size={12} className="text-gray-300 group-hover:text-gray-400 shrink-0" />
                                   )}
                                 </div>
                               </td>
@@ -794,38 +757,35 @@ export default function Orders() {
                               </td>
 
                               {/* Chair / Part */}
-                              {/* Chair / Part */}
-<td className="px-4 py-3.5 text-sm font-medium text-gray-900">
-  {/* MULTI ITEM */}
-  {o.items && o.items.length > 1 ? (
-    <details
-      onClick={(e) => e.stopPropagation()}
-      className="relative cursor-pointer"
-    >
-      <summary className="list-none flex items-center gap-1 text-[#c62d23] font-semibold">
-        {o.items.length} items
-        <ChevronDown size={12} />
-      </summary>
+                              <td className="px-4 py-3.5 text-sm font-medium text-gray-900">
+                                {o.items && o.items.length > 1 ? (
+                                  <details
+                                    onClick={(e) => e.stopPropagation()}
+                                    className="relative cursor-pointer"
+                                  >
+                                    <summary className="list-none flex items-center gap-1 text-[#c62d23] font-semibold">
+                                      {o.items.length} items
+                                      <ChevronDown size={12} />
+                                    </summary>
+                                    <div className="absolute z-20 mt-2 w-56 bg-white border border-gray-200 rounded-xl shadow-lg p-2 space-y-1">
+                                      {o.items.map((item, idx) => (
+                                        <div
+                                          key={idx}
+                                          className="flex justify-between text-sm px-2 py-1 rounded hover:bg-gray-50"
+                                        >
+                                          <span>{item.name}</span>
+                                          <span className="font-semibold">× {item.quantity}</span>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </details>
+                                ) : (
+                                  <span>
+                                    {(o.items && o.items[0]?.name) || o.chairModel}
+                                  </span>
+                                )}
+                              </td>
 
-      <div className="absolute z-20 mt-2 w-48 bg-white border border-gray-200 rounded-xl shadow-lg p-2 space-y-1">
-        {o.items.map((item, idx) => (
-          <div
-            key={idx}
-            className="flex justify-between text-sm px-2 py-1 rounded hover:bg-gray-50"
-          >
-            <span>{item.name}</span>
-            <span className="font-semibold">× {item.quantity}</span>
-          </div>
-        ))}
-      </div>
-    </details>
-  ) : (
-    /* SINGLE ITEM */
-    <span>
-      {(o.items && o.items[0]?.name) || o.chairModel}
-    </span>
-  )}
-</td>
                               {/* Remark */}
                               <td className="px-4 py-3.5 whitespace-nowrap text-sm text-gray-600 max-w-[220px] truncate">
                                 {o.remark ? o.remark : "—"}
@@ -837,38 +797,27 @@ export default function Orders() {
                               </td>
 
                               {/* Delivery Date */}
-                              <td
-                                className={`px-4 py-3.5 whitespace-nowrap text-sm ${isDelayed(o) ? "text-red-500 font-semibold" : "text-gray-600"}`}
-                              >
+                              <td className={`px-4 py-3.5 whitespace-nowrap text-sm ${isDelayed(o) ? "text-red-500 font-semibold" : "text-gray-600"}`}>
                                 {o.deliveryDate
-                                  ? new Date(
-                                      o.deliveryDate,
-                                    ).toLocaleDateString()
+                                  ? new Date(o.deliveryDate).toLocaleDateString()
                                   : "—"}
                               </td>
 
                               {/* Qty */}
-                              {/* Qty */}
-<td className="px-4 py-3.5 whitespace-nowrap text-sm font-bold text-gray-900">
-  {o.items
-    ? o.items.reduce((sum, i) => sum + i.quantity, 0)
-    : o.quantity}
-</td>
+                              <td className="px-4 py-3.5 whitespace-nowrap text-sm font-bold text-gray-900">
+                                {o.items
+                                  ? o.items.reduce((sum, i) => sum + i.quantity, 0)
+                                  : o.quantity}
+                              </td>
 
                               {/* Stage */}
                               <td className="px-4 py-3.5 whitespace-nowrap">
-                                <ProgressBadge
-                                  progress={o.progress}
-                                  orderType={o.orderType}
-                                />
+                                <ProgressBadge progress={o.progress} orderType={o.orderType} />
                               </td>
 
                               {/* Status */}
                               <td className="px-4 py-3.5 whitespace-nowrap">
-                                <StatusPill
-                                  variant={status.variant}
-                                  label={status.label}
-                                />
+                                <StatusPill variant={status.variant} label={status.label} />
                               </td>
 
                               {/* Actions */}
@@ -882,20 +831,14 @@ export default function Orders() {
                                     className="p-2 rounded-lg hover:bg-gray-100 transition-colors"
                                     title="Edit"
                                   >
-                                    <Pencil
-                                      size={15}
-                                      className="text-gray-500 hover:text-[#c62d23]"
-                                    />
+                                    <Pencil size={15} className="text-gray-500 hover:text-[#c62d23]" />
                                   </button>
                                   <button
                                     onClick={() => handleDeleteOrder(o._id)}
                                     className="p-2 rounded-lg hover:bg-gray-100 transition-colors"
                                     title="Delete"
                                   >
-                                    <Trash2
-                                      size={15}
-                                      className="text-gray-500 hover:text-red-600"
-                                    />
+                                    <Trash2 size={15} className="text-gray-500 hover:text-red-600" />
                                   </button>
                                 </div>
                               </td>
@@ -904,10 +847,7 @@ export default function Orders() {
                             {/* Expanded Progress */}
                             {isExpanded && o.progress !== "PARTIAL" && (
                               <tr>
-                                <td
-                                  colSpan={10}
-                                  className="px-4 py-0 bg-gray-50"
-                                >
+                                <td colSpan={10} className="px-4 py-0 bg-gray-50">
                                   <div className="my-3 p-5 bg-white rounded-xl border border-gray-100">
                                     <ExpandedProgress
                                       order={o}
@@ -930,17 +870,11 @@ export default function Orders() {
                   <p className="text-xs text-gray-400 order-2 sm:order-1">
                     Showing{" "}
                     <span className="font-semibold text-gray-600">
-                      {Math.min(
-                        (currentPage - 1) * PAGE_SIZE + 1,
-                        filteredOrders.length,
-                      )}
-                      –
-                      {Math.min(currentPage * PAGE_SIZE, filteredOrders.length)}
+                      {Math.min((currentPage - 1) * PAGE_SIZE + 1, filteredOrders.length)}
+                      –{Math.min(currentPage * PAGE_SIZE, filteredOrders.length)}
                     </span>{" "}
                     of{" "}
-                    <span className="font-semibold text-gray-600">
-                      {filteredOrders.length}
-                    </span>{" "}
+                    <span className="font-semibold text-gray-600">{filteredOrders.length}</span>{" "}
                     orders
                   </p>
 
@@ -954,12 +888,7 @@ export default function Orders() {
                     </button>
 
                     {Array.from({ length: totalPages }, (_, i) => i + 1)
-                      .filter(
-                        (p) =>
-                          p === 1 ||
-                          p === totalPages ||
-                          Math.abs(p - currentPage) <= 1,
-                      )
+                      .filter((p) => p === 1 || p === totalPages || Math.abs(p - currentPage) <= 1)
                       .reduce((acc, p, idx, arr) => {
                         if (idx > 0 && p - arr[idx - 1] > 1) acc.push("...");
                         acc.push(p);
@@ -967,12 +896,7 @@ export default function Orders() {
                       }, [])
                       .map((p, idx) =>
                         p === "..." ? (
-                          <span
-                            key={`e-${idx}`}
-                            className="px-2 text-xs text-gray-400"
-                          >
-                            …
-                          </span>
+                          <span key={`e-${idx}`} className="px-2 text-xs text-gray-400">…</span>
                         ) : (
                           <button
                             key={p}
@@ -989,9 +913,7 @@ export default function Orders() {
                       )}
 
                     <button
-                      onClick={() =>
-                        setCurrentPage((p) => Math.min(totalPages, p + 1))
-                      }
+                      onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
                       disabled={currentPage === totalPages}
                       className="px-3 py-1.5 text-xs rounded-lg border border-gray-200 font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed hover:border-[#c62d23] hover:text-[#c62d23]"
                     >
@@ -1042,9 +964,7 @@ export default function Orders() {
                     placeholder="Search or type vendor name"
                     value={vendorSearch}
                     onFocus={() => setShowVendorDropdown(true)}
-                    onBlur={() =>
-                      setTimeout(() => setShowVendorDropdown(false), 150)
-                    }
+                    onBlur={() => setTimeout(() => setShowVendorDropdown(false), 150)}
                     onChange={(e) => {
                       setVendorSearch(e.target.value);
                       setShowVendorDropdown(true);
@@ -1055,9 +975,7 @@ export default function Orders() {
                     <div className="absolute z-10 left-0 right-0 bg-white border border-gray-200 mt-1 rounded-xl max-h-44 overflow-auto shadow-xl">
                       {vendors
                         .filter((v) =>
-                          v.name
-                            .toLowerCase()
-                            .includes(vendorSearch.toLowerCase()),
+                          v.name.toLowerCase().includes(vendorSearch.toLowerCase()),
                         )
                         .map((v) => (
                           <div
@@ -1074,16 +992,12 @@ export default function Orders() {
                         ))}
                       {vendorSearch &&
                         !vendors.some(
-                          (v) =>
-                            v.name.toLowerCase() === vendorSearch.toLowerCase(),
+                          (v) => v.name.toLowerCase() === vendorSearch.toLowerCase(),
                         ) && (
                           <div
                             onMouseDown={() => {
                               const newName = vendorSearch.trim();
-                              setFormData({
-                                ...formData,
-                                dispatchedTo: newName,
-                              });
+                              setFormData({ ...formData, dispatchedTo: newName });
                               setVendorSearch(newName);
                               setVendors((prev) => [
                                 ...prev,
@@ -1112,7 +1026,7 @@ export default function Orders() {
                         setFormData((prev) => ({
                           ...prev,
                           orderType: type,
-                          chairModel: "",
+                          items: [{ chairModel: "", quantity: "" }],
                         }))
                       }
                       className={`py-2.5 rounded-xl text-sm font-medium border transition-all ${
@@ -1143,9 +1057,7 @@ export default function Orders() {
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
                   <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wide">
-                    {formData.orderType === "FULL"
-                      ? "Chair Models"
-                      : "Spare Parts"}
+                    {formData.orderType === "FULL" ? "Chair Models" : "Spare Parts"}
                   </label>
                   <button
                     type="button"
@@ -1183,22 +1095,16 @@ export default function Orders() {
                           const updated = [...itemSearches];
                           updated[index] = e.target.value;
                           setItemSearches(updated);
-                          updateItem(index, "chairModel", e.target.value); // allow free text too
+                          updateItem(index, "chairModel", e.target.value);
                         }}
                         className="w-full px-3 py-2 bg-white border border-gray-200 rounded-xl text-sm outline-none focus:border-[#c62d23] focus:ring-2 focus:ring-[#c62d23]/15 transition-all"
                       />
                       {showItemDropdowns[index] && (
                         <div className="absolute z-10 left-0 right-0 bg-white border border-gray-200 mt-1 rounded-xl max-h-44 overflow-auto shadow-xl">
-                          {(formData.orderType === "FULL"
-                            ? chairModels
-                            : spareParts
-                          )
+                          {(formData.orderType === "FULL" ? chairModels : spareParts)
+                            .filter((m) => typeof m === "string") // guard non-strings
                             .filter((m) =>
-                              m
-                                .toLowerCase()
-                                .includes(
-                                  (itemSearches[index] || "").toLowerCase(),
-                                ),
+                              m.toLowerCase().includes((itemSearches[index] || "").toLowerCase()),
                             )
                             .map((m) => (
                               <div
@@ -1217,46 +1123,25 @@ export default function Orders() {
                                 {m}
                               </div>
                             ))}
-                          {/* Add new option */}
-                          {itemSearches[index] &&
-                            !(
-                              formData.orderType === "FULL"
-                                ? chairModels
-                                : spareParts
-                            ).some(
+                          {/* Add new option — only for spare parts since chairs come from inventory */}
+                          {formData.orderType === "SPARE" &&
+                            itemSearches[index] &&
+                            !spareParts.some(
                               (m) =>
-                                m.toLowerCase() ===
-                                (itemSearches[index] || "").toLowerCase(),
+                                typeof m === "string" &&
+                                m.toLowerCase() === (itemSearches[index] || "").toLowerCase(),
                             ) && (
                               <div
                                 onMouseDown={async () => {
                                   const newName = itemSearches[index].trim();
-                                  // Save to backend
                                   try {
-                                    if (formData.orderType === "FULL") {
-                                      await axios.post(
-                                        `${API}/inventory/chair-models`,
-                                        { name: newName },
-                                        { headers },
-                                      );
-                                      setChairModels((prev) => [
-                                        ...prev,
-                                        newName,
-                                      ]);
-                                    } else {
-                                      await axios.post(
-                                        `${API}/inventory/spare-part-names`,
-                                        { name: newName },
-                                        { headers },
-                                      );
-                                      setSpareParts((prev) => [
-                                        ...prev,
-                                        newName,
-                                      ]);
-                                    }
-                                  } catch {
-                                    // Even if save fails, allow it locally
-                                  }
+                                    await axios.post(
+                                      `${API}/inventory/spare-part-names`,
+                                      { name: newName },
+                                      { headers },
+                                    );
+                                    setSpareParts((prev) => [...prev, newName]);
+                                  } catch {}
                                   updateItem(index, "chairModel", newName);
                                   const dropdowns = [...showItemDropdowns];
                                   dropdowns[index] = false;
@@ -1264,24 +1149,20 @@ export default function Orders() {
                                 }}
                                 className="px-4 py-2.5 bg-gray-50 hover:bg-green-50 cursor-pointer text-green-700 font-medium text-sm"
                               >
-                                ➕ Add "{itemSearches[index]}" as new{" "}
-                                {formData.orderType === "FULL"
-                                  ? "model"
-                                  : "part"}
+                                ➕ Add "{itemSearches[index]}" as new part
                               </div>
                             )}
                         </div>
                       )}
                     </div>
 
+                    {/* Quantity */}
                     <input
                       type="number"
                       min="1"
                       placeholder="Qty"
                       value={item.quantity}
-                      onChange={(e) =>
-                        updateItem(index, "quantity", e.target.value)
-                      }
+                      onChange={(e) => updateItem(index, "quantity", e.target.value)}
                       className="w-20 px-3 py-2 bg-white border border-gray-200 rounded-xl text-sm outline-none focus:border-[#c62d23] focus:ring-2 focus:ring-[#c62d23]/15 transition-all"
                     />
 
@@ -1290,12 +1171,8 @@ export default function Orders() {
                         type="button"
                         onClick={() => {
                           removeItem(index);
-                          setItemSearches((prev) =>
-                            prev.filter((_, i) => i !== index),
-                          );
-                          setShowItemDropdowns((prev) =>
-                            prev.filter((_, i) => i !== index),
-                          );
+                          setItemSearches((prev) => prev.filter((_, i) => i !== index));
+                          setShowItemDropdowns((prev) => prev.filter((_, i) => i !== index));
                         }}
                         className="p-1.5 text-gray-400 hover:text-red-500 transition-colors rounded-lg hover:bg-red-50"
                       >
@@ -1305,6 +1182,7 @@ export default function Orders() {
                   </div>
                 ))}
               </div>
+
               {/* Order Date (readonly) */}
               <FormField label="Order Date">
                 <div className="w-full px-4 py-2.5 bg-gray-50 border border-gray-100 rounded-xl text-sm text-gray-500 select-none">
@@ -1368,31 +1246,25 @@ function ExpandedProgress({ order, FULL_ORDER_STEPS, SPARE_ORDER_STEPS }) {
   return (
     <div className="space-y-4">
       {order.items && order.items.length > 0 && (
-  <div className="mb-5">
-    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
-      Items
-    </p>
-
-    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-      {order.items.map((item, idx) => (
-        <div
-          key={idx}
-          className="flex justify-between items-center px-3 py-2 rounded-lg border border-gray-100 bg-gray-50 text-sm"
-        >
-          <span className="font-medium text-gray-800">
-            {item.name}
-          </span>
-          <span className="font-semibold text-gray-900">
-            × {item.quantity}
-          </span>
+        <div className="mb-5">
+          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
+            Items
+          </p>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+            {order.items.map((item, idx) => (
+              <div
+                key={idx}
+                className="flex justify-between items-center px-3 py-2 rounded-lg border border-gray-100 bg-gray-50 text-sm"
+              >
+                <span className="font-medium text-gray-800">{item.name}</span>
+                <span className="font-semibold text-gray-900">× {item.quantity}</span>
+              </div>
+            ))}
+          </div>
         </div>
-      ))}
-    </div>
-  </div>
-)}
-      <div className="flex items-center justify-between">
-        {/* ── ITEMS SECTION ── */}
+      )}
 
+      <div className="flex items-center justify-between">
         <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
           Order Progress
         </p>
@@ -1421,10 +1293,7 @@ function ExpandedProgress({ order, FULL_ORDER_STEPS, SPARE_ORDER_STEPS }) {
           const done = index < safeIndex;
           const active = index === safeIndex;
           return (
-            <div
-              key={step.key}
-              className="flex flex-col items-center gap-1.5 flex-1"
-            >
+            <div key={step.key} className="flex flex-col items-center gap-1.5 flex-1">
               <div
                 className={`w-5 h-5 rounded-full border-2 flex items-center justify-center text-[10px] font-bold transition-all ${
                   done
@@ -1473,15 +1342,7 @@ function StatusPill({ variant, label }) {
   );
 }
 
-function StatCard({
-  title,
-  value,
-  icon,
-  danger,
-  onClick,
-  active,
-  accentColor,
-}) {
+function StatCard({ title, value, icon, danger, onClick, active, accentColor }) {
   return (
     <div
       onClick={onClick}
@@ -1495,9 +1356,7 @@ function StatCard({
       }}
     >
       <div className="flex items-start justify-between mb-3">
-        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
-          {title}
-        </p>
+        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">{title}</p>
         <div
           className="p-1.5 rounded-lg transition-colors"
           style={{ backgroundColor: `${accentColor}15`, color: accentColor }}

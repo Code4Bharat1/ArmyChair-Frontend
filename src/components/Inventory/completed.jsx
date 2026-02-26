@@ -95,40 +95,123 @@ export default function CompletedOrders() {
 
   /* ================= CSV EXPORT ================= */
   const exportCSV = () => {
-    const activeOrders = activeTab === "FULL" ? fullCompleted : spareCompleted;
-    if (!activeOrders.length) return;
+  const activeOrders = activeTab === "FULL" ? fullCompleted : spareCompleted;
+  if (!activeOrders.length) return alert("No orders to export");
 
-    const hdrs = ["Order ID", "Dispatched To", "Chair / Part", "Order Date", "Quantity", "Dispatched Qty", "Batches", "Completed At", "Status"];
-    const rows = activeOrders.map((o) => {
-      const late = (() => {
-        if (!o.deliveryDate) return false;
-        const d = new Date(o.deliveryDate); d.setHours(0, 0, 0, 0);
-        const c = new Date(o.updatedAt || o.createdAt); c.setHours(0, 0, 0, 0);
-        return c > d;
-      })();
-      const qty = o.items?.length ? o.items.reduce((s, i) => s + Number(i.quantity), 0) : o.quantity;
-      return [
+  const rows = [];
+
+  // Build per-batch rows
+  activeOrders.forEach((o) => {
+    const vendorName = o.dispatchedTo?.name || "";
+    const orderDate = o.orderDate ? new Date(o.orderDate).toLocaleDateString("en-GB") : "";
+    const deliveryDate = o.deliveryDate ? new Date(o.deliveryDate).toLocaleDateString("en-GB") : "";
+    const completedOn = new Date(o.updatedAt || o.createdAt).toLocaleDateString("en-GB");
+
+    const totalQty = o.items?.length
+      ? o.items.reduce((s, i) => s + Number(i.quantity || 0), 0)
+      : Number(o.quantity || 0);
+
+    const isLate = (() => {
+      if (!o.deliveryDate) return false;
+      const d = new Date(o.deliveryDate); d.setHours(0, 0, 0, 0);
+      const c = new Date(o.updatedAt || o.createdAt); c.setHours(0, 0, 0, 0);
+      return c > d;
+    })();
+
+    const itemsSummary = o.items?.length > 1
+      ? o.items.map((i) => `${i.name} × ${i.quantity}`).join(" | ")
+      : (o.items?.[0]?.name || o.chairModel || "");
+
+    const dispatches = o.dispatches || [];
+
+    if (dispatches.length === 0) {
+      // No batch records — single row
+      rows.push([
         o.orderId,
-        o.dispatchedTo?.name,
-        o.items?.length > 1 ? o.items.map(i => `${i.name}×${i.quantity}`).join(" | ") : (o.items?.[0]?.name || o.chairModel),
-        new Date(o.orderDate).toLocaleDateString(),
-        qty,
-        o.dispatchedQuantity || qty,
-        o.dispatches?.length || 1,
-        new Date(o.updatedAt || o.createdAt).toLocaleDateString(),
-        late ? "Completed Late" : "On Time",
-      ];
-    });
+        vendorName,
+        itemsSummary,
+        orderDate,
+        deliveryDate,
+        completedOn,
+        totalQty,
+        o.dispatchedQuantity || totalQty,
+        1,
+        "Batch 1",
+        new Date(o.updatedAt || o.createdAt).toLocaleDateString("en-GB"),
+        o.dispatchedQuantity || totalQty,
+        "",
+        isLate ? "Completed Late" : "On Time",
+        o.progress,
+      ]);
+    } else {
+      // One row per batch
+      dispatches.forEach((d, idx) => {
+        const batchDate = d.date ? new Date(d.date).toLocaleDateString("en-GB") : "";
+        
+        // Per-item breakdown for this batch
+        const batchItemsSummary = d.itemQuantities
+          ? Object.entries(d.itemQuantities)
+              .filter(([, qty]) => Number(qty) > 0)
+              .map(([name, qty]) => `${name} × ${qty}`)
+              .join(" | ")
+          : `${d.quantity} units`;
 
-    const csvContent = "data:text/csv;charset=utf-8," +
-      [hdrs, ...rows].map((e) => e.join(",")).join("\n");
-    const link = document.createElement("a");
-    link.setAttribute("href", encodeURI(csvContent));
-    link.setAttribute("download", `completed_orders_${activeTab.toLowerCase()}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  };
+        rows.push([
+          o.orderId,
+          vendorName,
+          itemsSummary,
+          orderDate,
+          deliveryDate,
+          completedOn,
+          totalQty,
+          o.dispatchedQuantity || totalQty,
+          dispatches.length,
+          `Batch ${idx + 1}`,
+          batchDate,
+          d.quantity,
+          batchItemsSummary,
+          isLate ? "Completed Late" : "On Time",
+          o.progress,
+        ]);
+      });
+    }
+  });
+
+  const headers = [
+    "Order ID",
+    "Client",
+    "Items",
+    "Order Date",
+    "Delivery Date",
+    "Completed On",
+    "Total Qty Ordered",
+    "Total Qty Dispatched",
+    "Total Batches",
+    "Batch No",
+    "Batch Date",
+    "Batch Qty",
+    "Batch Item Breakdown",
+    "Status",
+    "Progress",
+  ];
+
+  const csvContent =
+    [headers, ...rows]
+      .map((row) =>
+        row.map((cell) => `"${String(cell ?? "").replace(/"/g, '""')}"`).join(",")
+      )
+      .join("\n");
+
+  const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `completed_orders_${activeTab.toLowerCase()}_${new Date().toISOString().slice(0, 10)}.csv`;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+};
 
   const DATE_BTNS = [
     { label: "All",       value: "ALL"          },
@@ -343,11 +426,21 @@ const DispatchHistoryPanel = ({ order: o }) => {
     });
   };
 
+  // Per-item dispatched totals across all batches
+  const itemDispatchedMap = {};
+  dispatches.forEach((d) => {
+    if (d.itemQuantities) {
+      Object.entries(d.itemQuantities).forEach(([name, qty]) => {
+        itemDispatchedMap[name] = (itemDispatchedMap[name] || 0) + Number(qty || 0);
+      });
+    }
+  });
+
   return (
     <div className="bg-gradient-to-br from-gray-50 to-white border-t border-gray-100 px-4 sm:px-6 md:px-8 py-5">
       <div className="max-w-4xl">
 
-        {/* ── top bar: summary stats + progress ── */}
+        {/* ── Summary stats + progress bar ── */}
         <div className="flex flex-col sm:flex-row sm:items-center gap-4 mb-5">
           <div className="flex gap-6">
             <div className="text-center">
@@ -368,7 +461,6 @@ const DispatchHistoryPanel = ({ order: o }) => {
             </div>
           </div>
 
-          {/* progress bar */}
           {totalQty > 0 && (
             <div className="flex-1 min-w-0">
               <div className="flex justify-between text-[10px] text-gray-400 mb-1">
@@ -387,33 +479,53 @@ const DispatchHistoryPanel = ({ order: o }) => {
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
 
-          {/* ── LEFT: spare items (if any) ── */}
+          {/* ── LEFT: Order Items with per-item dispatch progress ── */}
           {isMultiPart && (
             <div>
               <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
-                Order Items
+                Items Progress
               </p>
-              <div className="space-y-1.5">
-                {o.items.map((item, i) => (
-                  <div key={i} className="flex items-center justify-between bg-white border border-gray-200 rounded-lg px-3 py-2 text-xs shadow-sm">
-                    <span className="font-medium text-gray-800 capitalize">{item.name}</span>
-                    <span className="bg-[#c62d23]/10 text-[#c62d23] font-bold px-2 py-0.5 rounded-full">
-                      × {item.quantity}
-                    </span>
-                  </div>
-                ))}
+              <div className="space-y-2">
+                {o.items.map((item, i) => {
+                  const dispatched = itemDispatchedMap[item.name] || 0;
+                  const remaining = item.quantity - dispatched;
+                  const pct = Math.min(100, Math.round((dispatched / item.quantity) * 100));
+                  return (
+                    <div key={i} className="bg-white border border-gray-200 rounded-xl px-3 py-2.5 shadow-sm">
+                      <div className="flex items-center justify-between mb-1.5">
+                        <span className="font-semibold text-sm text-gray-800 capitalize truncate">{item.name}</span>
+                        <span className="text-xs text-gray-500 shrink-0 ml-2">
+                          <span className="font-bold text-blue-600">{dispatched}</span>
+                          <span className="text-gray-400"> / {item.quantity}</span>
+                        </span>
+                      </div>
+                      <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                        <div
+                          className={`h-full rounded-full transition-all ${pct >= 100 ? 'bg-green-500' : 'bg-[#c62d23]'}`}
+                          style={{ width: `${pct}%` }}
+                        />
+                      </div>
+                      <div className="flex justify-between mt-1">
+                        <span className="text-[10px] text-gray-400">{pct}% dispatched</span>
+                        {remaining > 0
+                          ? <span className="text-[10px] text-amber-600 font-medium">{remaining} remaining</span>
+                          : <span className="text-[10px] text-green-600 font-medium">✓ Complete</span>
+                        }
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             </div>
           )}
 
-          {/* ── RIGHT: batch-by-batch dispatch history ── */}
+          {/* ── RIGHT: Batch-by-batch dispatch history ── */}
           <div className={isMultiPart ? "" : "lg:col-span-2"}>
             <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
               Dispatch Batches
             </p>
 
             {dispatches.length === 0 ? (
-              /* fallback: order dispatched in one shot, no batch records */
               <div className="bg-white border border-gray-200 rounded-xl px-4 py-3 shadow-sm flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <span className="bg-[#c62d23] text-white text-[10px] font-bold px-2 py-0.5 rounded-full">
@@ -424,16 +536,14 @@ const DispatchHistoryPanel = ({ order: o }) => {
                     <p className="text-[11px] text-gray-400 mt-0.5">Single dispatch</p>
                   </div>
                 </div>
-                <span className="text-[11px] text-gray-400">
-                  {formatDate(o.updatedAt)}
-                </span>
+                <span className="text-[11px] text-gray-400">{formatDate(o.updatedAt)}</span>
               </div>
             ) : (
               <div className="space-y-2">
                 {dispatches.map((d, i) => (
                   <div key={i} className="bg-white border border-gray-200 rounded-xl px-4 py-3 shadow-sm">
-                    {/* row 1 */}
-                    <div className="flex items-center justify-between mb-1">
+                    {/* Header row */}
+                    <div className="flex items-center justify-between mb-2">
                       <div className="flex items-center gap-2.5">
                         <span className="bg-[#c62d23] text-white text-[10px] font-bold px-2 py-0.5 rounded-full whitespace-nowrap">
                           Batch {i + 1}
@@ -442,20 +552,32 @@ const DispatchHistoryPanel = ({ order: o }) => {
                           {d.quantity} unit{d.quantity !== 1 ? "s" : ""}
                         </p>
                       </div>
-                      <span className="text-[11px] text-gray-400 whitespace-nowrap">
-                        {formatDate(d.date)}
-                      </span>
+                      <span className="text-[11px] text-gray-400 whitespace-nowrap">{formatDate(d.date)}</span>
                     </div>
 
-                    {/* row 2: notes */}
+                    {/* Per-item breakdown (if itemQuantities exists) */}
+                    {d.itemQuantities && Object.keys(d.itemQuantities).length > 0 && (
+                      <div className="mt-2 space-y-1">
+                        {Object.entries(d.itemQuantities)
+                          .filter(([, qty]) => Number(qty) > 0)
+                          .map(([name, qty]) => (
+                            <div key={name} className="flex items-center justify-between bg-gray-50 rounded-lg px-2.5 py-1.5 text-xs">
+                              <span className="text-gray-700 font-medium capitalize truncate">{name}</span>
+                              <span className="font-bold text-[#c62d23] shrink-0 ml-2">× {qty}</span>
+                            </div>
+                          ))}
+                      </div>
+                    )}
+
+                    {/* Notes */}
                     {d.notes && (
-                      <p className="text-[11px] text-gray-500 mt-1.5 flex items-start gap-1.5">
+                      <p className="text-[11px] text-gray-500 mt-2 flex items-start gap-1.5">
                         <span className="mt-px">📝</span>
                         <span>{d.notes}</span>
                       </p>
                     )}
 
-                    {/* row 3: dispatched by (if populated) */}
+                    {/* Dispatched by */}
                     {d.dispatchedBy?.name && (
                       <p className="text-[11px] text-gray-400 mt-1 flex items-center gap-1.5">
                         <span>👤</span>

@@ -4,27 +4,40 @@ import axios from "axios";
 import {
   CalendarDays, Download, History, Search, Filter,
   Package, Clock, CheckCircle2, RefreshCw, Eye,
-  X, ChevronUp, ChevronDown, ShoppingCart, Truck, Calendar
+  X, ChevronUp, ChevronDown, ShoppingCart, Truck, Calendar,
+  FileText, FileSpreadsheet, Send
 } from "lucide-react";
 import Sidebar from "./sidebar";
 import * as XLSX from "xlsx";
 
-
 /* ── status badge colours ── */
 const STATUS_STYLES = {
-  delivered:   "bg-green-50 text-green-700 border-green-200",
-  pending:     "bg-yellow-50 text-yellow-700 border-yellow-200",
-  in_transit:  "bg-blue-50 text-blue-700 border-blue-200",
-  processing:  "bg-purple-50 text-purple-700 border-purple-200",
-  cancelled:   "bg-red-50 text-red-700 border-red-200",
+  delivered:          "bg-green-50 text-green-700 border-green-200",
+  pending:            "bg-yellow-50 text-yellow-700 border-yellow-200",
+  in_transit:         "bg-blue-50 text-blue-700 border-blue-200",
+  processing:         "bg-purple-50 text-purple-700 border-purple-200",
+  cancelled:          "bg-red-50 text-red-700 border-red-200",
+  dispatched:         "bg-indigo-50 text-indigo-700 border-indigo-200",
+  partially_dispatched: "bg-orange-50 text-orange-700 border-orange-200",
+  ready_for_dispatch: "bg-teal-50 text-teal-700 border-teal-200",
+  production_pending: "bg-pink-50 text-pink-700 border-pink-200",
+  fitting_completed:  "bg-cyan-50 text-cyan-700 border-cyan-200",
+  order_placed:       "bg-sky-50 text-sky-700 border-sky-200",
 };
 const getStatusStyle = (s = "") =>
   STATUS_STYLES[s.toLowerCase().replace(/ /g, "_")] ??
   "bg-blue-50 text-blue-700 border-blue-200";
 
 /* ── tiny stat card ── */
-const StatCard = ({ icon: Icon, label, value, iconClass }) => (
-  <div className="bg-white border border-gray-200 rounded-2xl p-4 shadow-sm flex items-center gap-3">
+const StatCard = ({ icon: Icon, label, value, iconClass, active, onClick }) => (
+  <button
+    onClick={onClick}
+    className={`bg-white border rounded-2xl p-4 shadow-sm flex items-center gap-3 w-full text-left transition-all hover:shadow-md hover:-translate-y-0.5 ${
+      active
+        ? "border-[#c62d23] ring-2 ring-[#c62d23]/20 shadow-md"
+        : "border-gray-200 hover:border-gray-300"
+    }`}
+  >
     <div className={`p-2 rounded-xl ${iconClass}`}>
       <Icon size={18} />
     </div>
@@ -32,7 +45,10 @@ const StatCard = ({ icon: Icon, label, value, iconClass }) => (
       <p className="text-xl font-bold text-gray-900">{value}</p>
       <p className="text-xs text-gray-500">{label}</p>
     </div>
-  </div>
+    {active && (
+      <span className="ml-auto w-2 h-2 rounded-full bg-[#c62d23] shrink-0" />
+    )}
+  </button>
 );
 
 /* ── order detail modal ── */
@@ -112,22 +128,29 @@ const ORDER_TYPE_TABS = [
   },
 ];
 
+/* ── dispatched statuses (all statuses that count as "dispatched") ── */
+const DISPATCHED_STATUSES = ["dispatched", "partially_dispatched", "fitting_completed"];
+
 export default function OrderHistory() {
-  const [orders,        setOrders]        = useState([]);
-  const [loading,       setLoading]       = useState(true);
-  const [refreshing,    setRefreshing]    = useState(false);
-  const [range,         setRange]         = useState("all");
-  const [search,        setSearch]        = useState("");
-  const [statusFilter,  setStatusFilter]  = useState("all");
-  const [sortField,     setSortField]     = useState("orderDate");
-  const [sortDir,       setSortDir]       = useState("desc");
-  const [selectedOrder, setSelectedOrder] = useState(null);
-  const [orderTypeTab,  setOrderTypeTab]  = useState("all"); // ← NEW
-const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  // ── Calendar custom range state ──
-  const [showCalendar,  setShowCalendar]  = useState(false);
-  const [customFrom,    setCustomFrom]    = useState("");
-  const [customTo,      setCustomTo]      = useState("");
+  const [orders,           setOrders]           = useState([]);
+  const [loading,          setLoading]          = useState(true);
+  const [refreshing,       setRefreshing]       = useState(false);
+  const [range,            setRange]            = useState("all");
+  const [search,           setSearch]           = useState("");
+  const [statusFilter,     setStatusFilter]     = useState("all");
+  const [sortField,        setSortField]        = useState("orderDate");
+  const [sortDir,          setSortDir]          = useState("desc");
+  const [selectedOrder,    setSelectedOrder]    = useState(null);
+  const [orderTypeTab,     setOrderTypeTab]     = useState("all");
+  const [activeStatFilter, setActiveStatFilter] = useState(null); // "delivered" | "pending" | "dispatched" | null
+  const [mobileMenuOpen,   setMobileMenuOpen]   = useState(false);
+  const [showExportMenu,   setShowExportMenu]   = useState(false);
+  const exportMenuRef = useRef(null);
+
+  /* ── Calendar custom range state ── */
+  const [showCalendar, setShowCalendar] = useState(false);
+  const [customFrom,   setCustomFrom]   = useState("");
+  const [customTo,     setCustomTo]     = useState("");
   const calendarRef = useRef(null);
 
   const API    = process.env.NEXT_PUBLIC_API_URL;
@@ -137,9 +160,10 @@ const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   /* ── close calendar on outside click ── */
   useEffect(() => {
     const handler = (e) => {
-      if (calendarRef.current && !calendarRef.current.contains(e.target)) {
+      if (calendarRef.current && !calendarRef.current.contains(e.target))
         setShowCalendar(false);
-      }
+      if (exportMenuRef.current && !exportMenuRef.current.contains(e.target))
+        setShowExportMenu(false);
     };
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
@@ -176,18 +200,14 @@ const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
     setRange("thisMonth");
   };
 
-  /* ── helper: determine order type from an order object ──
-     Adjust the condition to match your actual data shape.
-     Here we assume orders have an `orderType` field: "fullChair" | "sparePart"
-     OR we fall back to checking if `chairModel` is set (full chair) vs not (spare part).
-  ── */
+  /* ── determine order type ── */
   const getOrderType = (o) => {
     const t = (o.orderType || "").toUpperCase().trim();
     if (t === "SPARE") return "sparePart";
-    return "fullChair"; // "FULL" or anything else → full chair
+    return "fullChair";
   };
 
-  /* ── per-tab counts (before other filters) ── */
+  /* ── per-tab counts ── */
   const tabCounts = useMemo(() => {
     const all       = orders.length;
     const fullChair = orders.filter((o) => getOrderType(o) === "fullChair").length;
@@ -202,22 +222,45 @@ const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   );
 
   const stats = useMemo(() => ({
-    total:     orders.length,
-    totalQty:  orders.reduce((s, o) => s + (o.quantity || 0), 0),
-    delivered: orders.filter((o) => o.progress?.toLowerCase() === "delivered").length,
-    pending:   orders.filter((o) =>
-      ["pending", "processing"].includes(o.progress?.toLowerCase())).length,
+    total:      orders.length,
+    totalQty:   orders.reduce((s, o) => s + (o.quantity || 0), 0),
+    delivered:  orders.filter((o) => o.progress?.toLowerCase() === "delivered").length,
+    pending:    orders.filter((o) =>
+      ["pending", "processing", "production_pending", "order_placed", "ready_for_dispatch"]
+        .includes(o.progress?.toLowerCase().replace(/ /g, "_"))).length,
+    dispatched: orders.filter((o) =>
+      DISPATCHED_STATUSES.includes(o.progress?.toLowerCase().replace(/ /g, "_"))).length,
   }), [orders]);
+
+  /* ── stat card click handler: toggle filter ── */
+  const handleStatClick = (filterKey) => {
+    setActiveStatFilter((prev) => (prev === filterKey ? null : filterKey));
+    setStatusFilter("all"); // reset dropdown when using stat card
+  };
 
   const filtered = useMemo(() => {
     let r = [...orders];
 
-    // ── order type tab filter ──
+    // ── order type tab ──
     if (orderTypeTab !== "all") {
       r = r.filter((o) => getOrderType(o) === orderTypeTab);
     }
 
-    // ── custom date range filter (client-side) ──
+    // ── stat card quick filter ──
+    if (activeStatFilter === "delivered") {
+      r = r.filter((o) => o.progress?.toLowerCase() === "delivered");
+    } else if (activeStatFilter === "pending") {
+      r = r.filter((o) =>
+        ["pending", "processing", "production_pending", "order_placed", "ready_for_dispatch"]
+          .includes(o.progress?.toLowerCase().replace(/ /g, "_"))
+      );
+    } else if (activeStatFilter === "dispatched") {
+      r = r.filter((o) =>
+        DISPATCHED_STATUSES.includes(o.progress?.toLowerCase().replace(/ /g, "_"))
+      );
+    }
+
+    // ── custom date range filter ──
     if (range === "custom" && customFrom && customTo) {
       const from = new Date(customFrom);
       from.setHours(0, 0, 0, 0);
@@ -239,7 +282,9 @@ const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
           : o.dispatchedTo)?.toLowerCase().includes(q)
       );
     }
+
     if (statusFilter !== "all") r = r.filter((o) => o.progress === statusFilter);
+
     r.sort((a, b) => {
       let av = a[sortField], bv = b[sortField];
       if (sortField.includes("Date")) { av = new Date(av || 0); bv = new Date(bv || 0); }
@@ -249,17 +294,16 @@ const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
         : av > bv ? -1 : av < bv ? 1 : 0;
     });
     return r;
-  }, [orders, search, statusFilter, sortField, sortDir, range, customFrom, customTo, orderTypeTab]);
+  }, [orders, search, statusFilter, sortField, sortDir, range, customFrom, customTo, orderTypeTab, activeStatFilter]);
 
   const toggleSort = (field) => {
     if (sortField === field) setSortDir((d) => (d === "asc" ? "desc" : "asc"));
     else { setSortField(field); setSortDir("asc"); }
   };
 
-  /* ── export ── */
-  const exportToExcel = () => {
-    if (!filtered.length) return;
-    const data = filtered.map((o) => ({
+  /* ── export helpers ── */
+  const getExportData = () =>
+    filtered.map((o) => ({
       "Order ID":      o.orderId,
       "Dispatched To": typeof o.dispatchedTo === "object" && o.dispatchedTo?.name
                          ? o.dispatchedTo.name : o.dispatchedTo,
@@ -269,11 +313,36 @@ const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
       Quantity:        o.quantity,
       Status:          o.progress?.replaceAll("_", " "),
     }));
+
+  const exportToExcel = () => {
+    if (!filtered.length) return;
+    const data = getExportData();
     const ws = XLSX.utils.json_to_sheet(data);
     ws["!cols"] = Object.keys(data[0]).map(() => ({ wch: 18 }));
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Orders");
     XLSX.writeFile(wb, `orders_${range}_${new Date().toISOString().slice(0, 10)}.xlsx`);
+    setShowExportMenu(false);
+  };
+
+  const exportToCSV = () => {
+    if (!filtered.length) return;
+    const data = getExportData();
+    const headers = Object.keys(data[0]);
+    const csvRows = [
+      headers.join(","),
+      ...data.map((row) =>
+        headers.map((h) => `"${String(row[h] ?? "").replace(/"/g, '""')}"`).join(",")
+      ),
+    ];
+    const blob = new Blob([csvRows.join("\n")], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `orders_${range}_${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+    setShowExportMenu(false);
   };
 
   /* ── sort icon ── */
@@ -302,465 +371,511 @@ const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const hasCustomActive = range === "custom" && customFrom && customTo;
 
   return (
+    /* ── Root: fixed height, flex row, no overflow on root ── */
+    <div className="flex h-screen overflow-hidden bg-gray-50 text-gray-900">
 
-    <div className="flex min-h-screen bg-gray-50 text-gray-900">
-      {/* Sidebar */}
-            <div className="hidden lg:block"><Sidebar /></div>
-            {mobileMenuOpen && (
-              <>
-                <div className="lg:hidden fixed inset-0 bg-black/50 z-40" onClick={() => setMobileMenuOpen(false)} />
-                <div className="lg:hidden fixed inset-y-0 left-0 z-50"><Sidebar onClose={() => setMobileMenuOpen(false)} /></div>
-              </>
-            )}
+      {/* ══ SIDEBAR — fixed, never scrolls ══ */}
+      <div className="hidden lg:flex lg:flex-col lg:shrink-0">
+        <Sidebar />
+      </div>
+
+      {/* Mobile sidebar overlay */}
+      {mobileMenuOpen && (
+        <>
+          <div
+            className="lg:hidden fixed inset-0 bg-black/50 z-40"
+            onClick={() => setMobileMenuOpen(false)}
+          />
+          <div className="lg:hidden fixed inset-y-0 left-0 z-50 flex flex-col">
+            <Sidebar onClose={() => setMobileMenuOpen(false)} />
+          </div>
+        </>
+      )}
+
+      {/* ══ ORDER MODAL ══ */}
       {selectedOrder && (
         <OrderModal order={selectedOrder} onClose={() => setSelectedOrder(null)} />
       )}
 
-      <div className="flex-1 overflow-auto">
+      {/* ══ MAIN CONTENT — scrollable ══ */}
+      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
 
-        {/* ══ HEADER ══ */}
-        <div className="sticky top-0 z-10 bg-white/80 backdrop-blur border-b border-gray-200 px-4 sm:px-6 py-4 sm:py-6 shadow-sm">
+        {/* ── HEADER — sticky inside main ── */}
+        <div className="shrink-0 bg-white/90 backdrop-blur border-b border-gray-200 px-4 sm:px-6 py-4 shadow-sm z-10">
           <div className="flex items-center justify-between gap-3">
-            <div>
-              <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 flex items-center gap-2">
-                <History size={28} className="text-[#c62d23] shrink-0" />
-                <span>Order History</span>
-              </h1>
-              <p className="text-xs sm:text-sm text-gray-600 mt-1">
-                View and search your past orders
-              </p>
+            <div className="flex items-center gap-3">
+              {/* Mobile hamburger */}
+              <button
+                className="lg:hidden p-2 rounded-xl border border-gray-200 bg-white text-gray-600 hover:bg-gray-100 transition-all"
+                onClick={() => setMobileMenuOpen(true)}
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/>
+                </svg>
+              </button>
+              <div>
+                <h1 className="text-xl sm:text-2xl font-bold text-gray-900 flex items-center gap-2">
+                  <History size={24} className="text-[#c62d23] shrink-0" />
+                  <span>Order History</span>
+                </h1>
+                <p className="text-xs text-gray-500 mt-0.5 hidden sm:block">
+                  View and search your past orders
+                </p>
+              </div>
             </div>
+
             <div className="flex items-center gap-2 shrink-0">
               <button
                 onClick={() => fetchHistory(range, true)}
                 disabled={refreshing}
                 title="Refresh"
-                className="p-2 sm:px-4 sm:py-2.5 rounded-xl border border-gray-200 bg-white text-gray-600 hover:bg-gray-100 transition-all disabled:opacity-50 flex items-center gap-2 text-sm font-medium shadow-sm"
+                className="p-2 sm:px-3 sm:py-2 rounded-xl border border-gray-200 bg-white text-gray-600 hover:bg-gray-100 transition-all disabled:opacity-50 flex items-center gap-2 text-sm font-medium shadow-sm"
               >
-                <RefreshCw size={16} className={refreshing ? "animate-spin" : ""} />
+                <RefreshCw size={15} className={refreshing ? "animate-spin" : ""} />
                 <span className="hidden sm:inline">Refresh</span>
               </button>
-              <button
-                onClick={exportToExcel}
-                disabled={loading || filtered.length === 0}
-                className="bg-green-600 hover:bg-green-700 text-white px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl flex items-center gap-2 shadow-sm font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed text-sm"
-              >
-                <Download size={16} />
-                <span className="hidden sm:inline">Export Excel</span>
-                <span className="sm:hidden">Export</span>
-              </button>
+
+              {/* Export dropdown */}
+              <div className="relative" ref={exportMenuRef}>
+                <button
+                  onClick={() => setShowExportMenu((v) => !v)}
+                  disabled={loading || filtered.length === 0}
+                  className="bg-green-600 hover:bg-green-700 text-white px-3 sm:px-4 py-2 rounded-xl flex items-center gap-2 shadow-sm font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+                >
+                  <Download size={15} />
+                  <span className="hidden sm:inline">Export</span>
+                  <ChevronDown size={13} />
+                </button>
+
+                {showExportMenu && (
+                  <div className="absolute right-0 top-full mt-1.5 z-30 bg-white border border-gray-200 rounded-xl shadow-xl overflow-hidden min-w-[160px]">
+                    <button
+                      onClick={exportToExcel}
+                      className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                    >
+                      <FileSpreadsheet size={15} className="text-green-600" />
+                      Export as Excel
+                    </button>
+                    <button
+                      onClick={exportToCSV}
+                      className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors border-t border-gray-100"
+                    >
+                      <FileText size={15} className="text-blue-600" />
+                      Export as CSV
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         </div>
 
-        <div className="p-4 sm:p-8 space-y-6 sm:space-y-8">
+        {/* ── SCROLLABLE CONTENT ── */}
+        <div className="flex-1 overflow-y-auto">
+          <div className="p-4 sm:p-6 space-y-5">
 
-          {/* ══ STAT CARDS ══ */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            <StatCard icon={ShoppingCart} label="Total Orders"  value={stats.total}     iconClass="bg-blue-50 text-blue-600"    />
-            <StatCard icon={Package}      label="Total Qty"      value={stats.totalQty}  iconClass="bg-violet-50 text-violet-600" />
-            <StatCard icon={CheckCircle2} label="Delivered"      value={stats.delivered} iconClass="bg-green-50 text-green-600"   />
-            <StatCard icon={Clock}        label="In Progress"    value={stats.pending}   iconClass="bg-yellow-50 text-yellow-600" />
-          </div>
+            {/* ══ STAT CARDS ══ */}
+            <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
+              {/* Total Orders — not a filter, just informational */}
+              <div className="bg-white border border-gray-200 rounded-2xl p-4 shadow-sm flex items-center gap-3">
+                <div className="p-2 rounded-xl bg-blue-50 text-blue-600">
+                  <ShoppingCart size={18} />
+                </div>
+                <div>
+                  <p className="text-xl font-bold text-gray-900">{stats.total}</p>
+                  <p className="text-xs text-gray-500">Total Orders</p>
+                </div>
+              </div>
 
-          {/* ══ ORDER TYPE TABS ══ */}
-          <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-sm">
-            <div className="flex divide-x divide-gray-200">
-              {ORDER_TYPE_TABS.map((tab) => {
-                const isActive = orderTypeTab === tab.value;
-                return (
-                  <button
-                    key={tab.value}
-                    onClick={() => setOrderTypeTab(tab.value)}
-                    className={`flex-1 flex items-center justify-center gap-2 px-4 py-3.5 text-sm font-semibold transition-all relative ${
-                      isActive
-                        ? "bg-[#c62d23] text-white shadow-inner"
-                        : "bg-white text-gray-600 hover:bg-gray-50 hover:text-gray-900"
-                    }`}
-                  >
-                    <span className={isActive ? "text-white" : "text-gray-400"}>
-                      {tab.icon}
-                    </span>
-                    <span className="hidden sm:inline">{tab.label}</span>
-                    <span className="sm:hidden">
-                      {tab.value === "all" ? "All" : tab.value === "fullChair" ? "Full Chair" : "Spare Parts"}
-                    </span>
-                    <span
-                      className={`inline-flex items-center justify-center min-w-[22px] h-[22px] px-1.5 rounded-full text-xs font-bold transition-all ${
+              {/* Total Qty */}
+              <div className="bg-white border border-gray-200 rounded-2xl p-4 shadow-sm flex items-center gap-3">
+                <div className="p-2 rounded-xl bg-violet-50 text-violet-600">
+                  <Package size={18} />
+                </div>
+                <div>
+                  <p className="text-xl font-bold text-gray-900">{stats.totalQty}</p>
+                  <p className="text-xs text-gray-500">Total Qty</p>
+                </div>
+              </div>
+
+              {/* Delivered — clickable */}
+              <StatCard
+                icon={CheckCircle2}
+                label="Delivered"
+                value={stats.delivered}
+                iconClass="bg-green-50 text-green-600"
+                active={activeStatFilter === "delivered"}
+                onClick={() => handleStatClick("delivered")}
+              />
+
+              {/* In Progress — clickable */}
+              <StatCard
+                icon={Clock}
+                label="In Progress"
+                value={stats.pending}
+                iconClass="bg-yellow-50 text-yellow-600"
+                active={activeStatFilter === "pending"}
+                onClick={() => handleStatClick("pending")}
+              />
+
+              {/* Dispatched — clickable (NEW) */}
+              <StatCard
+                icon={Send}
+                label="Dispatched"
+                value={stats.dispatched}
+                iconClass="bg-indigo-50 text-indigo-600"
+                active={activeStatFilter === "dispatched"}
+                onClick={() => handleStatClick("dispatched")}
+              />
+            </div>
+
+            {/* ══ ORDER TYPE TABS ══ */}
+            <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-sm">
+              <div className="flex divide-x divide-gray-200">
+                {ORDER_TYPE_TABS.map((tab) => {
+                  const isActive = orderTypeTab === tab.value;
+                  return (
+                    <button
+                      key={tab.value}
+                      onClick={() => setOrderTypeTab(tab.value)}
+                      className={`flex-1 flex items-center justify-center gap-2 px-4 py-3.5 text-sm font-semibold transition-all relative ${
                         isActive
-                          ? "bg-white/25 text-white"
-                          : "bg-gray-100 text-gray-600"
+                          ? "bg-[#c62d23] text-white shadow-inner"
+                          : "bg-white text-gray-600 hover:bg-gray-50 hover:text-gray-900"
                       }`}
                     >
-                      {tabCounts[tab.value]}
-                    </span>
-                    {/* Active bottom indicator */}
-                    {isActive && (
-                      <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-white/40" />
-                    )}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* ══ FILTERS ══ */}
-          <div className="bg-white border border-gray-200 rounded-2xl p-4 sm:p-6 shadow-sm space-y-4">
-
-            {/* ── Time range + Calendar ── */}
-            <div>
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Time Range</h3>
-              <div className="flex flex-wrap gap-2 sm:gap-3 items-center">
-                {[
-                  { label: "All Time",    value: "all"       },
-                  { label: "Today",       value: "today"     },
-                  { label: "Yesterday",   value: "yesterday" },
-                  { label: "Last 7 Days", value: "last7days" },
-                  { label: "This Month",  value: "thisMonth" },
-                  { label: "Last Month",  value: "lastMonth" },
-                ].map((btn) => (
-                  <button
-                    key={btn.value}
-                    onClick={() => {
-                      setRange(btn.value);
-                      setCustomFrom("");
-                      setCustomTo("");
-                      setShowCalendar(false);
-                    }}
-                    className={`px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl text-sm font-medium transition-all ${
-                      range === btn.value
-                        ? "bg-[#c62d23] text-white shadow-md"
-                        : "bg-gray-100 text-gray-700 hover:bg-gray-200 border border-gray-200"
-                    }`}
-                  >
-                    {btn.label}
-                  </button>
-                ))}
-
-                {/* ── Calendar button + popover ── */}
-                <div className="relative" ref={calendarRef}>
-                  <button
-                    onClick={() => setShowCalendar((v) => !v)}
-                    className={`flex items-center gap-2 px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl text-sm font-medium transition-all border ${
-                      hasCustomActive
-                        ? "bg-[#c62d23] text-white border-[#c62d23] shadow-md"
-                        : "bg-gray-100 text-gray-700 hover:bg-gray-200 border-gray-200"
-                    }`}
-                  >
-                    <Calendar size={15} />
-                    <span className="hidden sm:inline max-w-[180px] truncate">
-                      {hasCustomActive ? customLabel : "Custom Range"}
-                    </span>
-                    <span className="sm:hidden">Custom</span>
-                    {hasCustomActive && (
-                      <span
-                        className="ml-1 hover:text-white/70"
-                        onClick={(e) => { e.stopPropagation(); clearCustomRange(); }}
-                      >
-                        <X size={13} />
+                      <span className={isActive ? "text-white" : "text-gray-400"}>{tab.icon}</span>
+                      <span className="hidden sm:inline">{tab.label}</span>
+                      <span className="sm:hidden">
+                        {tab.value === "all" ? "All" : tab.value === "fullChair" ? "Full Chair" : "Spare Parts"}
                       </span>
+                      <span
+                        className={`inline-flex items-center justify-center min-w-[22px] h-[22px] px-1.5 rounded-full text-xs font-bold transition-all ${
+                          isActive ? "bg-white/25 text-white" : "bg-gray-100 text-gray-600"
+                        }`}
+                      >
+                        {tabCounts[tab.value]}
+                      </span>
+                      {isActive && <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-white/40" />}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* ══ FILTERS ══ */}
+            <div className="bg-white border border-gray-200 rounded-2xl p-4 sm:p-5 shadow-sm space-y-4">
+
+              {/* Time range */}
+              <div>
+                <h3 className="text-sm font-semibold text-gray-700 mb-3">Time Range</h3>
+                <div className="flex flex-wrap gap-2 items-center">
+                  {[
+                    { label: "All Time",    value: "all"       },
+                    { label: "Today",       value: "today"     },
+                    { label: "Yesterday",   value: "yesterday" },
+                    { label: "Last 7 Days", value: "last7days" },
+                    { label: "This Month",  value: "thisMonth" },
+                    { label: "Last Month",  value: "lastMonth" },
+                  ].map((btn) => (
+                    <button
+                      key={btn.value}
+                      onClick={() => { setRange(btn.value); setCustomFrom(""); setCustomTo(""); setShowCalendar(false); }}
+                      className={`px-3 py-2 rounded-xl text-sm font-medium transition-all ${
+                        range === btn.value
+                          ? "bg-[#c62d23] text-white shadow-md"
+                          : "bg-gray-100 text-gray-700 hover:bg-gray-200 border border-gray-200"
+                      }`}
+                    >
+                      {btn.label}
+                    </button>
+                  ))}
+
+                  {/* Calendar button */}
+                  <div className="relative" ref={calendarRef}>
+                    <button
+                      onClick={() => setShowCalendar((v) => !v)}
+                      className={`flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium transition-all border ${
+                        hasCustomActive
+                          ? "bg-[#c62d23] text-white border-[#c62d23] shadow-md"
+                          : "bg-gray-100 text-gray-700 hover:bg-gray-200 border-gray-200"
+                      }`}
+                    >
+                      <Calendar size={14} />
+                      <span className="hidden sm:inline max-w-[180px] truncate">
+                        {hasCustomActive ? customLabel : "Custom Range"}
+                      </span>
+                      <span className="sm:hidden">Custom</span>
+                      {hasCustomActive && (
+                        <span
+                          className="ml-1 hover:text-white/70"
+                          onClick={(e) => { e.stopPropagation(); clearCustomRange(); }}
+                        >
+                          <X size={13} />
+                        </span>
+                      )}
+                    </button>
+
+                    {showCalendar && (
+                      <div className="absolute left-0 top-full mt-2 z-30 bg-white border border-gray-200 rounded-2xl shadow-2xl p-5 w-72 sm:w-80">
+                        <div className="flex items-center justify-between mb-4">
+                          <p className="text-sm font-semibold text-gray-800">Select Date Range</p>
+                          <button onClick={() => setShowCalendar(false)} className="p-1 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-colors">
+                            <X size={14} />
+                          </button>
+                        </div>
+                        <div className="space-y-3">
+                          <div>
+                            <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">From</label>
+                            <input type="date" value={customFrom} max={customTo || toInputDate(new Date())} onChange={(e) => setCustomFrom(e.target.value)} className="w-full px-3 py-2.5 text-sm bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#c62d23]/20 focus:border-[#c62d23] transition-all" />
+                          </div>
+                          <div>
+                            <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">To</label>
+                            <input type="date" value={customTo} min={customFrom || undefined} max={toInputDate(new Date())} onChange={(e) => setCustomTo(e.target.value)} className="w-full px-3 py-2.5 text-sm bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#c62d23]/20 focus:border-[#c62d23] transition-all" />
+                          </div>
+                        </div>
+                        <div className="mt-4 pt-3 border-t border-gray-100">
+                          <p className="text-xs text-gray-400 font-medium mb-2">Quick select</p>
+                          <div className="flex flex-wrap gap-1.5">
+                            {[
+                              { label: "Last 3 months", days: 90 },
+                              { label: "Last 6 months", days: 180 },
+                              { label: "This year", days: null, year: true },
+                            ].map((p) => (
+                              <button
+                                key={p.label}
+                                onClick={() => {
+                                  const to = new Date();
+                                  const from = p.year ? new Date(to.getFullYear(), 0, 1) : new Date();
+                                  if (!p.year) from.setDate(from.getDate() - p.days);
+                                  setCustomFrom(toInputDate(from));
+                                  setCustomTo(toInputDate(to));
+                                }}
+                                className="px-2.5 py-1 text-xs rounded-lg bg-gray-100 text-gray-600 hover:bg-[#c62d23]/10 hover:text-[#c62d23] transition-colors font-medium border border-gray-200"
+                              >
+                                {p.label}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                        <div className="flex gap-2 mt-4">
+                          <button onClick={clearCustomRange} className="flex-1 py-2 text-sm font-medium rounded-xl border border-gray-200 text-gray-600 hover:bg-gray-50 transition-colors">Clear</button>
+                          <button onClick={applyCustomRange} disabled={!customFrom || !customTo} className="flex-1 py-2 text-sm font-semibold rounded-xl bg-[#c62d23] hover:bg-[#b02620] text-white transition-colors disabled:opacity-40 disabled:cursor-not-allowed shadow-sm">Apply</button>
+                        </div>
+                      </div>
                     )}
-                  </button>
+                  </div>
+                </div>
+              </div>
 
-                  {/* ── Popover ── */}
-                  {showCalendar && (
-                    <div className="absolute left-0 top-full mt-2 z-30 bg-white border border-gray-200 rounded-2xl shadow-2xl p-5 w-72 sm:w-80">
-                      <div className="flex items-center justify-between mb-4">
-                        <p className="text-sm font-semibold text-gray-800">Select Date Range</p>
-                        <button
-                          onClick={() => setShowCalendar(false)}
-                          className="p-1 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-colors"
-                        >
-                          <X size={14} />
-                        </button>
-                      </div>
-
-                      <div className="space-y-3">
-                        <div>
-                          <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">
-                            From
-                          </label>
-                          <input
-                            type="date"
-                            value={customFrom}
-                            max={customTo || toInputDate(new Date())}
-                            onChange={(e) => setCustomFrom(e.target.value)}
-                            className="w-full px-3 py-2.5 text-sm bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#c62d23]/20 focus:border-[#c62d23] transition-all"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">
-                            To
-                          </label>
-                          <input
-                            type="date"
-                            value={customTo}
-                            min={customFrom || undefined}
-                            max={toInputDate(new Date())}
-                            onChange={(e) => setCustomTo(e.target.value)}
-                            className="w-full px-3 py-2.5 text-sm bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#c62d23]/20 focus:border-[#c62d23] transition-all"
-                          />
-                        </div>
-                      </div>
-
-                      <div className="mt-4 pt-3 border-t border-gray-100">
-                        <p className="text-xs text-gray-400 font-medium mb-2">Quick select</p>
-                        <div className="flex flex-wrap gap-1.5">
-                          {[
-                            { label: "Last 3 months", days: 90 },
-                            { label: "Last 6 months", days: 180 },
-                            { label: "This year",     days: null, year: true },
-                          ].map((p) => (
-                            <button
-                              key={p.label}
-                              onClick={() => {
-                                const to = new Date();
-                                let from;
-                                if (p.year) {
-                                  from = new Date(to.getFullYear(), 0, 1);
-                                } else {
-                                  from = new Date();
-                                  from.setDate(from.getDate() - p.days);
-                                }
-                                setCustomFrom(toInputDate(from));
-                                setCustomTo(toInputDate(to));
-                              }}
-                              className="px-2.5 py-1 text-xs rounded-lg bg-gray-100 text-gray-600 hover:bg-[#c62d23]/10 hover:text-[#c62d23] transition-colors font-medium border border-gray-200"
-                            >
-                              {p.label}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-
-                      <div className="flex gap-2 mt-4">
-                        <button
-                          onClick={clearCustomRange}
-                          className="flex-1 py-2 text-sm font-medium rounded-xl border border-gray-200 text-gray-600 hover:bg-gray-50 transition-colors"
-                        >
-                          Clear
-                        </button>
-                        <button
-                          onClick={applyCustomRange}
-                          disabled={!customFrom || !customTo}
-                          className="flex-1 py-2 text-sm font-semibold rounded-xl bg-[#c62d23] hover:bg-[#b02620] text-white transition-colors disabled:opacity-40 disabled:cursor-not-allowed shadow-sm"
-                        >
-                          Apply
-                        </button>
-                      </div>
-                    </div>
+              {/* Search + status filter */}
+              <div className="flex flex-col sm:flex-row gap-3">
+                <div className="relative flex-1">
+                  <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+                  <input
+                    type="text"
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    placeholder="Search by order ID, chair, or customer…"
+                    className="w-full pl-9 pr-8 py-2.5 text-sm bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#c62d23]/20 focus:border-[#c62d23] transition-all"
+                  />
+                  {search && (
+                    <button onClick={() => setSearch("")} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+                      <X size={14} />
+                    </button>
                   )}
                 </div>
+                <div className="relative">
+                  <Filter size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+                  <select
+                    value={statusFilter}
+                    onChange={(e) => { setStatusFilter(e.target.value); setActiveStatFilter(null); }}
+                    className="w-full sm:w-auto pl-9 pr-4 py-2.5 text-sm bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#c62d23]/20 focus:border-[#c62d23] appearance-none cursor-pointer transition-all"
+                  >
+                    {statuses.map((s) => (
+                      <option key={s} value={s}>
+                        {s === "all" ? "All Statuses" : s.replaceAll("_", " ")}
+                      </option>
+                    ))}
+                  </select>
+                </div>
               </div>
+
+              {/* Active filter chips */}
+              {(search || statusFilter !== "all" || hasCustomActive || orderTypeTab !== "all" || activeStatFilter) && (
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-xs text-gray-400 font-medium">Active filters:</span>
+                  {activeStatFilter && (
+                    <span className="flex items-center gap-1 bg-[#c62d23]/10 text-[#c62d23] text-xs font-medium px-2.5 py-1 rounded-full">
+                      {activeStatFilter === "delivered" ? "Delivered" : activeStatFilter === "pending" ? "In Progress" : "Dispatched"}
+                      <button onClick={() => setActiveStatFilter(null)}><X size={11} /></button>
+                    </span>
+                  )}
+                  {orderTypeTab !== "all" && (
+                    <span className="flex items-center gap-1 bg-[#c62d23]/10 text-[#c62d23] text-xs font-medium px-2.5 py-1 rounded-full">
+                      {ORDER_TYPE_TABS.find((t) => t.value === orderTypeTab)?.label}
+                      <button onClick={() => setOrderTypeTab("all")}><X size={11} /></button>
+                    </span>
+                  )}
+                  {search && (
+                    <span className="flex items-center gap-1 bg-[#c62d23]/10 text-[#c62d23] text-xs font-medium px-2.5 py-1 rounded-full">
+                      "{search}"
+                      <button onClick={() => setSearch("")}><X size={11} /></button>
+                    </span>
+                  )}
+                  {statusFilter !== "all" && (
+                    <span className="flex items-center gap-1 bg-[#c62d23]/10 text-[#c62d23] text-xs font-medium px-2.5 py-1 rounded-full">
+                      {statusFilter.replaceAll("_", " ")}
+                      <button onClick={() => setStatusFilter("all")}><X size={11} /></button>
+                    </span>
+                  )}
+                  {hasCustomActive && (
+                    <span className="flex items-center gap-1 bg-[#c62d23]/10 text-[#c62d23] text-xs font-medium px-2.5 py-1 rounded-full">
+                      <Calendar size={10} />
+                      {customLabel}
+                      <button onClick={clearCustomRange}><X size={11} /></button>
+                    </span>
+                  )}
+                  <button
+                    onClick={() => { setSearch(""); setStatusFilter("all"); clearCustomRange(); setOrderTypeTab("all"); setActiveStatFilter(null); }}
+                    className="text-xs text-gray-400 underline hover:text-gray-600"
+                  >
+                    Clear all
+                  </button>
+                </div>
+              )}
             </div>
 
-            {/* Search + status filter */}
-            <div className="flex flex-col sm:flex-row gap-3">
-              <div className="relative flex-1">
-                <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
-                <input
-                  type="text"
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  placeholder="Search by order ID, chair, or customer…"
-                  className="w-full pl-9 pr-8 py-2.5 text-sm bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#c62d23]/20 focus:border-[#c62d23] transition-all"
-                />
-                {search && (
-                  <button
-                    onClick={() => setSearch("")}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                  >
-                    <X size={14} />
-                  </button>
-                )}
-              </div>
-
-              <div className="relative">
-                <Filter size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
-                <select
-                  value={statusFilter}
-                  onChange={(e) => setStatusFilter(e.target.value)}
-                  className="w-full sm:w-auto pl-9 pr-4 py-2.5 text-sm bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#c62d23]/20 focus:border-[#c62d23] appearance-none cursor-pointer transition-all"
-                >
-                  {statuses.map((s) => (
-                    <option key={s} value={s}>
-                      {s === "all" ? "All Statuses" : s.replaceAll("_", " ")}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
-
-            {/* Active filter chips */}
-            {(search || statusFilter !== "all" || hasCustomActive || orderTypeTab !== "all") && (
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="text-xs text-gray-400 font-medium">Active filters:</span>
-                {orderTypeTab !== "all" && (
-                  <span className="flex items-center gap-1 bg-[#c62d23]/10 text-[#c62d23] text-xs font-medium px-2.5 py-1 rounded-full">
-                    {ORDER_TYPE_TABS.find((t) => t.value === orderTypeTab)?.label}
-                    <button onClick={() => setOrderTypeTab("all")}><X size={11} /></button>
-                  </span>
-                )}
-                {search && (
-                  <span className="flex items-center gap-1 bg-[#c62d23]/10 text-[#c62d23] text-xs font-medium px-2.5 py-1 rounded-full">
-                    "{search}"
-                    <button onClick={() => setSearch("")}><X size={11} /></button>
-                  </span>
-                )}
-                {statusFilter !== "all" && (
-                  <span className="flex items-center gap-1 bg-[#c62d23]/10 text-[#c62d23] text-xs font-medium px-2.5 py-1 rounded-full">
-                    {statusFilter.replaceAll("_", " ")}
-                    <button onClick={() => setStatusFilter("all")}><X size={11} /></button>
-                  </span>
-                )}
-                {hasCustomActive && (
-                  <span className="flex items-center gap-1 bg-[#c62d23]/10 text-[#c62d23] text-xs font-medium px-2.5 py-1 rounded-full">
-                    <Calendar size={10} />
-                    {customLabel}
-                    <button onClick={clearCustomRange}><X size={11} /></button>
-                  </span>
-                )}
-                <button
-                  onClick={() => { setSearch(""); setStatusFilter("all"); clearCustomRange(); setOrderTypeTab("all"); }}
-                  className="text-xs text-gray-400 underline hover:text-gray-600"
-                >
-                  Clear all
-                </button>
-              </div>
-            )}
-          </div>
-
-          {/* ══ TABLE + MOBILE CARDS ══ */}
-          <div className="bg-white rounded-2xl overflow-hidden border border-gray-200 shadow-sm">
-            {loading ? (
-              <div className="p-12 text-center">
-                <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-[#c62d23]" />
-                <p className="mt-3 text-gray-500">Loading history…</p>
-              </div>
-            ) : filtered.length === 0 ? (
-              <div className="text-center text-gray-500 py-16 px-4">
-                <CalendarDays size={48} className="mx-auto mb-4 text-gray-300" />
-                <p className="text-lg font-medium">No orders found</p>
-                <p className="text-sm">No orders found for the selected period</p>
-                {(search || statusFilter !== "all" || hasCustomActive || orderTypeTab !== "all") && (
-                  <button
-                    onClick={() => { setSearch(""); setStatusFilter("all"); clearCustomRange(); setOrderTypeTab("all"); }}
-                    className="mt-4 text-sm text-[#c62d23] underline"
-                  >
-                    Clear filters
-                  </button>
-                )}
-              </div>
-            ) : (
-              <>
-                {/* ─── Desktop table ─── */}
-                <div className="hidden md:block overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="bg-gray-50 border-b border-gray-200">
-                        {COLS.map((col) => (
-                          <th
-                            key={col.field}
-                            onClick={() => col.sortable && toggleSort(col.field)}
-                            className={`p-4 text-left font-semibold text-gray-700 select-none ${
-                              col.sortable ? "cursor-pointer hover:text-gray-900" : ""
-                            }`}
-                          >
-                            <span className="flex items-center gap-1">
-                              {col.label}
-                              {col.sortable && <SortIcon field={col.field} />}
-                            </span>
-                          </th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {filtered.map((o, index) => {
-                        const name =
-                          typeof o.dispatchedTo === "object" && o.dispatchedTo?.name
-                            ? o.dispatchedTo.name
-                            : o.dispatchedTo;
-                        return (
-                          <tr
-                            key={o._id}
-                            className={`border-b border-gray-100 hover:bg-gray-50 transition-colors group ${
-                              index % 2 === 0 ? "bg-white" : "bg-gray-50"
-                            }`}
-                          >
-                            <td className="p-4 font-semibold text-gray-900">{o.orderId}</td>
-                            <td className="p-4 text-gray-700">{name}</td>
-                            <td className="p-4 font-medium text-gray-900">{o.chairModel}</td>
-                            <td className="p-4 text-gray-700">{new Date(o.orderDate).toLocaleDateString()}</td>
-                            <td className="p-4 text-gray-700">
-                              {o.deliveryDate ? new Date(o.deliveryDate).toLocaleDateString() : "—"}
-                            </td>
-                            <td className="p-4 font-semibold text-gray-900">{o.quantity}</td>
-                            <td className="p-4">
-                              <span className={`px-3 py-1 rounded-full text-xs font-medium border ${getStatusStyle(o.progress)}`}>
-                                {o.progress?.replaceAll("_", " ")}
+            {/* ══ TABLE + MOBILE CARDS ══ */}
+            <div className="bg-white rounded-2xl overflow-hidden border border-gray-200 shadow-sm">
+              {loading ? (
+                <div className="p-12 text-center">
+                  <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-[#c62d23]" />
+                  <p className="mt-3 text-gray-500">Loading history…</p>
+                </div>
+              ) : filtered.length === 0 ? (
+                <div className="text-center text-gray-500 py-16 px-4">
+                  <CalendarDays size={48} className="mx-auto mb-4 text-gray-300" />
+                  <p className="text-lg font-medium">No orders found</p>
+                  <p className="text-sm">No orders found for the selected filters</p>
+                  {(search || statusFilter !== "all" || hasCustomActive || orderTypeTab !== "all" || activeStatFilter) && (
+                    <button
+                      onClick={() => { setSearch(""); setStatusFilter("all"); clearCustomRange(); setOrderTypeTab("all"); setActiveStatFilter(null); }}
+                      className="mt-4 text-sm text-[#c62d23] underline"
+                    >
+                      Clear filters
+                    </button>
+                  )}
+                </div>
+              ) : (
+                <>
+                  {/* Desktop table */}
+                  <div className="hidden md:block overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="bg-gray-50 border-b border-gray-200">
+                          {COLS.map((col) => (
+                            <th
+                              key={col.field}
+                              onClick={() => col.sortable && toggleSort(col.field)}
+                              className={`p-4 text-left font-semibold text-gray-700 select-none ${
+                                col.sortable ? "cursor-pointer hover:text-gray-900" : ""
+                              }`}
+                            >
+                              <span className="flex items-center gap-1">
+                                {col.label}
+                                {col.sortable && <SortIcon field={col.field} />}
                               </span>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
+                            </th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {filtered.map((o, index) => {
+                          const name =
+                            typeof o.dispatchedTo === "object" && o.dispatchedTo?.name
+                              ? o.dispatchedTo.name
+                              : o.dispatchedTo;
+                          return (
+                            <tr
+                              key={o._id}
+                              className={`border-b border-gray-100 hover:bg-gray-50 transition-colors ${
+                                index % 2 === 0 ? "bg-white" : "bg-gray-50/50"
+                              }`}
+                            >
+                              <td className="p-4 font-semibold text-gray-900">{o.orderId}</td>
+                              <td className="p-4 text-gray-700">{name}</td>
+                              <td className="p-4 font-medium text-gray-900">{o.chairModel}</td>
+                              <td className="p-4 text-gray-700">{new Date(o.orderDate).toLocaleDateString()}</td>
+                              <td className="p-4 text-gray-700">
+                                {o.deliveryDate ? new Date(o.deliveryDate).toLocaleDateString() : "—"}
+                              </td>
+                              <td className="p-4 font-semibold text-gray-900">{o.quantity}</td>
+                              <td className="p-4">
+                                <span className={`px-3 py-1 rounded-full text-xs font-medium border ${getStatusStyle(o.progress)}`}>
+                                  {o.progress?.replaceAll("_", " ")}
+                                </span>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
 
-                {/* ─── Mobile cards ─── */}
-                <div className="md:hidden divide-y divide-gray-100">
-                  {filtered.map((o) => {
-                    const name =
-                      typeof o.dispatchedTo === "object" && o.dispatchedTo?.name
-                        ? o.dispatchedTo.name
-                        : o.dispatchedTo;
-                    return (
-                      <button
-                        key={o._id}
-                        onClick={() => setSelectedOrder(o)}
-                        className="w-full text-left px-4 py-4 hover:bg-gray-50 transition-colors active:bg-gray-100"
-                      >
-                        <div className="flex items-start justify-between gap-2 mb-1.5">
-                          <p className="font-bold text-gray-900 text-sm">{o.orderId}</p>
-                          <span className={`px-2.5 py-0.5 rounded-full text-xs font-medium border shrink-0 ${getStatusStyle(o.progress)}`}>
-                            {o.progress?.replaceAll("_", " ")}
-                          </span>
-                        </div>
-                        <p className="text-sm text-gray-800 flex items-center gap-1 mb-0.5">
-                          <Truck size={12} className="text-gray-400 shrink-0" />
-                          {o.chairModel}
-                        </p>
-                        <p className="text-xs text-gray-500 mb-2">{name}</p>
-                        <div className="flex items-center justify-between">
-                          <span className="text-xs text-gray-400">
-                            {new Date(o.orderDate).toLocaleDateString()}
-                          </span>
-                          <span className="text-xs font-semibold text-gray-700 bg-gray-100 px-2 py-0.5 rounded-lg">
-                            Qty: {o.quantity}
-                          </span>
-                        </div>
-                      </button>
-                    );
-                  })}
-                </div>
+                  {/* Mobile cards */}
+                  <div className="md:hidden divide-y divide-gray-100">
+                    {filtered.map((o) => {
+                      const name =
+                        typeof o.dispatchedTo === "object" && o.dispatchedTo?.name
+                          ? o.dispatchedTo.name
+                          : o.dispatchedTo;
+                      return (
+                        <button
+                          key={o._id}
+                          onClick={() => setSelectedOrder(o)}
+                          className="w-full text-left px-4 py-4 hover:bg-gray-50 transition-colors active:bg-gray-100"
+                        >
+                          <div className="flex items-start justify-between gap-2 mb-1.5">
+                            <p className="font-bold text-gray-900 text-sm">{o.orderId}</p>
+                            <span className={`px-2.5 py-0.5 rounded-full text-xs font-medium border shrink-0 ${getStatusStyle(o.progress)}`}>
+                              {o.progress?.replaceAll("_", " ")}
+                            </span>
+                          </div>
+                          <p className="text-sm text-gray-800 flex items-center gap-1 mb-0.5">
+                            <Truck size={12} className="text-gray-400 shrink-0" />
+                            {o.chairModel}
+                          </p>
+                          <p className="text-xs text-gray-500 mb-2">{name}</p>
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs text-gray-400">
+                              {new Date(o.orderDate).toLocaleDateString()}
+                            </span>
+                            <span className="text-xs font-semibold text-gray-700 bg-gray-100 px-2 py-0.5 rounded-lg">
+                              Qty: {o.quantity}
+                            </span>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
 
-                {/* Footer */}
-                <div className="px-4 sm:px-6 py-3 border-t border-gray-100 bg-gray-50 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-1">
-                  <p className="text-xs text-gray-400">
-                    Showing{" "}
-                    <span className="font-semibold text-gray-600">{filtered.length}</span> of{" "}
-                    <span className="font-semibold text-gray-600">{orders.length}</span> orders
-                  </p>
-                  <p className="text-xs text-gray-400">
-                    Filtered qty:{" "}
-                    <span className="font-semibold text-gray-600">
-                      {filtered.reduce((s, o) => s + (o.quantity || 0), 0)}
-                    </span>{" "}
-                    units
-                  </p>
-                </div>
-              </>
-            )}
+                  {/* Footer */}
+                  <div className="px-4 sm:px-6 py-3 border-t border-gray-100 bg-gray-50 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-1">
+                    <p className="text-xs text-gray-400">
+                      Showing <span className="font-semibold text-gray-600">{filtered.length}</span> of{" "}
+                      <span className="font-semibold text-gray-600">{orders.length}</span> orders
+                    </p>
+                    <p className="text-xs text-gray-400">
+                      Filtered qty: <span className="font-semibold text-gray-600">
+                        {filtered.reduce((s, o) => s + (o.quantity || 0), 0)}
+                      </span> units
+                    </p>
+                  </div>
+                </>
+              )}
+            </div>
+
           </div>
         </div>
       </div>
