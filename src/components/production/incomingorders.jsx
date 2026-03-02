@@ -59,6 +59,8 @@ export default function ProductionOrdersPage() {
   const [inventorySearch, setInventorySearch] = useState({});
   const [addedItems, setAddedItems] = useState({});
   const [itemWorkers, setItemWorkers] = useState({});
+  // shape: { [orderId]: { name: string, quantity: number } }
+  const [activeProduct, setActiveProduct] = useState({});
 
   /* ─── auth ─── */
   useEffect(() => {
@@ -97,21 +99,20 @@ export default function ProductionOrdersPage() {
   }, [fetchOrders]);
 
   /* ─── inventory ─── */
- const fetchProductionInventory = async () => {
-  try {
-    const user = JSON.parse(localStorage.getItem("user") || "{}");
-    // ✅ Use the dedicated production endpoint
-    const res = await axios.get(
-      `${API}/inventory/production-stock?location=PROD_${user.name}`,
-      { headers: hdrs() }
-    );
-    setWorkerInventory({
-      ALL_PRODUCTION: res.data.inventory || [],
-    });
-  } catch (e) {
-    console.error(e);
-  }
-};
+  const fetchProductionInventory = async () => {
+    try {
+      const user = JSON.parse(localStorage.getItem("user") || "{}");
+      const res = await axios.get(
+        `${API}/inventory/production-stock?location=PROD_${user.name}`,
+        { headers: hdrs() }
+      );
+      setWorkerInventory({
+        ALL_PRODUCTION: res.data.inventory || [],
+      });
+    } catch (e) {
+      console.error(e);
+    }
+  };
 
   /* ─── actions ─── */
   const setLoad = (key, val) => setActionLoading((p) => ({ ...p, [key]: val }));
@@ -142,7 +143,6 @@ export default function ProductionOrdersPage() {
     }
   };
 
-  /* ─── 🔥 FIXED: assignWorker — no throw inside, proper try/catch ─── */
   const assignWorker = async (orderId) => {
     const order = orders.find((o) => o._id === orderId);
     const map = itemWorkers[orderId];
@@ -152,7 +152,6 @@ export default function ProductionOrdersPage() {
       return;
     }
 
-    // Validate all items have a worker selected
     if (!order.items || order.items.length === 0) {
       toast.error("No items found in this order");
       return;
@@ -188,39 +187,20 @@ export default function ProductionOrdersPage() {
     }
   };
 
-  const acceptOrder = async (orderId, parts) => {
-    const order = orders.find((o) => o._id === orderId);
-    if (!parts || !Object.keys(parts).length) {
-      toast.error("Please add parts before accepting the order");
-      return;
+  // ✅ FIXED: flatten per-product parts before sending to backend
+  const acceptOrder = async (orderId) => {
+    const perProductParts = addedItems[orderId] || {};
+
+    // Flatten: merge all products' parts into one object
+    const flatParts = {};
+    for (const productParts of Object.values(perProductParts)) {
+      for (const [partName, qty] of Object.entries(productParts)) {
+        flatParts[partName] = (flatParts[partName] || 0) + qty;
+      }
     }
 
-    const partsToValidate = getMergedParts(order);
-
-    if (Object.keys(partsToValidate).length === 0) {
+    if (!Object.keys(flatParts).length) {
       toast.error("Please add parts before accepting the order");
-      return;
-    }
-
-    const invalidParts = Object.entries(partsToValidate).filter(
-      ([name, qty]) => qty !== order.quantity
-    );
-
-    if (invalidParts.length > 0) {
-      toast.error(
-        <div>
-          <p className="font-semibold mb-1">Quantity mismatch detected</p>
-          <p className="text-xs">Each product must be exactly {order.quantity}</p>
-          <div className="mt-2 text-xs space-y-1">
-            {invalidParts.map(([name, qty]) => (
-              <div key={name}>
-                • {name}: {qty} (need {order.quantity})
-              </div>
-            ))}
-          </div>
-        </div>,
-        { duration: 5000 }
-      );
       return;
     }
 
@@ -228,7 +208,7 @@ export default function ProductionOrdersPage() {
     try {
       await axios.post(
         `${API}/orders/${orderId}/production-accept`,
-        { parts },
+        { parts: flatParts },
         { headers: hdrs() }
       );
       setAddedItems((prev) => {
@@ -239,7 +219,7 @@ export default function ProductionOrdersPage() {
       toast.success("Order accepted successfully!");
       fetchOrders();
     } catch (e) {
-      toast.error(e.response?.data?.message || "Failed to accept order. Please try again.");
+      toast.error(e.response?.data?.message || "Failed to accept order.");
     } finally {
       setLoad(orderId + "_accept", false);
     }
@@ -267,17 +247,26 @@ export default function ProductionOrdersPage() {
     }
   };
 
+  // ✅ FIXED: validate against active product's qty, store nested by product
   const addItemToSelection = (orderId, partName, totalQty) => {
     const qty = acceptQty[partName] || 0;
-    const order = orders.find((o) => o._id === orderId);
+    const active = activeProduct[orderId]; // { name, quantity }
+
+    if (!active) {
+      toast.error("Please select a product first by clicking on it above");
+      return;
+    }
 
     if (qty <= 0 || qty > totalQty) {
       toast.error(`Please enter a quantity between 1 and ${totalQty}`);
       return;
     }
 
-    if (qty > order.quantity) {
-      toast.error(`Cannot add more than ${order.quantity} for this product`);
+    // Validate against THIS product's required quantity
+    const currentAdded =
+      addedItems[orderId]?.[active.name]?.[partName.trim().toLowerCase()] || 0;
+    if (currentAdded + qty > active.quantity) {
+      toast.error(`Cannot exceed ${active.quantity} for "${active.name}"`);
       return;
     }
 
@@ -287,7 +276,10 @@ export default function ProductionOrdersPage() {
       ...prev,
       [orderId]: {
         ...(prev[orderId] || {}),
-        [normalized]: (prev[orderId]?.[normalized] || 0) + qty,
+        [active.name]: {
+          ...(prev[orderId]?.[active.name] || {}),
+          [normalized]: (prev[orderId]?.[active.name]?.[normalized] || 0) + qty,
+        },
       },
     }));
 
@@ -297,16 +289,20 @@ export default function ProductionOrdersPage() {
       return updated;
     });
 
-    toast.success(`Added ${qty} × ${partName} to production`);
+    toast.success(`Added ${qty} × ${partName} → ${active.name}`);
   };
 
-  const removeItemFromSelection = (orderId, partName) => {
+  // ✅ FIXED: takes productName + partName
+  const removeItemFromSelection = (orderId, productName, partName) => {
     setAddedItems((prev) => {
       const updated = { ...prev };
-      if (updated[orderId]) {
-        const removedQty = updated[orderId][partName];
-        delete updated[orderId][partName];
-        if (Object.keys(updated[orderId]).length === 0) delete updated[orderId];
+      if (updated[orderId]?.[productName]) {
+        const removedQty = updated[orderId][productName][partName];
+        delete updated[orderId][productName][partName];
+        if (!Object.keys(updated[orderId][productName]).length)
+          delete updated[orderId][productName];
+        if (!Object.keys(updated[orderId] || {}).length)
+          delete updated[orderId];
         if (removedQty) toast.success(`Removed ${removedQty} × ${partName}`);
       }
       return updated;
@@ -350,23 +346,35 @@ export default function ProductionOrdersPage() {
   };
 
   const handleRowClick = (orderId) => {
-  const order = orders.find((o) => o._id === orderId);
-  if (order?.items && order.items.length > 0) {
-    setExpandedOrder((prev) => {
-      const isOpening = prev !== orderId;
-      if (isOpening) {
-        fetchProductionInventory(); // ✅ auto-fetch on expand
+    const order = orders.find((o) => o._id === orderId);
+    if (order?.items && order.items.length > 0) {
+      setExpandedOrder((prev) => {
+        const isOpening = prev !== orderId;
+        if (isOpening) {
+          fetchProductionInventory();
+        }
+        return isOpening ? orderId : null;
+      });
+    }
+  };
+
+  // ✅ Flatten addedItems for a given order (for display / backend)
+  const getFlatAddedItems = (orderId) => {
+    const perProduct = addedItems[orderId] || {};
+    const flat = {};
+    for (const productParts of Object.values(perProduct)) {
+      for (const [part, qty] of Object.entries(productParts)) {
+        flat[part] = (flat[part] || 0) + qty;
       }
-      return isOpening ? orderId : null;
-    });
-  }
-};
+    }
+    return flat;
+  };
 
   const getMergedParts = (order) => {
     const backendParts = order.productionParts || {};
-    const localParts = addedItems[order._id] || {};
+    const localFlat = getFlatAddedItems(order._id);
     const merged = { ...backendParts };
-    Object.entries(localParts).forEach(([key, val]) => {
+    Object.entries(localFlat).forEach(([key, val]) => {
       merged[key] = (merged[key] || 0) + val;
     });
     return merged;
@@ -433,7 +441,6 @@ export default function ProductionOrdersPage() {
 
           {/* ─── Mobile Header ─── */}
           <div className="md:hidden">
-            {/* Top bar */}
             <div className="flex items-center justify-between px-4 pt-4 pb-3">
               <div className="flex items-center gap-2.5">
                 <div className="w-8 h-8 bg-[#c62d23] rounded-lg flex items-center justify-center">
@@ -451,7 +458,6 @@ export default function ProductionOrdersPage() {
               </button>
             </div>
 
-            {/* Stat chips */}
             <div className="flex gap-2 px-4 pb-3 overflow-x-auto">
               {[
                 { label: "Pending", count: pending.length, color: "red", tab: "Pending" },
@@ -575,7 +581,10 @@ export default function ProductionOrdersPage() {
                           setAcceptQty((p) => ({ ...p, [name]: val }))
                         }
                         onAddItem={(name, qty) => addItemToSelection(order._id, name, qty)}
-                        onRemoveItem={(name) => removeItemFromSelection(order._id, name)}
+                        // ✅ FIXED: pass productName + partName
+                        onRemoveItem={(productName, partName) =>
+                          removeItemFromSelection(order._id, productName, partName)
+                        }
                         requestData={requestData[order._id]}
                         onRequestDataChange={(data) =>
                           setRequestData((p) => ({ ...p, [order._id]: data }))
@@ -584,7 +593,7 @@ export default function ProductionOrdersPage() {
                         requestLoading={actionLoading[order._id + "_req"]}
                         onRefreshInventory={fetchProductionInventory}
                         isOrderAccepted={isOrderAccepted(order)}
-                        onAccept={() => acceptOrder(order._id, addedItems[order._id] || {})}
+                        onAccept={() => acceptOrder(order._id)}
                         acceptLoading={actionLoading[order._id + "_accept"]}
                         onComplete={() => markCompleted(order._id)}
                         completeLoading={actionLoading[order._id + "_complete"]}
@@ -592,6 +601,10 @@ export default function ProductionOrdersPage() {
                         getMergedParts={getMergedParts}
                         itemWorkers={itemWorkers}
                         setItemWorkers={setItemWorkers}
+                        activeProduct={activeProduct[order._id]}
+                        onActiveProductChange={(product) =>
+                          setActiveProduct((p) => ({ ...p, [order._id]: product }))
+                        }
                       />
                     );
                   })}
@@ -638,6 +651,8 @@ const OrderCard = ({
   onRefreshInventory, isOrderAccepted, onAccept, acceptLoading,
   onComplete, completeLoading, getTotalAddedQty, getMergedParts,
   itemWorkers, setItemWorkers,
+  // ✅ NEW props
+  activeProduct, onActiveProductChange,
 }) => {
   const workerDisplay = order.productionAssignments?.length
     ? [...new Set(order.productionAssignments.map((a) => a.worker))].join(", ")
@@ -647,7 +662,6 @@ const OrderCard = ({
     <>
       {/* ─── MOBILE ─── */}
       <div className="md:hidden bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
-        {/* Card Header */}
         <div className="px-4 pt-4 pb-3 space-y-3">
           {/* Row 1: Order ID + Status */}
           <div className="flex items-center justify-between">
@@ -797,6 +811,8 @@ const OrderCard = ({
               getMergedParts={getMergedParts}
               itemWorkers={itemWorkers}
               setItemWorkers={setItemWorkers}
+              activeProduct={activeProduct}
+              onActiveProductChange={onActiveProductChange}
             />
           </div>
         )}
@@ -918,6 +934,8 @@ const OrderCard = ({
               getMergedParts={getMergedParts}
               itemWorkers={itemWorkers}
               setItemWorkers={setItemWorkers}
+              activeProduct={activeProduct}
+              onActiveProductChange={onActiveProductChange}
             />
           </div>
         )}
@@ -936,6 +954,8 @@ const ExpandedOrderDetails = ({
   onRefreshInventory, isOrderAccepted, onAccept, acceptLoading,
   onComplete, completeLoading, getTotalAddedQty, getMergedParts,
   itemWorkers, setItemWorkers,
+  // ✅ NEW
+  activeProduct, onActiveProductChange,
 }) => {
 
   const PRODUCTION_DONE = [
@@ -944,23 +964,46 @@ const ExpandedOrderDetails = ({
   ];
   const isFullyDone = PRODUCTION_DONE.includes(order.progress);
 
+  // ✅ How many parts added for the currently selected product
+  const activeAddedCount = activeProduct
+    ? Object.values(addedItems?.[activeProduct.name] || {}).reduce((s, v) => s + v, 0)
+    : 0;
+
   return (
     <div className="space-y-5">
-      {/* Order Items Summary — always visible */}
+      {/* ✅ Order Items — clickable to select active product */}
       {order.items?.length > 0 && (
         <div className="bg-white border border-gray-200 rounded-xl p-4">
           <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-3">
             Order Items
+            {!isFullyDone && (
+              <span className="ml-2 text-[10px] font-normal text-gray-400 normal-case">
+                — tap a product to collect its parts
+              </span>
+            )}
           </p>
           <div className="space-y-2">
             {order.items.map((item) => {
               const assignedWorker = order.productionAssignments?.find(
                 (a) => a.product?.toLowerCase() === item.name?.toLowerCase()
               )?.worker;
+              const isActive = activeProduct?.name === item.name;
+              // parts added for this specific product
+              const productAddedCount = Object.values(
+                addedItems?.[item.name] || {}
+              ).reduce((s, v) => s + v, 0);
+
               return (
                 <div
                   key={item.name}
-                  className="flex items-center justify-between bg-gray-50 rounded-xl px-3 py-2.5"
+                  onClick={() => !isFullyDone && onActiveProductChange({ name: item.name, quantity: item.quantity })}
+                  className={`flex items-center justify-between rounded-xl px-3 py-2.5 transition-all border-2 ${
+                    isFullyDone
+                      ? "bg-gray-50 border-transparent"
+                      : isActive
+                      ? "bg-red-50 border-[#c62d23] cursor-pointer"
+                      : "bg-gray-50 border-transparent hover:bg-gray-100 cursor-pointer"
+                  }`}
                 >
                   <div>
                     <p className="text-sm font-semibold text-gray-800">{item.name}</p>
@@ -969,8 +1012,19 @@ const ExpandedOrderDetails = ({
                         <UserCircle size={10} /> {assignedWorker}
                       </p>
                     )}
+                    {/* Show how many parts added for this product */}
+                    {!isFullyDone && productAddedCount > 0 && (
+                      <p className="text-[10px] text-green-600 font-semibold mt-0.5">
+                        ✓ {productAddedCount} parts added
+                      </p>
+                    )}
                   </div>
-                  <span className="text-sm font-bold text-gray-700">× {item.quantity}</span>
+                  <div className="text-right">
+                    <span className="text-sm font-bold text-gray-700">× {item.quantity}</span>
+                    {!isFullyDone && isActive && (
+                      <p className="text-[10px] text-[#c62d23] font-bold mt-0.5">Selected</p>
+                    )}
+                  </div>
                 </div>
               );
             })}
@@ -978,7 +1032,7 @@ const ExpandedOrderDetails = ({
         </div>
       )}
 
-      {/* ✅ COMPLETED: show only a done banner, nothing else */}
+      {/* ✅ COMPLETED: show only a done banner */}
       {isFullyDone ? (
         <div className="flex items-center justify-center gap-2 px-6 py-4 rounded-xl bg-green-50 border border-green-200 text-green-700 font-bold">
           <CheckCircle size={18} />
@@ -986,19 +1040,32 @@ const ExpandedOrderDetails = ({
         </div>
       ) : (
         <>
-          {/* Stats Row */}
+          {/* Stats Row — ✅ shows active product's required qty */}
           <div className="flex flex-wrap gap-2">
             {[
-              { label: "Worker", value: order.productionWorker || "—", style: "bg-blue-50 text-blue-700 border-blue-200" },
-              { label: "Required", value: order.quantity, style: "bg-red-50 text-red-700 border-red-200" },
+              {
+                label: "Worker",
+                value: activeProduct
+                  ? (order.productionAssignments?.find(
+                      (a) => a.product?.toLowerCase() === activeProduct.name?.toLowerCase()
+                    )?.worker || order.productionWorker || "—")
+                  : "—",
+                style: "bg-blue-50 text-blue-700 border-blue-200",
+              },
+              {
+                label: "Required",
+                value: activeProduct ? activeProduct.quantity : "—",
+                style: "bg-red-50 text-red-700 border-red-200",
+              },
               {
                 label: "Added",
-                value: getTotalAddedQty(order),
-                style: getTotalAddedQty(order) === order.quantity
-                  ? "bg-green-50 text-green-700 border-green-200"
-                  : getTotalAddedQty(order) > order.quantity
-                  ? "bg-red-50 text-red-700 border-red-200"
-                  : "bg-yellow-50 text-yellow-700 border-yellow-200",
+                value: activeAddedCount,
+                style:
+                  activeProduct && activeAddedCount === activeProduct.quantity
+                    ? "bg-green-50 text-green-700 border-green-200"
+                    : activeProduct && activeAddedCount > activeProduct.quantity
+                    ? "bg-red-50 text-red-700 border-red-200"
+                    : "bg-yellow-50 text-yellow-700 border-yellow-200",
               },
             ].map(({ label, value, style }) => (
               <div key={label} className={`px-3 py-1.5 rounded-full border text-xs font-semibold ${style}`}>
@@ -1014,18 +1081,20 @@ const ExpandedOrderDetails = ({
             </button>
           </div>
 
-          {/* Progress Bar */}
-          {(() => {
-            const total = getTotalAddedQty(order);
-            const pct = Math.min((total / order.quantity) * 100, 100);
-            const isOk = total === order.quantity;
-            const isOver = total > order.quantity;
+          {/* ✅ Progress Bar — per active product */}
+          {activeProduct && (() => {
+            const total = activeAddedCount;
+            const pct = Math.min((total / activeProduct.quantity) * 100, 100);
+            const isOk = total === activeProduct.quantity;
+            const isOver = total > activeProduct.quantity;
             return (
               <div className="bg-white border border-gray-200 rounded-xl p-4">
                 <div className="flex justify-between items-center mb-2">
-                  <span className="text-xs font-semibold text-gray-600">Quantity Progress</span>
+                  <span className="text-xs font-semibold text-gray-600">
+                    Quantity Progress — <span className="text-[#c62d23]">{activeProduct.name}</span>
+                  </span>
                   <span className={`text-xs font-bold ${isOk ? "text-green-600" : isOver ? "text-red-600" : "text-yellow-600"}`}>
-                    {total} / {order.quantity}
+                    {total} / {activeProduct.quantity}
                   </span>
                 </div>
                 <div className="w-full bg-gray-100 rounded-full h-2">
@@ -1034,29 +1103,48 @@ const ExpandedOrderDetails = ({
                     style={{ width: `${pct}%` }}
                   />
                 </div>
-                {isOver && <p className="text-xs text-red-600 mt-2 font-medium">⚠️ Remove {total - order.quantity} excess units</p>}
-                {!isOk && !isOver && total > 0 && <p className="text-xs text-yellow-600 mt-2 font-medium">Add {order.quantity - total} more to complete</p>}
+                {isOver && <p className="text-xs text-red-600 mt-2 font-medium">⚠️ Remove {total - activeProduct.quantity} excess units</p>}
+                {!isOk && !isOver && total > 0 && (
+                  <p className="text-xs text-yellow-600 mt-2 font-medium">
+                    Add {activeProduct.quantity - total} more to complete
+                  </p>
+                )}
               </div>
             );
           })()}
 
-          {/* Added Items */}
+          {/* ✅ Added Items — nested by product */}
           {addedItems && Object.keys(addedItems).length > 0 && (
             <div>
-              <p className="text-[10px] font-bold text-green-700 uppercase tracking-wider mb-2">Added to Production</p>
-              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
-                {Object.entries(addedItems).map(([name, qty]) => (
-                  <div key={name} className="bg-green-50 border border-green-200 rounded-xl px-3 py-2.5 flex items-center justify-between">
-                    <div>
-                      <p className="text-xs font-semibold text-green-800 capitalize leading-tight">{name}</p>
-                      <p className="text-xs text-green-600 font-bold">{qty} pcs</p>
-                    </div>
-                    <button onClick={() => onRemoveItem(name)} className="text-red-500 hover:bg-red-100 p-1 rounded-lg transition-colors">
-                      <X size={13} />
-                    </button>
+              <p className="text-[10px] font-bold text-green-700 uppercase tracking-wider mb-2">
+                Added to Production
+              </p>
+              {Object.entries(addedItems).map(([productName, parts]) => (
+                <div key={productName} className="mb-3">
+                  <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1.5">
+                    {productName}
+                  </p>
+                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
+                    {Object.entries(parts).map(([partName, qty]) => (
+                      <div
+                        key={partName}
+                        className="bg-green-50 border border-green-200 rounded-xl px-3 py-2.5 flex items-center justify-between"
+                      >
+                        <div>
+                          <p className="text-xs font-semibold text-green-800 capitalize leading-tight">{partName}</p>
+                          <p className="text-xs text-green-600 font-bold">{qty} pcs</p>
+                        </div>
+                        <button
+                          onClick={() => onRemoveItem(productName, partName)}
+                          className="text-red-500 hover:bg-red-100 p-1 rounded-lg transition-colors"
+                        >
+                          <X size={13} />
+                        </button>
+                      </div>
+                    ))}
                   </div>
-                ))}
-              </div>
+                </div>
+              ))}
             </div>
           )}
 
@@ -1076,18 +1164,29 @@ const ExpandedOrderDetails = ({
           {workerInventory.ALL_PRODUCTION && (
             <div>
               <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-2">Available Inventory</p>
+              {!activeProduct && (
+                <p className="text-xs text-orange-600 font-medium mb-2">
+                  ⬆️ Select a product above before adding parts
+                </p>
+              )}
               <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
                 {(() => {
+                  // ✅ Deduct only the active product's added qty for display
+                  const activeAdded = activeProduct ? (addedItems?.[activeProduct.name] || {}) : {};
                   const grouped = (workerInventory.ALL_PRODUCTION || [])
                     .filter((i) => i.type === "SPARE")
                     .reduce((a, i) => { a[i.partName] = (a[i.partName] || 0) + i.quantity; return a; }, {});
                   const searchTerm = (inventorySearch || "").toLowerCase();
                   const filtered = Object.entries(grouped)
-                    .map(([name, qty]) => [name, qty - (addedItems?.[name.toLowerCase()] || 0)])
+                    .map(([name, qty]) => [name, qty - (activeAdded[name.toLowerCase()] || 0)])
                     .filter(([name, rem]) => rem > 0 && name.toLowerCase().includes(searchTerm))
                     .slice(0, 8);
                   if (!filtered.length)
-                    return <div className="col-span-full text-center py-6 text-gray-400 text-sm">{inventorySearch ? "No matching items" : "No inventory available"}</div>;
+                    return (
+                      <div className="col-span-full text-center py-6 text-gray-400 text-sm">
+                        {inventorySearch ? "No matching items" : "No inventory available"}
+                      </div>
+                    );
                   return filtered.map(([name, rem]) => (
                     <div key={name} className="bg-white border border-gray-200 rounded-xl p-3 hover:border-[#c62d23] transition-all">
                       <div className="flex items-center justify-between mb-2">
@@ -1095,8 +1194,21 @@ const ExpandedOrderDetails = ({
                         <span className="text-xs font-bold text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded-md">{rem}</span>
                       </div>
                       <div className="flex gap-1.5">
-                        <input type="number" min="0" max={rem} placeholder="Qty" value={acceptQty[name] || ""} onChange={(e) => onQtyChange(name, Number(e.target.value))} className="flex-1 px-2 py-1.5 border border-gray-200 rounded-lg text-xs focus:border-[#c62d23] outline-none" />
-                        <button onClick={() => onAddItem(name, rem)} className="bg-emerald-600 hover:bg-emerald-700 text-white px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all">Add</button>
+                        <input
+                          type="number"
+                          min="0"
+                          max={rem}
+                          placeholder="Qty"
+                          value={acceptQty[name] || ""}
+                          onChange={(e) => onQtyChange(name, Number(e.target.value))}
+                          className="flex-1 px-2 py-1.5 border border-gray-200 rounded-lg text-xs focus:border-[#c62d23] outline-none"
+                        />
+                        <button
+                          onClick={() => onAddItem(name, rem)}
+                          className="bg-emerald-600 hover:bg-emerald-700 text-white px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all"
+                        >
+                          Add
+                        </button>
                       </div>
                     </div>
                   ));
@@ -1112,9 +1224,25 @@ const ExpandedOrderDetails = ({
               Request Additional Inventory
             </p>
             <div className="flex flex-col sm:flex-row gap-2">
-              <input type="text" value={requestData?.partName || ""} placeholder="Part name" onChange={(e) => onRequestDataChange({ ...requestData, partName: e.target.value })} className="flex-1 px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:border-[#c62d23] outline-none" />
-              <input type="number" value={requestData?.quantity || ""} placeholder="Qty" onChange={(e) => onRequestDataChange({ ...requestData, quantity: Number(e.target.value) })} className="w-full sm:w-20 px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:border-[#c62d23] outline-none" />
-              <button onClick={onSendRequest} disabled={requestLoading} className="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 text-white px-4 py-2.5 rounded-xl text-sm font-bold transition-all inline-flex items-center gap-1.5 justify-center">
+              <input
+                type="text"
+                value={requestData?.partName || ""}
+                placeholder="Part name"
+                onChange={(e) => onRequestDataChange({ ...requestData, partName: e.target.value })}
+                className="flex-1 px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:border-[#c62d23] outline-none"
+              />
+              <input
+                type="number"
+                value={requestData?.quantity || ""}
+                placeholder="Qty"
+                onChange={(e) => onRequestDataChange({ ...requestData, quantity: Number(e.target.value) })}
+                className="w-full sm:w-20 px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:border-[#c62d23] outline-none"
+              />
+              <button
+                onClick={onSendRequest}
+                disabled={requestLoading}
+                className="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 text-white px-4 py-2.5 rounded-xl text-sm font-bold transition-all inline-flex items-center gap-1.5 justify-center"
+              >
                 {requestLoading ? <Loader2 size={14} className="animate-spin" /> : <><Send size={13} /> Send</>}
               </button>
             </div>
@@ -1123,11 +1251,19 @@ const ExpandedOrderDetails = ({
           {/* Action Button */}
           <div className="flex gap-3 pt-1">
             {!isOrderAccepted ? (
-              <button onClick={onAccept} disabled={acceptLoading} className="flex-1 bg-green-600 hover:bg-green-700 disabled:bg-gray-300 text-white px-6 py-3.5 rounded-xl font-bold transition-all disabled:cursor-not-allowed inline-flex items-center justify-center gap-2">
+              <button
+                onClick={onAccept}
+                disabled={acceptLoading}
+                className="flex-1 bg-green-600 hover:bg-green-700 disabled:bg-gray-300 text-white px-6 py-3.5 rounded-xl font-bold transition-all disabled:cursor-not-allowed inline-flex items-center justify-center gap-2"
+              >
                 {acceptLoading ? <Loader2 size={16} className="animate-spin" /> : <><CheckCircle size={16} /> Confirm Acceptance</>}
               </button>
             ) : (
-              <button onClick={onComplete} disabled={completeLoading} className="flex-1 bg-emerald-600 hover:bg-emerald-700 disabled:bg-gray-300 text-white px-6 py-3.5 rounded-xl font-bold transition-all disabled:cursor-not-allowed inline-flex items-center justify-center gap-2">
+              <button
+                onClick={onComplete}
+                disabled={completeLoading}
+                className="flex-1 bg-emerald-600 hover:bg-emerald-700 disabled:bg-gray-300 text-white px-6 py-3.5 rounded-xl font-bold transition-all disabled:cursor-not-allowed inline-flex items-center justify-center gap-2"
+              >
                 {completeLoading ? <Loader2 size={16} className="animate-spin" /> : <><CheckCircle size={16} /> Mark Completed</>}
               </button>
             )}

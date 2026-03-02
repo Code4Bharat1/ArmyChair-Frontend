@@ -68,7 +68,7 @@ import { useRouter } from "next/navigation";
         {/* Header */}
         <div className="text-center mb-8">
           <h1 className="text-3xl font-bold text-white mb-2">
-            Army Industry
+            Army Industries
           </h1>
           <p className="text-neutral-400 text-sm">
             Create a new account
@@ -204,7 +204,7 @@ import { useRouter } from "next/navigation";
 
         {/* Footer */}
         <p className="mt-8 text-center text-xs text-neutral-500">
-          © 2024 Army Industry. All rights reserved.
+          © 2024 Army Industries. All rights reserved.
         </p>
       </div>
     </div>

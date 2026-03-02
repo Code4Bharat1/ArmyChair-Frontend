@@ -108,7 +108,7 @@ export default function ProductionSidebar() {
           >
             Logout
           </button>
-          Army Industry © 2026
+          Army Industries © 2026
         </div>
       </div>
     </>

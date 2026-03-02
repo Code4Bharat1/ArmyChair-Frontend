@@ -153,7 +153,7 @@ export default function SalesSidebar() {
             Logout
           </button>
           <p className="text-xs text-gray-500 text-center mt-3">
-            Army Industry © 2026
+            Army Industries © 2026
           </p>
         </div>
       </div>

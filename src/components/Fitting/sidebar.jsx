@@ -137,7 +137,7 @@ export default function FittingSidebar() {
             Logout
           </button>
           <p className="text-xs text-gray-500 text-center font-medium">
-            Army Industry © 2026
+            Army Industries © 2026
           </p>
         </div>
       </aside>

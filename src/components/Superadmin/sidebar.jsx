@@ -35,7 +35,7 @@ const menuItem = (href) =>
       <div className="p-6 border-b border-gray-100">
         <h1 className="text-2xl font-bold flex items-center gap-2">
           <span className="text-gray-900">Army</span>
-          <span className="text-[#c62d23]">Industry</span>
+          <span className="text-[#c62d23]">Industries</span>
         </h1>
       </div>
 
@@ -109,7 +109,7 @@ const menuItem = (href) =>
           Logout
         </button>
          <p className="text-xs py-4 text-gray-500 text-center font-medium">
-            Army Industry © 2026
+            Army Industries © 2026
           </p>
       </div>
     </div>

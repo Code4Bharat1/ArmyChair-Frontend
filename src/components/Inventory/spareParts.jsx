@@ -1273,7 +1273,7 @@ export default function SparePartsInventory() {
               {/* Vendor — Searchable Dropdown */}
               <div>
                 <label className="block text-sm font-semibold text-gray-900 mb-1.5">
-                  Dispatched To <span className="text-red-500">*</span>
+                  Vendor : <span className="text-red-500">*</span>
                 </label>
                 <SearchableDropdown
                   value={form.vendor}

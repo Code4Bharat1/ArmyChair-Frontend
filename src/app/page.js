@@ -29,7 +29,7 @@ export default function HomePage() {
     } else if (user.role === "fitting") {
       router.replace("/fitting");
     } else if (user.role === "sales") {
-      router.replace("/sales");
+      router.replace("/sales/order");
     } else {
       router.replace("/login");
     }

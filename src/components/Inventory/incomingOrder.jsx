@@ -606,45 +606,48 @@ export default function WarehouseOrders() {
     }
 
     if (o.progress === "FITTING_COMPLETED") {
-  return (
-    <div className="flex gap-2">
-      <button
-        disabled={isLoading}
-        onClick={() => handleMarkReady(o._id)}
-        className="bg-emerald-600 hover:bg-emerald-700 px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm font-medium disabled:opacity-50 text-white transition-all shadow-sm hover:shadow-md"
-      >
-        {isLoading ? "Processing..." : <span>Mark Complete</span>}
-      </button>
-    </div>
-  );
-}
+      return (
+        <div className="flex gap-2">
+          <button
+            disabled={isLoading}
+            onClick={() => handleMarkReady(o._id)}
+            className="bg-emerald-600 hover:bg-emerald-700 px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm font-medium disabled:opacity-50 text-white transition-all shadow-sm hover:shadow-md"
+          >
+            {isLoading ? "Processing..." : <span>Mark Complete</span>}
+          </button>
+        </div>
+      );
+    }
 
-// ✅ NEW: FITTING_IN_PROGRESS — show Dispatch if ANY item is ready
-if (o.progress === "FITTING_IN_PROGRESS") {
-  const hasReadyItems = o.items?.some((i) => i.fittingStatus === "COMPLETED");
-  
-  if (!hasReadyItems) {
-    return (
-      <span className="text-gray-500 text-xs sm:text-sm font-medium">
-        In Progress
-      </span>
-    );
-  }
+    // ✅ NEW: FITTING_IN_PROGRESS — show Dispatch if ANY item is ready
+    if (o.progress === "FITTING_IN_PROGRESS") {
+      const hasReadyItems = o.items?.some(
+        (i) => i.fittingStatus === "COMPLETED",
+      );
 
-  return (
-    <div className="flex flex-col gap-1.5">
-      <button
-        onClick={() => setDispatchOrder(o)}
-        className="bg-green-600 hover:bg-green-700 text-white px-3 py-2 rounded-lg text-xs sm:text-sm font-medium"
-      >
-        Dispatch Ready
-      </button>
-      <span className="text-[10px] text-amber-600 font-medium text-center">
-        {o.items.filter(i => i.fittingStatus === "COMPLETED").length}/{o.items.length} SKUs ready
-      </span>
-    </div>
-  );
-}
+      if (!hasReadyItems) {
+        return (
+          <span className="text-gray-500 text-xs sm:text-sm font-medium">
+            In Progress
+          </span>
+        );
+      }
+
+      return (
+        <div className="flex flex-col gap-1.5">
+          <button
+            onClick={() => setDispatchOrder(o)}
+            className="bg-green-600 hover:bg-green-700 text-white px-3 py-2 rounded-lg text-xs sm:text-sm font-medium"
+          >
+            Dispatch Ready
+          </button>
+          <span className="text-[10px] text-amber-600 font-medium text-center">
+            {o.items.filter((i) => i.fittingStatus === "COMPLETED").length}/
+            {o.items.length} SKUs ready
+          </span>
+        </div>
+      );
+    }
     if (
       o.progress === "READY_FOR_DISPATCH" ||
       o.progress === "PARTIALLY_DISPATCHED"
@@ -948,35 +951,32 @@ if (o.progress === "FITTING_IN_PROGRESS") {
           // AFTER — warehouseDirect orders skip fitting entirely, show all items
           const isSpare = dispatchOrder.orderType === "SPARE";
 
-// warehouseDirect orders arrive as WAREHOUSE_COLLECTED directly from sales
-// Also treat orders that never went through production/fitting as direct
-const isWarehouseDirect = 
-  dispatchOrder.warehouseDirect === true ||
-  (dispatchOrder.orderType === "FULL" && 
-   !dispatchOrder.items?.some(i => i.fittingStatus === "COMPLETED") &&
-   (dispatchOrder.progress === "WAREHOUSE_COLLECTED" || 
-    dispatchOrder.progress === "READY_FOR_DISPATCH" ||
-    dispatchOrder.progress === "PARTIALLY_DISPATCHED"));
+          const isWarehouseDirect =
+            dispatchOrder.warehouseDirect === true ||
+            (dispatchOrder.orderType === "FULL" &&
+              !dispatchOrder.items?.some(
+                (i) => i.fittingStatus === "COMPLETED",
+              ) &&
+              (dispatchOrder.progress === "WAREHOUSE_COLLECTED" ||
+                dispatchOrder.progress === "READY_FOR_DISPATCH" ||
+                dispatchOrder.progress === "PARTIALLY_DISPATCHED"));
 
-const orderItems = (dispatchOrder.items || []).filter((i) =>
-  isWarehouseDirect || isSpare
-    ? true
-    : i.fittingStatus === "COMPLETED"
-);
+          // SKUs still at fitting — show info message, not dispatchable yet
+          const pendingFittingItems =
+            !isWarehouseDirect && !isSpare
+              ? (dispatchOrder.items || []).filter(
+                  (i) => i.fittingStatus !== "COMPLETED",
+                )
+              : [];
 
-if (orderItems.length === 0) {
-  alert("No items found on this order");
-  return null;
-}
+          // All eligible items (fitting done, or direct/spare)
+          const allEligibleItems = (dispatchOrder.items || []).filter((i) =>
+            isWarehouseDirect || isSpare
+              ? true
+              : i.fittingStatus === "COMPLETED",
+          );
 
-          if (orderItems.length === 0) {
-            alert(
-              isWarehouseDirect
-                ? "No items found on this order"
-                : "No items have completed fitting yet",
-            );
-            return null;
-          }
+          // Build already-dispatched map
           const alreadyDispatchedMap = {};
           if (dispatchOrder.dispatches?.length) {
             dispatchOrder.dispatches.forEach((d) => {
@@ -989,7 +989,22 @@ if (orderItems.length === 0) {
             });
           }
 
-          const totalOrdered = orderItems.reduce((s, i) => s + i.quantity, 0);
+          // Hide fully dispatched items — only show items with remaining qty
+          const orderItems = allEligibleItems.filter((i) => {
+            const alreadyDone = alreadyDispatchedMap[i.name] || 0;
+            return alreadyDone < i.quantity;
+          });
+
+          if (orderItems.length === 0 && pendingFittingItems.length === 0) {
+            alert("All items have been fully dispatched.");
+            return null;
+          }
+
+          // Use ALL items for totals (not filtered orderItems)
+          const totalOrdered = (dispatchOrder.items || []).reduce(
+            (s, i) => s + i.quantity,
+            0,
+          );
           const totalAlreadyDispatched =
             Number(dispatchOrder.dispatchedQuantity) || 0;
           const totalRemaining = totalOrdered - totalAlreadyDispatched;
@@ -1059,17 +1074,44 @@ if (orderItems.length === 0) {
                       </p>
                       <div className="space-y-1.5 max-h-24 overflow-y-auto">
                         {dispatchOrder.dispatches.map((d, i) => (
-                          <div
+                          <details
                             key={i}
-                            className="flex justify-between items-center text-xs bg-white border border-gray-200 rounded-lg px-3 py-1.5"
+                            className="bg-white border border-gray-200 rounded-lg overflow-hidden"
                           >
-                            <span className="font-medium text-gray-700">
-                              Batch {i + 1}: {d.quantity} units
-                            </span>
-                            <span className="text-gray-400">
-                              {new Date(d.date).toLocaleDateString()}
-                            </span>
-                          </div>
+                            <summary className="flex justify-between items-center text-xs px-3 py-1.5 cursor-pointer hover:bg-gray-50 transition list-none">
+                              <span className="font-medium text-gray-700">
+                                Batch {i + 1}: {d.quantity} units
+                              </span>
+                              <span className="text-gray-400">
+                                {new Date(d.date).toLocaleDateString()}
+                              </span>
+                            </summary>
+                            {d.itemQuantities &&
+                              Object.keys(d.itemQuantities).length > 0 && (
+                                <div className="border-t border-gray-100 px-3 py-2 space-y-1">
+                                  {Object.entries(d.itemQuantities).map(
+                                    ([name, qty]) => (
+                                      <div
+                                        key={name}
+                                        className="flex justify-between items-center text-xs"
+                                      >
+                                        <span className="text-gray-600 truncate">
+                                          {name}
+                                        </span>
+                                        <span className="font-bold text-gray-800 ml-2">
+                                          {qty} units
+                                        </span>
+                                      </div>
+                                    ),
+                                  )}
+                                  {d.notes && (
+                                    <p className="text-[10px] text-gray-400 pt-1 border-t border-gray-100 mt-1">
+                                      Note: {d.notes}
+                                    </p>
+                                  )}
+                                </div>
+                              )}
+                          </details>
                         ))}
                       </div>
                     </div>
@@ -1157,6 +1199,42 @@ if (orderItems.length === 0) {
                     );
                   })}
                 </div>
+
+                {/* Pending fitting items */}
+                {pendingFittingItems.length > 0 && (
+                  <div className="px-6 pb-2">
+                    <div className="border border-amber-200 bg-amber-50 rounded-xl p-4">
+                      <p className="text-xs font-bold text-amber-700 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                        <Clock size={13} /> Still at Fitting
+                      </p>
+                      <div className="space-y-2">
+                        {pendingFittingItems.map((item) => (
+                          <div
+                            key={item.name}
+                            className="flex items-center justify-between bg-white border border-amber-200 rounded-lg px-3 py-2.5"
+                          >
+                            <div>
+                              <p className="font-semibold text-sm text-gray-800">
+                                {item.name}
+                              </p>
+                              <p className="text-xs text-amber-600 mt-0.5">
+                                Qty: {item.quantity}
+                              </p>
+                            </div>
+                            <span className="text-[10px] bg-amber-100 text-amber-700 border border-amber-300 px-2 py-1 rounded-full font-semibold whitespace-nowrap">
+                              At Fitting
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                      <p className="text-[11px] text-amber-600 mt-3 leading-relaxed">
+                        ⚠ These SKUs are still undergoing fitting. Once
+                        completed, they will appear here for dispatch. Please
+                        contact the fitting team for an update.
+                      </p>
+                    </div>
+                  </div>
+                )}
 
                 {/* Notes */}
                 <div className="px-6 pb-4">

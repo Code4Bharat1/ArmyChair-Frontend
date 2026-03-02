@@ -143,7 +143,7 @@ export default function InventorySidebar({ onClose }) {
           Logout
         </button>
         <p className="px-4 sm:px-6 py-2 sm:py-3 text-xs text-gray-500 text-center font-medium border-t border-gray-200">
-          Army Industry © 2026
+          Army Industries © 2026
         </p>
       </div>
 
