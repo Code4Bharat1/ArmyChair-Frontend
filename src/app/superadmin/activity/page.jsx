@@ -33,18 +33,18 @@ export default function ActivityLogPage() {
 
   /* ================= LOAD DATA ================= */
   const loadData = async (authToken) => {
-    if (!authToken) return;
+  if (!authToken) return;
 
-    const res = await axios.get(`${API.replace("/api", "")}/activity`, {
-      headers: { Authorization: `Bearer ${authToken}` },
-    });
-    setLogs(res.data.logs || []);
+  const res = await axios.get(`${API}/activity`, {
+    headers: { Authorization: `Bearer ${authToken}` },
+  });
+  setLogs(res.data.logs || []);
 
-    const exportsRes = await axios.get(`${API}/activity/files`, {
-      headers: { Authorization: `Bearer ${authToken}` },
-    });
-    setFiles(exportsRes.data.files || []);
-  };
+  const exportsRes = await axios.get(`${API}/activity/files`, {
+    headers: { Authorization: `Bearer ${authToken}` },
+  });
+  setFiles(exportsRes.data.files || []);
+};
 
   useEffect(() => {
     if (token) loadData(token);
