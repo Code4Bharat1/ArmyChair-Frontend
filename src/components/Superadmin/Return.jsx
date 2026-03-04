@@ -14,15 +14,10 @@ const getAuthHeaders = () => {
   };
 };
 
-/* ── helper: safely extract a display name from returnedFrom field ── */
 const resolveReturnedFrom = (value) => {
   if (!value) return "—";
   if (typeof value === "object" && value.name) return value.name;
-  if (typeof value === "string") {
-    // Raw ObjectID (24 hex chars) → look it up from vendors cache if possible
-    // We'll pass the vendorMap to resolve it
-    return value;
-  }
+  if (typeof value === "string") return value;
   return String(value);
 };
 
@@ -31,16 +26,20 @@ const Return = () => {
   const [selectedType, setSelectedType] = useState("All");
   const [selectedStatus, setSelectedStatus] = useState("All");
   const [returns, setReturns] = useState([]);
-  const [vendors, setVendors] = useState([]); // ← vendor list for ID→name lookup
+  const [vendors, setVendors] = useState([]);
   const [loading, setLoading] = useState(false);
   const [openModal, setOpenModal] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  // ── Always compute today's date string (YYYY-MM-DD) ──
+  const todayDate = new Date().toISOString().split("T")[0];
+
   const [form, setForm] = useState({
     orderId: "",
     chairType: "",
     description: "",
     quantity: 1,
-    returnDate: "",
+    returnDate: todayDate,   // ← defaults to today
     category: "Functional",
     vendor: "",
     location: "",
@@ -55,14 +54,12 @@ const Return = () => {
     return map;
   }, [vendors]);
 
-  /* ── resolve any returnedFrom value to a human-readable name ── */
   const getReturnedFromName = (value) => {
     if (!value) return "—";
     if (typeof value === "object" && value.name) return value.name;
     if (typeof value === "string") {
-      // If it looks like a Mongo ObjectID and we have it in vendorMap, use that
       if (vendorMap[value]) return vendorMap[value];
-      return value; // fallback: show as-is (already a name string)
+      return value;
     }
     return String(value);
   };
@@ -189,9 +186,11 @@ const Return = () => {
       };
       await axios.post(`${API}/returns`, payload, { headers: getAuthHeaders() });
       setOpenModal(false);
+      // ← reset with today's date again so next open is fresh
       setForm({
         orderId: "", chairType: "", description: "", quantity: 1,
-        returnDate: "", category: "Functional", vendor: "",
+        returnDate: new Date().toISOString().split("T")[0],
+        category: "Functional", vendor: "",
         location: "", returnedFrom: "", reason: "",
       });
       fetchReturns();
@@ -345,10 +344,7 @@ const Return = () => {
                     {filteredReturns.map((r, index) => (
                       <tr key={r._id} className={`border-b border-gray-100 hover:bg-gray-50 transition-colors ${index % 2 === 0 ? "bg-white" : "bg-gray-50"}`}>
                         <td className="p-4 font-medium text-gray-900">{r.orderId}</td>
-
-                        {/* ✅ Always shows name, never raw ObjectID */}
                         <td className="p-4 text-gray-700">{getReturnedFromName(r.returnedFrom)}</td>
-
                         <td className="p-4 text-gray-700">{r.chairType}</td>
                         <td className="p-4 text-gray-700">{r.deliveryDate ? new Date(r.deliveryDate).toLocaleDateString() : "—"}</td>
                         <td className="p-4 font-semibold text-gray-900">{r.quantity}</td>
@@ -396,7 +392,6 @@ const Return = () => {
                     <div className="flex justify-between items-start mb-3">
                       <div className="flex-1">
                         <p className="font-semibold text-gray-900 text-sm sm:text-base">{r.orderId}</p>
-                        {/* ✅ Name resolved here too */}
                         <p className="text-xs sm:text-sm text-gray-600 mt-1">{getReturnedFromName(r.returnedFrom)}</p>
                       </div>
                       <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${r.category === "Functional" ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"}`}>
@@ -474,7 +469,6 @@ const Return = () => {
                 />
               </div>
 
-              {/* Auto-filled preview when order is found */}
               {form.returnedFrom && (
                 <div className="bg-gray-50 rounded-xl p-3 border border-gray-200 text-sm space-y-1">
                   <p className="text-gray-500 text-xs font-semibold uppercase tracking-wide mb-1">Order Details</p>
@@ -514,7 +508,10 @@ const Return = () => {
               </div>
 
               <div>
-                <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-2">Return Date</label>
+                <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-2">
+                  Return Date
+                  <span className="ml-2 text-xs text-gray-400 font-normal">(defaults to today)</span>
+                </label>
                 <input
                   type="date"
                   value={form.returnDate}

@@ -304,9 +304,9 @@ export default function SparePartsInventory() {
         chalanNo: form.chalanNo,
       };
 
-      if (role === "admin" && form.maxQuantity !== "") {
-        payload.maxQuantity = Number(form.maxQuantity);
-      }
+     if (form.maxQuantity !== "") {
+  payload.maxQuantity = Number(form.maxQuantity);
+}
 
       if (editId) {
         await axios.patch(
@@ -1257,13 +1257,22 @@ export default function SparePartsInventory() {
                   value={form.partName}
                   displayValue={form.partNameDisplay}
                   options={partNamesList}
-                  onSelect={(val, label) =>
-                    setForm((f) => ({
-                      ...f,
-                      partName: label || val,
-                      partNameDisplay: label || val,
-                    }))
-                  }
+                  onSelect={(val, label) => {
+  const existingEntry = items.find(
+    (i) => i.partName?.trim().toLowerCase() === (label || val).trim().toLowerCase()
+  );
+  setForm((f) => ({
+    ...f,
+    partName: label || val,
+    partNameDisplay: label || val,
+    minQuantity: existingEntry?.minQuantity
+      ? String(existingEntry.minQuantity)
+      : f.minQuantity,
+    maxQuantity: existingEntry?.maxQuantity
+      ? String(existingEntry.maxQuantity)
+      : f.maxQuantity,
+  }));
+}}
                   onAddNew={handleAddNewPartName}
                   placeholder="Search or type part name..."
                   addNewLabel="Add new part"
@@ -1356,15 +1365,14 @@ export default function SparePartsInventory() {
               />
 
               {/* Max Quantity — admin only */}
-              {role === "admin" && (
-                <ModalInput
-                  label="Max Quantity"
-                  type="number"
-                  value={form.maxQuantity}
-                  onChange={(v) => setForm({ ...form, maxQuantity: v })}
-                  placeholder="Enter max stock level"
-                />
-              )}
+               {/* Max Quantity */}
+              <ModalInput
+                label="Max Quantity"
+                type="number"
+                value={form.maxQuantity}
+                onChange={(v) => setForm({ ...form, maxQuantity: v })}
+                placeholder="Enter max stock level"
+              />
             </div>
 
             <div className="px-5 py-4 border-t border-gray-100 flex gap-3 sticky bottom-0 bg-white z-10 rounded-b-2xl">

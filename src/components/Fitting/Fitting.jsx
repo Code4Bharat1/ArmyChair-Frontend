@@ -20,6 +20,7 @@ const FITTING_STATUSES = [
   "FITTING_IN_PROGRESS",
   "FITTING_COMPLETED",
   "READY_FOR_DISPATCH",
+  "PARTIALLY_DISPATCHED",
   "DISPATCHED",
   "DELIVERED",
 ];
@@ -318,7 +319,7 @@ export default function Fitting() {
                                             <CheckCircle size={11} />
                                             {isProcessing ? "..." : "Mark Complete"}
                                           </button>
-                                        ) : ["PRODUCTION_COMPLETED", "FITTING_IN_PROGRESS"].includes(o.progress) ? (
+                                        ) : ["PRODUCTION_COMPLETED", "FITTING_IN_PROGRESS", "PARTIALLY_DISPATCHED"].includes(o.progress) ? (
                                           <button
                                             onClick={() => updateItemFitting(o._id, idx, "IN_PROGRESS")}
                                             disabled={isProcessing}

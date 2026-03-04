@@ -14,6 +14,7 @@ import {
   Activity,
   LogOut,
   History,
+  XCircle,
 } from "lucide-react";
 import LanguageToggle from "@/components/LanguageToggle";
 
@@ -64,6 +65,10 @@ const menuItem = (href) =>
         <Link href="/superadmin/return" className={menuItem("/superadmin/return")}>
           <RotateCcw size={18} />
           Returns
+        </Link>
+        <Link href="/superadmin/BadReturn" className={menuItem("/superadmin/BadReturn")}>
+          <XCircle size={18} />
+          Bad Returns
         </Link>
         <Link href="/superadmin/ClientReport" className={menuItem("/superadmin/ClientReport")}>
           <Users size={18} />

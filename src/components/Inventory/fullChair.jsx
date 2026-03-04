@@ -1,4 +1,5 @@
 //warehouse fullchair inventory page - list, add, update, delete, export csv, bulk upload, filter by vendor/status/search
+// GROUPED by product name with expandable rows (like spare parts page)
 "use client";
 import { useRouter } from "next/navigation";
 import React, { useEffect, useMemo, useRef, useState } from "react";
@@ -25,7 +26,7 @@ import {
   ChevronsRight,
   MapPin,
   CheckCircle,
-  Clock,
+  ChevronDown,
 } from "lucide-react";
 import axios from "axios";
 import InventorySidebar from "./sidebar";
@@ -177,7 +178,10 @@ export default function InventoryPage() {
 
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize, setPageSize] = useState(10);
+  const [pageSize, setPageSize] = useState(25);
+
+  // Expanded rows (by product name key)
+  const [expandedProducts, setExpandedProducts] = useState(new Set());
 
   const [showForm, setShowForm] = useState(false);
   const [editId, setEditId] = useState(null);
@@ -198,6 +202,7 @@ export default function InventoryPage() {
     vendorName: "",
     quantity: "",
     minQuantity: "",
+    maxQuantity: "",
     color: "",
     mesh: "",
     remark: "",
@@ -292,7 +297,7 @@ export default function InventoryPage() {
         mesh: form.mesh,
         remark: form.remark,
         chalanNo: form.chalanNo,
-        maxQuantity: 500,
+        maxQuantity: form.maxQuantity !== "" ? Number(form.maxQuantity) : 0,
         location: form.location || "WAREHOUSE",
       };
       if (editId) {
@@ -328,6 +333,7 @@ export default function InventoryPage() {
       vendor: item.vendor || null,
       quantity: Number(item.quantity || 0),
       minQuantity: item.minQuantity ?? 0,
+      maxQuantity: item.maxQuantity ?? null,
       color: item.colour || "",
       mesh: item.mesh || "",
       remark: item.remark || "",
@@ -338,6 +344,44 @@ export default function InventoryPage() {
     }));
   }, [inventory]);
 
+  /* ================= GROUP DATA (like spare parts) ================= */
+  const groupedProducts = useMemo(() => {
+    const grouped = new Map();
+    inventoryData.forEach((item) => {
+      const key = item.name.trim().toLowerCase();
+      if (!grouped.has(key)) {
+        grouped.set(key, {
+          productName: item.name,
+          entries: [],
+          totalQuantity: 0,
+          totalMinQuantity: 0,
+          totalMaxQuantity: 0,
+          worstStatus: "Healthy",
+          vendorNames: new Set(),
+          locationCount: 0,
+        });
+      }
+      const group = grouped.get(key);
+      group.entries.push(item);
+      group.totalQuantity += item.quantity;
+      group.totalMinQuantity += item.minQuantity || 0;
+      group.totalMaxQuantity += item.maxQuantity || 0;
+      group.vendorNames.add(item.vendor?.name || "");
+      group.locationCount = group.entries.length;
+
+      const statusPriority = {
+        Critical: 4,
+        "Low Stock": 3,
+        Overstocked: 2,
+        Healthy: 1,
+      };
+      if ((statusPriority[item.status] || 0) > (statusPriority[group.worstStatus] || 0)) {
+        group.worstStatus = item.status;
+      }
+    });
+    return Array.from(grouped.values());
+  }, [inventoryData]);
+
   const vendors = useMemo(() => {
     const names = inventoryData.map((i) => i.vendor?.name).filter(Boolean);
     return ["All", ...new Set(names)];
@@ -345,17 +389,21 @@ export default function InventoryPage() {
 
   const statuses = ["All", "Healthy", "Low Stock", "Critical"];
 
-  const filteredData = useMemo(() => {
+  /* ================= FILTER (on grouped) ================= */
+  const filteredGrouped = useMemo(() => {
     const term = (searchTerm || "").toLowerCase();
-    return inventoryData.filter((i) => {
-      return (
-        (i.name || "").toLowerCase().includes(term) &&
-        (filterVendor === "All" ||
-          (i.vendor?.name || "") === filterVendor) &&
-        (filterStatus === "All" || (i.status || "") === filterStatus)
-      );
+    return groupedProducts.filter((g) => {
+      const matchSearch = g.productName.toLowerCase().includes(term);
+      const matchVendor =
+        filterVendor === "All" ||
+        g.entries.some((e) => (e.vendor?.name || "") === filterVendor);
+      const matchStatus =
+        filterStatus === "All" ||
+        g.worstStatus === filterStatus ||
+        g.entries.some((e) => e.status === filterStatus);
+      return matchSearch && matchVendor && matchStatus;
     });
-  }, [inventoryData, searchTerm, filterVendor, filterStatus]);
+  }, [groupedProducts, searchTerm, filterVendor, filterStatus]);
 
   // Reset to page 1 when filters change
   useEffect(() => {
@@ -363,12 +411,12 @@ export default function InventoryPage() {
   }, [searchTerm, filterVendor, filterStatus, pageSize]);
 
   /* ================= PAGINATION ================= */
-  const totalItems = filteredData.length;
+  const totalItems = filteredGrouped.length;
   const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
   const safePage = Math.min(currentPage, totalPages);
   const startIdx = (safePage - 1) * pageSize;
   const endIdx = Math.min(startIdx + pageSize, totalItems);
-  const paginatedData = filteredData.slice(startIdx, endIdx);
+  const paginatedGroups = filteredGrouped.slice(startIdx, endIdx);
 
   const goToPage = (p) =>
     setCurrentPage(Math.max(1, Math.min(p, totalPages)));
@@ -382,19 +430,28 @@ export default function InventoryPage() {
     return pages;
   }, [safePage, totalPages]);
 
+  /* ================= TOGGLE EXPAND ================= */
+  const toggleExpand = (productName) => {
+    const newExpanded = new Set(expandedProducts);
+    newExpanded.has(productName)
+      ? newExpanded.delete(productName)
+      : newExpanded.add(productName);
+    setExpandedProducts(newExpanded);
+  };
+
   /* ================= STATS ================= */
   const totalStock = useMemo(
     () => inventoryData.reduce((s, i) => s + Number(i.quantity || 0), 0),
     [inventoryData]
   );
-  const totalProducts = inventoryData.length;
+  const totalProducts = groupedProducts.length;
   const lowStockCount = useMemo(
-    () => inventoryData.filter((i) => i.status !== "Healthy").length,
-    [inventoryData]
+    () => groupedProducts.filter((g) => g.worstStatus === "Low Stock" || g.worstStatus === "Critical").length,
+    [groupedProducts]
   );
   const healthyCount = useMemo(
-    () => inventoryData.filter((i) => i.status === "Healthy").length,
-    [inventoryData]
+    () => groupedProducts.filter((g) => g.worstStatus === "Healthy").length,
+    [groupedProducts]
   );
 
   const closeModal = () => {
@@ -407,6 +464,7 @@ export default function InventoryPage() {
       vendorName: "",
       quantity: "",
       minQuantity: "",
+      maxQuantity: "",
       color: "",
       mesh: "",
       remark: "",
@@ -415,21 +473,6 @@ export default function InventoryPage() {
       chalanNo: "",
     });
   };
-
-  const TABLE_HEADERS = [
-    "Product",
-    "Color",
-    "Mesh",
-    "Remark",
-    "Vendor",
-    "Location",
-    "Chalan No",
-    "Quantity",
-    "Min Qty",
-    "Status",
-    "Created",
-    "Actions",
-  ];
 
   /* ================= UI ================= */
   return (
@@ -497,7 +540,7 @@ export default function InventoryPage() {
 
             <div className="flex items-center gap-2 flex-shrink-0">
               <button
-                onClick={() => exportToCSV(filteredData)}
+                onClick={() => exportToCSV(inventoryData)}
                 className="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-2 sm:px-4 sm:py-2.5 rounded-lg sm:rounded-xl font-medium flex items-center gap-1.5 transition-all shadow-sm hover:shadow-md text-xs sm:text-sm"
                 title="Export to CSV"
               >
@@ -552,7 +595,7 @@ export default function InventoryPage() {
               accentColor="#c62d23"
             />
             <StatCard
-              title="Total Products"
+              title="Unique Products"
               value={totalProducts}
               icon={<Boxes className="text-[#c62d23]" />}
               onClick={() => setFilterStatus("All")}
@@ -644,8 +687,7 @@ export default function InventoryPage() {
               )}
 
               <div className="flex items-center text-xs text-gray-400 font-medium whitespace-nowrap self-center">
-                {filteredData.length} item
-                {filteredData.length !== 1 ? "s" : ""}
+                {filteredGrouped.length} product{filteredGrouped.length !== 1 ? "s" : ""} &bull; {inventoryData.length} entries
               </div>
             </div>
           </div>
@@ -658,14 +700,14 @@ export default function InventoryPage() {
                 size={17}
               />
               <span className="text-xs sm:text-sm text-amber-800 font-medium">
-                {lowStockCount} item{lowStockCount !== 1 ? "s" : ""} need
+                {lowStockCount} product{lowStockCount !== 1 ? "s" : ""} need
                 immediate restocking
               </span>
             </div>
           )}
 
           {/* ===== DESKTOP TABLE ===== */}
-          <div className="hidden md:block bg-white rounded-2xl overflow-hidden border border-gray-200 shadow-sm">
+          <div className="hidden md:block bg-white border border-gray-200 rounded-2xl shadow-sm overflow-hidden">
             {loading ? (
               <div className="py-16 text-center">
                 <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-[#c62d23]"></div>
@@ -678,129 +720,149 @@ export default function InventoryPage() {
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm border-collapse">
                     <thead>
-                      <tr className="bg-gray-50 border-b border-gray-200">
-                        {TABLE_HEADERS.map((h) => (
-                          <th
-                            key={h}
-                            className={`px-3 py-2 text-xs font-semibold text-gray-600 whitespace-nowrap ${
-                              h === "Quantity" || h === "Min Qty" ? "text-right" : "text-left"
-                            }`}
-                          >
-                            {h}
-                          </th>
-                        ))}
-                      </tr>
-                    </thead>
+  <tr className="bg-gray-50 border-b border-gray-200">
+    <th className="w-10 px-3 py-2 text-left"></th>
+    <th className="px-3 py-2 text-left text-xs font-semibold text-gray-600 whitespace-nowrap">Product</th>
+    <th className="px-3 py-2 text-left text-xs font-semibold text-gray-600 whitespace-nowrap">Color</th>
+    <th className="px-3 py-2 text-left text-xs font-semibold text-gray-600 whitespace-nowrap">Mesh</th>
+    <th className="px-3 py-2 text-left text-xs font-semibold text-gray-600 whitespace-nowrap">Remark</th>
+    <th className="px-3 py-2 text-left text-xs font-semibold text-gray-600 whitespace-nowrap">Vendor</th>
+    <th className="px-3 py-2 text-left text-xs font-semibold text-gray-600 whitespace-nowrap">Location</th>
+    <th className="px-3 py-2 text-left text-xs font-semibold text-gray-600 whitespace-nowrap">Chalan No</th>
+    <th className="px-3 py-2 text-right text-xs font-semibold text-gray-600 whitespace-nowrap">Min Qty</th>
+    <th className="px-3 py-2 text-right text-xs font-semibold text-gray-600 whitespace-nowrap">Quantity</th>
+    <th className="px-3 py-2 text-right text-xs font-semibold text-gray-600 whitespace-nowrap">Max Qty</th>
+    <th className="px-3 py-2 text-left text-xs font-semibold text-gray-600 whitespace-nowrap">Status</th>
+    <th className="px-3 py-2 text-left text-xs font-semibold text-gray-600 whitespace-nowrap">Created</th>
+    <th className="px-3 py-2 text-left text-xs font-semibold text-gray-600 whitespace-nowrap">Actions</th>
+  </tr>
+</thead>
 
                     <tbody className="divide-y divide-gray-100">
-                      {paginatedData.length === 0 ? (
+                      {paginatedGroups.length === 0 ? (
                         <tr>
-                          <td
-                            colSpan={TABLE_HEADERS.length}
-                            className="py-14 text-center text-gray-400 text-sm"
-                          >
+                          <td colSpan="8" className="py-14 text-center text-gray-400 text-sm">
                             No inventory found
                           </td>
                         </tr>
                       ) : (
-                        paginatedData.map((i, idx) => (
-                          <tr
-                            key={i.id}
-                            className={`transition-colors hover:bg-blue-50/30 ${
-                              idx % 2 === 1 ? "bg-gray-50/40" : "bg-white"
-                            }`}
-                          >
-                            <td className="px-3 py-2 font-semibold text-gray-900 text-sm whitespace-nowrap">
-                              {i.name}
-                            </td>
-                            <td className="px-3 py-2 text-gray-600 text-xs">
-                              {i.color || "—"}
-                            </td>
-                            <td className="px-3 py-2 text-gray-600 text-xs">
-                              {i.mesh || "—"}
-                            </td>
-                            <td
-                              className="px-3 py-2 text-gray-500 text-xs max-w-[160px] truncate"
-                              title={i.remark}
-                            >
-                              {i.remark || "—"}
-                            </td>
-                            <td className="px-3 py-2">
-                              <div className="flex items-center gap-1.5 text-gray-600 text-xs">
-                                <Building2
-                                  size={12}
-                                  className="text-gray-400 flex-shrink-0"
-                                />
-                                {i.vendor?.name || "—"}
-                              </div>
-                            </td>
-                            <td className="px-3 py-2">
-                              <div className="flex items-center gap-1 text-gray-600 text-xs">
-                                <MapPin size={11} className="text-gray-400 flex-shrink-0" />
-                                {i.location || "—"}
-                              </div>
-                            </td>
-                            <td className="px-3 py-2 text-gray-600 text-xs font-medium">
-                              {i.chalanNo || "—"}
-                            </td>
-                            <td className="px-3 py-2 font-bold text-gray-900 text-sm text-right tabular-nums">
-                              {i.quantity}
-                            </td>
-                            <td className="px-3 py-2 text-right tabular-nums">
-                              <span className={`text-xs font-semibold ${i.quantity <= i.minQuantity && i.minQuantity > 0 ? "text-red-600" : "text-gray-400"}`}>
-                                {i.minQuantity > 0 ? i.minQuantity : "—"}
-                              </span>
-                            </td>
-                            <td className="px-3 py-2">
-                              <StatusBadge status={i.status} />
-                            </td>
-                            <td className="px-3 py-2 text-gray-400 text-xs whitespace-nowrap">
-                              {i.createdAt
-                                ? new Date(i.createdAt).toLocaleDateString()
-                                : "—"}
-                            </td>
-                            <td className="px-3 py-2">
-                              <div className="flex items-center gap-1">
-                                <button
-                                  onClick={() => {
-                                    setEditId(i.id);
-                                    setForm({
-                                      chairType: i.name,
-                                      chairTypeId: i.name,
-                                      vendor: i.vendor?._id || "",
-                                      vendorName: i.vendor?.name || "",
-                                      quantity: i.quantity,
-                                      minQuantity: i.minQuantity ?? "",
-                                      color: i.color || "",
-                                      mesh: i.mesh || "",
-                                      remark: i.remark || "",
-                                      location: i.location || "",
-                                      locationDisplay: i.location || "",
-                                      chalanNo: i.chalanNo || "",
-                                    });
-                                    setShowForm(true);
-                                  }}
-                                  className="p-1 hover:bg-blue-100 rounded-md transition"
-                                  title="Edit"
-                                >
-                                  <Pencil
-                                    size={13}
-                                    className="text-gray-400 hover:text-blue-600"
-                                  />
-                                </button>
-                                <button
-                                  onClick={() => deleteInventory(i.id)}
-                                  className="p-1 hover:bg-red-100 rounded-md transition"
-                                  title="Delete"
-                                >
-                                  <Trash2
-                                    size={13}
-                                    className="text-gray-400 hover:text-red-600"
-                                  />
-                                </button>
-                              </div>
-                            </td>
-                          </tr>
+                        paginatedGroups.map((group) => (
+                          <React.Fragment key={group.productName}>
+                            {/* MASTER ROW */}
+<tr
+  className="hover:bg-blue-50/30 cursor-pointer transition-colors group"
+  onClick={() => toggleExpand(group.productName)}
+>
+  <td className="px-3 py-3 text-center">
+    <span className="text-gray-400 group-hover:text-gray-600 transition-colors">
+      {expandedProducts.has(group.productName) ? (
+        <ChevronDown size={15} />
+      ) : (
+        <ChevronRight size={15} />
+      )}
+    </span>
+  </td>
+  <td className="px-3 py-3 font-semibold text-gray-900 whitespace-nowrap">{group.productName}</td>
+  <td className="px-3 py-3 text-gray-400 text-xs italic">—</td>
+  <td className="px-3 py-3 text-gray-400 text-xs italic">—</td>
+  <td className="px-3 py-3 text-gray-400 text-xs italic">—</td>
+  <td className="px-3 py-3 text-gray-500 text-xs">{[...group.vendorNames].filter(Boolean).join(", ") || "—"}</td>
+  <td className="px-3 py-3">
+    <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-gray-100 text-gray-600 rounded-md text-xs font-medium">
+      <MapPin size={10} className="text-[#c62d23]" />
+      {group.locationCount} entr{group.locationCount !== 1 ? "ies" : "y"}
+    </span>
+  </td>
+  <td className="px-3 py-3 text-gray-400 text-xs italic">—</td>
+    <td className="px-3 py-3 text-right text-gray-500 text-xs">{group.totalMinQuantity || "—"}</td>
+  <td className="px-3 py-3 text-right font-bold text-gray-900 tabular-nums">{group.totalQuantity}</td>
+<td className="px-3 py-3 text-right text-gray-500 text-xs">{group.totalMaxQuantity || "—"}</td>
+  <td className="px-3 py-3"><StatusBadge status={group.worstStatus} /></td>
+  <td className="px-3 py-3 text-gray-400 text-xs">—</td>
+  <td className="px-3 py-3"></td>
+</tr>
+
+                            {/* DETAIL ROWS */}
+                            {expandedProducts.has(group.productName) &&
+                              group.entries.map((item, idx) => (
+                                <tr 
+  key={item.id}
+  className={`bg-slate-50/70 transition-colors hover:bg-slate-100/60 ${
+    idx === group.entries.length - 1 ? "border-b-2 border-gray-200" : ""
+  }`}
+>
+  <td className="px-3 py-2.5"></td>
+  <td className="px-3 py-2.5 text-gray-500 text-xs pl-6">—</td>
+  <td className="px-3 py-2.5 text-gray-600 text-xs">{item.color || "—"}</td>
+  <td className="px-3 py-2.5 text-gray-600 text-xs">{item.mesh || "—"}</td>
+  <td className="px-3 py-2.5 text-gray-500 text-xs max-w-[120px] truncate" title={item.remark}>{item.remark || "—"}</td>
+  <td className="px-3 py-2.5">
+    <div className="flex items-center gap-1.5 text-gray-600 text-xs">
+      <Building2 size={11} className="text-gray-400 flex-shrink-0" />
+      {item.vendor?.name || "—"}
+    </div>
+  </td>
+  <td className="px-3 py-2.5">
+    <div className="flex items-center gap-1 text-gray-600 text-xs">
+      <MapPin size={11} className="text-gray-400 flex-shrink-0" />
+      {item.location || "—"}
+    </div>
+  </td>
+  <td className="px-3 py-2.5 text-gray-600 text-xs font-medium">{item.chalanNo || "—"}</td>
+  <td className="px-3 py-2.5 text-right tabular-nums">
+    <span className={`text-xs font-semibold ${item.quantity <= item.minQuantity && item.minQuantity > 0 ? "text-red-600" : "text-gray-400"}`}>
+      {item.minQuantity > 0 ? item.minQuantity : "—"}
+    </span>
+  </td>
+  <td className="px-3 py-2.5 font-semibold text-gray-900 text-sm text-right tabular-nums">{item.quantity}</td>
+  <td className="px-3 py-2.5 text-right tabular-nums">
+  <span className="text-xs font-semibold text-gray-400">
+    {item.maxQuantity ?? "—"}
+  </span>
+</td>
+  <td className="px-3 py-2.5"><StatusBadge status={item.status} size="sm" /></td>
+  <td className="px-3 py-2.5 text-gray-400 text-xs whitespace-nowrap">
+    {item.createdAt ? new Date(item.createdAt).toLocaleDateString() : "—"}
+  </td>
+  <td className="px-3 py-2.5">
+    <div className="flex items-center gap-1">
+      <button
+        onClick={(e) => {
+          e.stopPropagation();
+          setEditId(item.id);
+          setForm({
+            chairType: item.name,
+            chairTypeId: item.name,
+            vendor: item.vendor?._id || "",
+            vendorName: item.vendor?.name || "",
+            quantity: item.quantity,
+            minQuantity: item.minQuantity ?? "",
+            color: item.color || "",
+            mesh: item.mesh || "",
+            remark: item.remark || "",
+            location: item.location || "",
+            locationDisplay: item.location || "",
+            chalanNo: item.chalanNo || "",
+          });
+          setShowForm(true);
+        }}
+        className="p-1.5 hover:bg-blue-100 rounded-md transition"
+        title="Edit"
+      >
+        <Pencil size={13} className="text-gray-400 hover:text-blue-600" />
+      </button>
+      <button
+        onClick={(e) => { e.stopPropagation(); deleteInventory(item.id); }}
+        className="p-1.5 hover:bg-red-100 rounded-md transition"
+        title="Delete"
+      >
+        <Trash2 size={13} className="text-gray-400 hover:text-red-600" />
+      </button>
+    </div>
+  </td>
+</tr>
+                              ))}
+                          </React.Fragment>
                         ))
                       )}
                     </tbody>
@@ -831,18 +893,10 @@ export default function InventoryPage() {
                     </div>
 
                     <div className="flex items-center gap-1">
-                      <PagBtn
-                        onClick={() => goToPage(1)}
-                        disabled={safePage === 1}
-                        title="First page"
-                      >
+                      <PagBtn onClick={() => goToPage(1)} disabled={safePage === 1} title="First page">
                         <ChevronsLeft size={14} />
                       </PagBtn>
-                      <PagBtn
-                        onClick={() => goToPage(safePage - 1)}
-                        disabled={safePage === 1}
-                        title="Previous page"
-                      >
+                      <PagBtn onClick={() => goToPage(safePage - 1)} disabled={safePage === 1} title="Previous page">
                         <ChevronLeft size={14} />
                       </PagBtn>
 
@@ -850,49 +904,30 @@ export default function InventoryPage() {
                         <>
                           <PagBtn onClick={() => goToPage(1)}>1</PagBtn>
                           {pageNumbers[0] > 2 && (
-                            <span className="px-1 text-gray-400 text-xs">
-                              …
-                            </span>
+                            <span className="px-1 text-gray-400 text-xs">…</span>
                           )}
                         </>
                       )}
 
                       {pageNumbers.map((p) => (
-                        <PagBtn
-                          key={p}
-                          onClick={() => goToPage(p)}
-                          active={p === safePage}
-                        >
+                        <PagBtn key={p} onClick={() => goToPage(p)} active={p === safePage}>
                           {p}
                         </PagBtn>
                       ))}
 
                       {pageNumbers[pageNumbers.length - 1] < totalPages && (
                         <>
-                          {pageNumbers[pageNumbers.length - 1] <
-                            totalPages - 1 && (
-                            <span className="px-1 text-gray-400 text-xs">
-                              …
-                            </span>
+                          {pageNumbers[pageNumbers.length - 1] < totalPages - 1 && (
+                            <span className="px-1 text-gray-400 text-xs">…</span>
                           )}
-                          <PagBtn onClick={() => goToPage(totalPages)}>
-                            {totalPages}
-                          </PagBtn>
+                          <PagBtn onClick={() => goToPage(totalPages)}>{totalPages}</PagBtn>
                         </>
                       )}
 
-                      <PagBtn
-                        onClick={() => goToPage(safePage + 1)}
-                        disabled={safePage === totalPages}
-                        title="Next page"
-                      >
+                      <PagBtn onClick={() => goToPage(safePage + 1)} disabled={safePage === totalPages} title="Next page">
                         <ChevronRight size={14} />
                       </PagBtn>
-                      <PagBtn
-                        onClick={() => goToPage(totalPages)}
-                        disabled={safePage === totalPages}
-                        title="Last page"
-                      >
+                      <PagBtn onClick={() => goToPage(totalPages)} disabled={safePage === totalPages} title="Last page">
                         <ChevronsRight size={14} />
                       </PagBtn>
                     </div>
@@ -904,138 +939,166 @@ export default function InventoryPage() {
 
           {/* ===== MOBILE CARDS ===== */}
           <div className="md:hidden space-y-3">
+            {/* Mobile Search */}
+            <div className="bg-white rounded-xl border border-gray-200 p-3 shadow-sm">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" size={15} />
+                <input
+                  type="text"
+                  placeholder="Search product..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-full pl-9 pr-9 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#c62d23]/20 focus:border-[#c62d23] outline-none text-sm bg-white"
+                />
+                {searchTerm && (
+                  <button onClick={() => setSearchTerm("")} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+                    <X size={13} />
+                  </button>
+                )}
+              </div>
+            </div>
+
             {loading ? (
               <div className="bg-white rounded-xl p-8 text-center border border-gray-200">
                 <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-[#c62d23]"></div>
                 <p className="mt-2 text-gray-500 text-sm">Loading...</p>
               </div>
-            ) : filteredData.length === 0 ? (
+            ) : paginatedGroups.length === 0 ? (
               <div className="bg-white rounded-xl p-8 text-center text-gray-400 border border-gray-200 text-sm">
                 No inventory found
               </div>
             ) : (
               <>
-                {paginatedData.map((i) => (
+                {paginatedGroups.map((group) => (
                   <div
-                    key={i.id}
-                    className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm"
+                    key={group.productName}
+                    className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden"
                   >
-                    <div className="flex items-start justify-between mb-3">
-                      <div className="flex-1 min-w-0">
-                        <h3 className="font-semibold text-gray-900 text-sm mb-1 truncate">
-                          {i.name}
-                        </h3>
-                        <div className="flex items-center gap-1.5 text-gray-500 text-xs">
-                          <Building2
-                            size={11}
-                            className="text-gray-400 flex-shrink-0"
-                          />
-                          <span className="truncate">
-                            {i.vendor?.name || "—"}
-                          </span>
+                    <div
+                      className="p-4 cursor-pointer"
+                      onClick={() => toggleExpand(group.productName)}
+                    >
+                      <div className="flex items-start justify-between mb-2">
+                        <div className="flex items-center gap-2 flex-1 min-w-0">
+                          {expandedProducts.has(group.productName) ? (
+                            <ChevronDown size={15} className="text-gray-400 flex-shrink-0" />
+                          ) : (
+                            <ChevronRight size={15} className="text-gray-400 flex-shrink-0" />
+                          )}
+                          <h3 className="font-semibold text-gray-900 text-sm truncate">
+                            {group.productName}
+                          </h3>
                         </div>
-                        {i.location && (
-                          <div className="flex items-center gap-1 text-gray-400 text-xs mt-0.5">
-                            <MapPin size={10} className="flex-shrink-0" />
-                            {i.location}
-                          </div>
-                        )}
-                        {i.chalanNo && (
-                          <div className="text-gray-400 text-xs mt-0.5">
-                            Chalan:{" "}
-                            <span className="font-medium text-gray-600">
-                              {i.chalanNo}
-                            </span>
-                          </div>
-                        )}
+                        <StatusBadge status={group.worstStatus} />
                       </div>
-                      <StatusBadge status={i.status} />
-                    </div>
-
-                    {(i.color || i.mesh || i.remark) && (
-                      <div className="grid grid-cols-3 gap-2 mb-3 text-xs">
-                        {i.color && (
-                          <div>
-                            <p className="text-gray-400 mb-0.5">Color</p>
-                            <p className="font-medium text-gray-700">
-                              {i.color}
-                            </p>
-                          </div>
-                        )}
-                        {i.mesh && (
-                          <div>
-                            <p className="text-gray-400 mb-0.5">Mesh</p>
-                            <p className="font-medium text-gray-700">
-                              {i.mesh}
-                            </p>
-                          </div>
-                        )}
-                        {i.remark && (
-                          <div>
-                            <p className="text-gray-400 mb-0.5">Remark</p>
-                            <p className="font-medium text-gray-700 truncate">
-                              {i.remark}
-                            </p>
-                          </div>
-                        )}
+                      <div className="flex items-center gap-1.5 text-gray-500 text-xs mb-3 pl-5">
+                        <Package size={11} className="text-gray-400" />
+                        <span>
+                          {group.locationCount} entr{group.locationCount !== 1 ? "ies" : "y"}
+                        </span>
                       </div>
-                    )}
-
-                    {i.createdAt && (
-                      <p className="text-[10px] text-gray-400 mb-2">
-                        Added: {new Date(i.createdAt).toLocaleDateString()}
-                      </p>
-                    )}
-
-                    <div className="flex items-center justify-between pt-3 border-t border-gray-100">
-                      <div className="flex items-end gap-4">
+                      <div className="grid grid-cols-2 gap-3 text-xs pl-5">
                         <div>
-                          <p className="text-xs text-gray-400 mb-0.5">Quantity</p>
-                          <p className="font-bold text-gray-900 text-xl leading-none">
-                            {i.quantity}
+                          <p className="text-gray-400 mb-0.5">Total Stock</p>
+                          <p className="font-bold text-gray-900 text-lg leading-none">
+                            {group.totalQuantity}
                           </p>
                         </div>
-                        {i.minQuantity > 0 && (
-                          <div>
-                            <p className="text-xs text-gray-400 mb-0.5">Min Qty</p>
-                            <p className={`font-semibold text-sm leading-none ${i.quantity <= i.minQuantity ? "text-red-600" : "text-gray-500"}`}>
-                              {i.minQuantity}
-                            </p>
-                          </div>
-                        )}
-                      </div>
-                      <div className="flex gap-2">
-                        <button
-                          onClick={() => {
-                            setEditId(i.id);
-                            setForm({
-                              chairType: i.name,
-                              chairTypeId: i.name,
-                              vendor: i.vendor?._id || "",
-                              vendorName: i.vendor?.name || "",
-                              quantity: i.quantity,
-                              minQuantity: i.minQuantity ?? "",
-                              color: i.color || "",
-                              mesh: i.mesh || "",
-                              remark: i.remark || "",
-                              location: i.location || "",
-                              locationDisplay: i.location || "",
-                              chalanNo: i.chalanNo || "",
-                            });
-                            setShowForm(true);
-                          }}
-                          className="p-2.5 bg-blue-50 hover:bg-blue-100 text-blue-600 rounded-lg transition flex items-center gap-1.5 text-xs font-medium"
-                        >
-                          <Pencil size={13} /> Edit
-                        </button>
-                        <button
-                          onClick={() => deleteInventory(i.id)}
-                          className="p-2.5 bg-red-50 hover:bg-red-100 text-red-600 rounded-lg transition"
-                        >
-                          <Trash2 size={13} />
-                        </button>
+                        <div>
+                          <p className="text-gray-400 mb-0.5">Vendors</p>
+                          <p className="font-semibold text-gray-900 text-xs">
+                            {[...group.vendorNames].filter(Boolean).join(", ") || "—"}
+                          </p>
+                        </div>
                       </div>
                     </div>
+
+                    {expandedProducts.has(group.productName) && (
+                      <div className="border-t border-gray-200 divide-y divide-gray-100 bg-gray-50/50">
+                        {group.entries.map((item) => (
+                          <div key={item.id} className="p-4">
+                            <div className="flex items-center justify-between mb-2">
+                              <div className="flex items-center gap-1.5">
+                                <MapPin size={13} className="text-[#c62d23]" />
+                                <span className="font-medium text-sm">{item.location || "—"}</span>
+                              </div>
+                              <StatusBadge status={item.status} size="sm" />
+                            </div>
+                            <div className="grid grid-cols-2 gap-3 mb-2 text-xs">
+                              <div>
+                                <p className="text-gray-400 mb-0.5">Quantity</p>
+                                <p className="font-bold text-gray-900">{item.quantity}</p>
+                              </div>
+                              <div>
+                                <p className="text-gray-400 mb-0.5">Min Qty</p>
+                                <p className={`font-semibold ${item.quantity <= item.minQuantity && item.minQuantity > 0 ? "text-red-600" : "text-gray-900"}`}>
+                                  {item.minQuantity > 0 ? item.minQuantity : "—"}
+                                </p>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-1.5 text-xs text-gray-500 mb-1">
+                              <Building2 size={11} />
+                              <span>{item.vendor?.name || "—"}</span>
+                            </div>
+                            {(item.color || item.mesh) && (
+                              <div className="flex gap-1.5 mb-1">
+                                {item.color && <span className="text-xs bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded">{item.color}</span>}
+                                {item.mesh && <span className="text-xs bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded">{item.mesh}</span>}
+                              </div>
+                            )}
+                            {item.chalanNo && (
+                              <p className="text-xs text-gray-400 mb-1">
+                                Chalan: <span className="font-medium text-gray-600">{item.chalanNo}</span>
+                              </p>
+                            )}
+                            {item.remark && (
+                              <p className="text-xs text-gray-400 italic mb-1">{item.remark}</p>
+                            )}
+                            {item.createdAt && (
+                              <p className="text-[10px] text-gray-400 mb-2">
+                                Added: {new Date(item.createdAt).toLocaleDateString()}
+                              </p>
+                            )}
+                            <div className="flex gap-2 mt-3">
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setEditId(item.id);
+                                  setForm({
+                                    chairType: item.name,
+                                    chairTypeId: item.name,
+                                    vendor: item.vendor?._id || "",
+                                    vendorName: item.vendor?.name || "",
+                                    quantity: item.quantity,
+                                    minQuantity: item.minQuantity ?? "",
+                                    maxQuantity: item.maxQuantity ?? "",
+                                    color: item.color || "",
+                                    mesh: item.mesh || "",
+                                    remark: item.remark || "",
+                                    location: item.location || "",
+                                    locationDisplay: item.location || "",
+                                    chalanNo: item.chalanNo || "",
+                                  });
+                                  setShowForm(true);
+                                }}
+                                className="flex-1 bg-blue-50 hover:bg-blue-100 text-blue-700 py-2 px-3 rounded-lg transition flex items-center justify-center gap-1.5 text-xs font-medium"
+                              >
+                                <Pencil size={13} /> Edit
+                              </button>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  deleteInventory(item.id);
+                                }}
+                                className="bg-red-50 hover:bg-red-100 text-red-700 py-2 px-3 rounded-lg transition flex items-center justify-center"
+                              >
+                                <Trash2 size={13} />
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 ))}
 
@@ -1102,13 +1165,22 @@ export default function InventoryPage() {
                     value={form.chairTypeId}
                     displayValue={form.chairType}
                     options={chairModelsList}
-                    onSelect={(val, label) =>
-                      setForm((f) => ({
-                        ...f,
-                        chairType: label || val,
-                        chairTypeId: val,
-                      }))
-                    }
+                    onSelect={(val, label) => {
+  const normalized = (label || val).trim().toLowerCase();
+  const entryWithMin = inventoryData.find(
+    (i) => i.name.trim().toLowerCase() === normalized && i.minQuantity
+  );
+  const entryWithMax = inventoryData.find(
+    (i) => i.name.trim().toLowerCase() === normalized && i.maxQuantity
+  );
+  setForm((f) => ({
+    ...f,
+    chairType: label || val,
+    chairTypeId: val,
+    minQuantity: entryWithMin ? String(entryWithMin.minQuantity) : f.minQuantity,
+    maxQuantity: entryWithMax ? String(entryWithMax.maxQuantity) : f.maxQuantity,
+  }));
+}}
                     onAddNew={handleAddNewChairModel}
                     placeholder="Search chair type..."
                     addNewLabel="Add new chair type"
@@ -1197,6 +1269,15 @@ export default function InventoryPage() {
                   value={form.minQuantity}
                   onChange={(v) => setForm({ ...form, minQuantity: v })}
                   placeholder="Alert threshold (optional)"
+                />
+
+                {/* Max Quantity */}
+                <Input
+                  label="Max Quantity"
+                  type="number"
+                  value={form.maxQuantity}
+                  onChange={(v) => setForm({ ...form, maxQuantity: v })}
+                  placeholder="Enter max stock level"
                 />
 
                 {/* Chalan / Bill No */}
@@ -1307,15 +1388,18 @@ const StatCard = ({ title, value, icon, danger, onClick, active, accentColor }) 
 };
 
 /* ================= STATUS BADGE ================= */
-const StatusBadge = ({ status }) => {
+const StatusBadge = ({ status, size = "default" }) => {
   const map = {
     Healthy: "bg-green-100 text-green-800",
     "Low Stock": "bg-amber-100 text-amber-800",
     Critical: "bg-red-100 text-red-800",
+    Overstocked: "bg-blue-100 text-blue-800",
   };
+  const sizeClasses =
+    size === "sm" ? "px-2 py-0.5 text-[10px]" : "px-2.5 py-1 text-[11px]";
   return (
     <span
-      className={`px-2.5 py-1 rounded-full text-[11px] font-semibold whitespace-nowrap ${
+      className={`${sizeClasses} rounded-full font-semibold whitespace-nowrap ${
         map[status] || "bg-gray-100 text-gray-700"
       }`}
     >
@@ -1339,7 +1423,7 @@ const Input = ({
     </label>
     <input
       type={type}
-      value={value}
+      value={value ?? ""}
       onChange={(e) => onChange(e.target.value)}
       placeholder={placeholder}
       className="w-full p-2.5 bg-white border border-gray-300 rounded-xl outline-none text-gray-900 placeholder-gray-400 focus:border-[#c62d23] focus:ring-2 focus:ring-[#c62d23]/20 transition text-sm"

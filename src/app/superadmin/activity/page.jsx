@@ -23,6 +23,11 @@ export default function ActivityLogPage() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [showActions, setShowActions] = useState(false);
 
+  // Filter states
+  const [filterModule, setFilterModule] = useState("All");
+  const [filterAction, setFilterAction] = useState("All");
+  const [searchQuery, setSearchQuery] = useState("");
+
   const API = process.env.NEXT_PUBLIC_API_URL;
 
   /* ================= GET TOKEN (CLIENT SAFE) ================= */
@@ -33,18 +38,18 @@ export default function ActivityLogPage() {
 
   /* ================= LOAD DATA ================= */
   const loadData = async (authToken) => {
-  if (!authToken) return;
+    if (!authToken) return;
 
-  const res = await axios.get(`${API}/activity`, {
-    headers: { Authorization: `Bearer ${authToken}` },
-  });
-  setLogs(res.data.logs || []);
+    const res = await axios.get(`${API}/activity`, {
+      headers: { Authorization: `Bearer ${authToken}` },
+    });
+    setLogs(res.data.logs || []);
 
-  const exportsRes = await axios.get(`${API}/activity/files`, {
-    headers: { Authorization: `Bearer ${authToken}` },
-  });
-  setFiles(exportsRes.data.files || []);
-};
+    const exportsRes = await axios.get(`${API}/activity/files`, {
+      headers: { Authorization: `Bearer ${authToken}` },
+    });
+    setFiles(exportsRes.data.files || []);
+  };
 
   useEffect(() => {
     if (token) loadData(token);
@@ -144,7 +149,22 @@ export default function ActivityLogPage() {
     return `${hrs}h ${mins}m`;
   };
 
-  const filteredLogs = logs.filter((l) => l.action !== "WORK_TIME");
+  /* ================= FILTERED LOGS ================= */
+  const baseLogs = logs.filter((l) => l.action !== "WORK_TIME");
+  const uniqueModules = ["All", ...Array.from(new Set(baseLogs.map((l) => l.module).filter(Boolean)))];
+  const uniqueActions = ["All", ...Array.from(new Set(baseLogs.map((l) => l.action).filter(Boolean)))];
+
+  const filteredLogs = baseLogs.filter((l) => {
+    const matchModule = filterModule === "All" || l.module === filterModule;
+    const matchAction = filterAction === "All" || l.action === filterAction;
+    const matchSearch =
+      !searchQuery ||
+      l.user?.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      l.description?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      l.action?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      l.module?.toLowerCase().includes(searchQuery.toLowerCase());
+    return matchModule && matchAction && matchSearch;
+  });
 
   return (
     <ProtectedRoute allowedRoles={["admin"]}>
@@ -201,6 +221,44 @@ export default function ActivityLogPage() {
             {/* BUTTON BAR - Desktop */}
             <div className="hidden lg:block bg-white border border-gray-200 rounded-2xl p-6 shadow-sm hover:shadow-md transition-shadow">
               <div className="flex flex-wrap items-center gap-4">
+
+                {/* Search */}
+                <input
+                  type="text"
+                  placeholder="Search logs..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="px-4 py-3 rounded-xl border-2 border-gray-200 focus:border-[#c62d23] outline-none transition-all text-sm min-w-[200px]"
+                />
+
+                {/* Module Filter */}
+                <select
+                  value={filterModule}
+                  onChange={(e) => setFilterModule(e.target.value)}
+                  className="px-4 py-3 rounded-xl border-2 border-gray-200 focus:border-[#c62d23] outline-none transition-all text-sm font-medium cursor-pointer"
+                >
+                  {uniqueModules.map((m) => <option key={m}>{m}</option>)}
+                </select>
+
+                {/* Action Filter */}
+                <select
+                  value={filterAction}
+                  onChange={(e) => setFilterAction(e.target.value)}
+                  className="px-4 py-3 rounded-xl border-2 border-gray-200 focus:border-[#c62d23] outline-none transition-all text-sm font-medium cursor-pointer"
+                >
+                  {uniqueActions.map((a) => <option key={a}>{a}</option>)}
+                </select>
+
+                {/* Clear Filters */}
+                {(filterModule !== "All" || filterAction !== "All" || searchQuery) && (
+                  <button
+                    onClick={() => { setFilterModule("All"); setFilterAction("All"); setSearchQuery(""); }}
+                    className="text-sm text-[#c62d23] underline font-medium cursor-pointer"
+                  >
+                    Clear filters
+                  </button>
+                )}
+
                 <button
                   onClick={exportCSV}
                   className="bg-white px-5 py-3 rounded-xl border-2 border-gray-200 shadow-sm hover:border-[#c62d23] hover:shadow-md transition-all duration-200 cursor-pointer group flex items-center gap-2 font-medium"
@@ -306,6 +364,44 @@ export default function ActivityLogPage() {
             {/* MOBILE ACTION PANEL */}
             {showActions && (
               <div className="lg:hidden bg-white border border-gray-200 rounded-xl p-4 shadow-sm space-y-3">
+
+                {/* Mobile Search */}
+                <input
+                  type="text"
+                  placeholder="Search logs..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full px-4 py-3 rounded-lg border-2 border-gray-200 focus:border-[#c62d23] outline-none text-sm"
+                />
+
+                {/* Mobile Module + Action filters */}
+                <div className="flex gap-2">
+                  <select
+                    value={filterModule}
+                    onChange={(e) => setFilterModule(e.target.value)}
+                    className="flex-1 px-3 py-3 rounded-lg border-2 border-gray-200 text-sm font-medium focus:border-[#c62d23] outline-none"
+                  >
+                    {uniqueModules.map((m) => <option key={m}>{m}</option>)}
+                  </select>
+                  <select
+                    value={filterAction}
+                    onChange={(e) => setFilterAction(e.target.value)}
+                    className="flex-1 px-3 py-3 rounded-lg border-2 border-gray-200 text-sm font-medium focus:border-[#c62d23] outline-none"
+                  >
+                    {uniqueActions.map((a) => <option key={a}>{a}</option>)}
+                  </select>
+                </div>
+
+                {/* Mobile Clear filters */}
+                {(filterModule !== "All" || filterAction !== "All" || searchQuery) && (
+                  <button
+                    onClick={() => { setFilterModule("All"); setFilterAction("All"); setSearchQuery(""); }}
+                    className="w-full text-sm text-[#c62d23] underline font-medium"
+                  >
+                    Clear filters
+                  </button>
+                )}
+
                 <button
                   onClick={() => {
                     exportCSV();
@@ -486,6 +582,22 @@ export default function ActivityLogPage() {
                           </td>
                         </tr>
                       ))}
+
+                    {mode === "logs" && filteredLogs.length === 0 && (
+                      <tr>
+                        <td colSpan={6} className="p-8 text-center text-gray-500 text-sm">
+                          No activity logs found
+                        </td>
+                      </tr>
+                    )}
+
+                    {mode === "daily" && dailyData.length === 0 && (
+                      <tr>
+                        <td colSpan={4} className="p-8 text-center text-gray-500 text-sm">
+                          No work data found for selected date
+                        </td>
+                      </tr>
+                    )}
                   </tbody>
                 </table>
               </div>
@@ -569,19 +681,19 @@ export default function ActivityLogPage() {
                       </div>
                     </div>
                   ))}
+
+                {mode === "logs" && filteredLogs.length === 0 && (
+                  <div className="p-8 text-center text-gray-500 text-sm">
+                    No activity logs found
+                  </div>
+                )}
+
+                {mode === "daily" && dailyData.length === 0 && (
+                  <div className="p-8 text-center text-gray-500 text-sm">
+                    No work data found for selected date
+                  </div>
+                )}
               </div>
-
-              {mode === "logs" && logs.length === 0 && (
-                <div className="p-8 text-center text-gray-500 text-sm">
-                  No activity logs found
-                </div>
-              )}
-
-              {mode === "daily" && dailyData.length === 0 && (
-                <div className="p-8 text-center text-gray-500 text-sm">
-                  No work data found for selected date
-                </div>
-              )}
             </div>
 
             {/* DAILY ARCHIVES */}

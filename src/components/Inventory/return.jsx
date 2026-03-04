@@ -41,12 +41,6 @@ const StatusBadge = ({ status }) => {
 };
 
 /* ─── DERIVE GROUP STATUS ───────────────────────────────────────── */
-/**
- * Given an array of return docs for the same orderId, compute a single
- * "group status" for display and action logic.
- *
- * Priority:  In-Fitting > Pending > Accepted > Rejected > Completed
- */
 const deriveGroupStatus = (returns) => {
   const statuses = returns.map((r) => r.status);
   if (statuses.includes("In-Fitting")) return "In-Fitting";
@@ -74,7 +68,7 @@ const Return = () => {
   const [orderPreview, setOrderPreview]   = useState(null);
   const [form, setForm] = useState({
     orderId: "",
-    returnDate: "",
+    returnDate: new Date().toISOString().split("T")[0],
     reason: "",
   });
 
@@ -114,6 +108,7 @@ const Return = () => {
 
       setOrderPreview({
         chairModel:   order.chairModel,
+        orderType:    order.orderType,   // ✅ store orderType for display
         dispatchedTo: dispatchedName,
         salesPerson:  order.salesPerson?.name || "—",
         progress:     order.progress,
@@ -151,19 +146,6 @@ const Return = () => {
   }, []);
 
   /* ── GROUP returns by orderId ─────────────────────────────────── */
-  /**
-   * Each "group" is:
-   * {
-   *   orderId,
-   *   returnedFrom,
-   *   returnDate,          // earliest
-   *   returns: [...],      // all raw return docs
-   *   allItems: [...],     // merged items across all returns (with category label)
-   *   totalQty,
-   *   groupStatus,
-   *   hasAccepted,         // any doc with status=Accepted & not yet moved
-   * }
-   */
   const groupedReturns = useMemo(() => {
     const map = {};
     returns.forEach((r) => {
@@ -180,13 +162,11 @@ const Return = () => {
       const grp = map[r.orderId];
       grp.returns.push(r);
 
-      // Merge items into allItems
       (r.items || [{ name: r.chairType, quantity: r.quantity, fittingStatus: "PENDING" }]).forEach((item) => {
         grp.allItems.push({ ...item, category: r.category });
         grp.totalQty += item.quantity;
       });
 
-      // Track earliest return date
       if (new Date(r.returnDate) < new Date(grp.returnDate)) {
         grp.returnDate = r.returnDate;
       }
@@ -194,9 +174,11 @@ const Return = () => {
 
     return Object.values(map).map((grp) => ({
       ...grp,
-      groupStatus: deriveGroupStatus(grp.returns),
-      hasAccepted: grp.returns.some((r) => r.status === "Accepted" && !r.movedToInventory),
-      categories: [...new Set(grp.returns.map((r) => r.category))],
+      groupStatus:  deriveGroupStatus(grp.returns),
+      hasAccepted:  grp.returns.some((r) => r.status === "Accepted" && !r.movedToInventory),
+      categories:   [...new Set(grp.returns.map((r) => r.category))],
+      // ✅ derive orderType from the first return doc (all returns for same order share it)
+      orderType:    grp.returns[0]?.orderType || "FULL",
     }));
   }, [returns]);
 
@@ -234,9 +216,6 @@ const Return = () => {
   }, [search, selectedType, selectedStatus, groupedReturns, vendorMap]);
 
   /* ── actions ── */
-  /**
-   * Move ALL pending returns in the group to fitting at once.
-   */
   const moveGroupToFitting = async (group) => {
     const pendingReturns = group.returns.filter((r) => r.status === "Pending");
     try {
@@ -251,15 +230,20 @@ const Return = () => {
     }
   };
 
-  /**
-   * Move all accepted (not yet moved) returns in the group to inventory.
-   */
+  // ✅ Updated: handles both SPARE (pending → spare inventory) and FULL (accepted → inventory)
   const moveGroupToInventory = async (group) => {
-    const acceptedReturns = group.returns.filter((r) => r.status === "Accepted" && !r.movedToInventory);
+    const isSpare = group.orderType === "SPARE";
+
+    const targetReturns = isSpare
+      ? group.returns.filter((r) => r.status === "Pending" && !r.movedToInventory)
+      : group.returns.filter((r) => r.status === "Accepted" && !r.movedToInventory);
+
+    const endpoint = isSpare ? "move-spare-to-inventory" : "move-to-inventory";
+
     try {
       await Promise.all(
-        acceptedReturns.map((r) =>
-          axios.post(`${API}/returns/${r._id}/move-to-inventory`, {}, { headers: getAuthHeaders() })
+        targetReturns.map((r) =>
+          axios.post(`${API}/returns/${r._id}/${endpoint}`, {}, { headers: getAuthHeaders() })
         )
       );
       fetchReturns();
@@ -277,7 +261,6 @@ const Return = () => {
       return alert("Enter quantity for at least one item");
     }
 
-    // Group items by category — one return per category
     const groups = {};
     selectedItems.forEach((i) => {
       const cat = i.category || "Functional";
@@ -302,7 +285,7 @@ const Return = () => {
   };
 
   const resetForm = () => {
-    setForm({ orderId: "", returnDate: "", reason: "" });
+    setForm({ orderId: "", returnDate: new Date().toISOString().split("T")[0], reason: "" });
     setReturnItems([]);
     setOrderPreview(null);
   };
@@ -460,12 +443,22 @@ const Return = () => {
                           </td>
 
                           {/* Order ID */}
-                          <td className="px-4 py-3 font-semibold text-gray-900">{grp.orderId}</td>
+                          <td className="px-4 py-3">
+                            <p className="font-semibold text-gray-900">{grp.orderId}</p>
+                            {/* ✅ Show order type badge under order ID */}
+                            <span className={`inline-block mt-0.5 px-2 py-0.5 rounded text-[10px] font-bold ${
+                              grp.orderType === "SPARE"
+                                ? "bg-purple-100 text-purple-700"
+                                : "bg-blue-100 text-blue-700"
+                            }`}>
+                              {grp.orderType || "FULL"}
+                            </span>
+                          </td>
 
                           {/* Returned From */}
                           <td className="px-4 py-3 text-gray-700">{getReturnedFromName(grp.returnedFrom)}</td>
 
-                          {/* Items — all SKUs in one cell with category badge */}
+                          {/* Items */}
                           <td className="px-4 py-3">
                             <div className="flex flex-wrap gap-1.5 max-w-xs">
                               {grp.allItems.map((item, i) => (
@@ -538,6 +531,12 @@ const Return = () => {
                                         <span className="font-semibold text-gray-900">{grp.orderId}</span>
                                       </div>
                                       <div className="flex justify-between">
+                                        <span className="text-gray-500">Order Type</span>
+                                        <span className={`font-semibold px-2 py-0.5 rounded text-xs ${grp.orderType === "SPARE" ? "bg-purple-100 text-purple-700" : "bg-blue-100 text-blue-700"}`}>
+                                          {grp.orderType || "FULL"}
+                                        </span>
+                                      </div>
+                                      <div className="flex justify-between">
                                         <span className="text-gray-500">Returned From</span>
                                         <span className="font-semibold text-gray-900">{getReturnedFromName(grp.returnedFrom)}</span>
                                       </div>
@@ -593,13 +592,16 @@ const Return = () => {
                                           </div>
                                           <div className="flex items-center gap-2 text-right">
                                             <span className="text-sm font-bold text-gray-700">×{item.quantity}</span>
-                                            <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
-                                              item.fittingStatus === "GOOD" ? "bg-green-100 text-green-700"
-                                              : item.fittingStatus === "BAD" ? "bg-red-100 text-red-700"
-                                              : "bg-gray-100 text-gray-500"
-                                            }`}>
-                                              {item.fittingStatus === "GOOD" ? "✓ Good" : item.fittingStatus === "BAD" ? "✗ Bad" : "Pending"}
-                                            </span>
+                                            {/* ✅ Spare parts don't go through fitting, so no fittingStatus display */}
+                                            {grp.orderType !== "SPARE" && (
+                                              <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
+                                                item.fittingStatus === "GOOD" ? "bg-green-100 text-green-700"
+                                                : item.fittingStatus === "BAD" ? "bg-red-100 text-red-700"
+                                                : "bg-gray-100 text-gray-500"
+                                              }`}>
+                                                {item.fittingStatus === "GOOD" ? "✓ Good" : item.fittingStatus === "BAD" ? "✗ Bad" : "Pending"}
+                                              </span>
+                                            )}
                                           </div>
                                         </div>
                                       ))}
@@ -617,6 +619,12 @@ const Return = () => {
                                       ))
                                     ) : (
                                       <p className="text-sm text-gray-400 italic">No notes provided</p>
+                                    )}
+                                    {/* ✅ Info note for spare returns */}
+                                    {grp.orderType === "SPARE" && grp.groupStatus === "Pending" && (
+                                      <div className="bg-purple-50 border border-purple-200 rounded-lg px-3 py-2 text-xs text-purple-700">
+                                        ℹ Spare part returns go directly to inventory — no fitting inspection required.
+                                      </div>
                                     )}
                                     <div className="pt-2" onClick={(e) => e.stopPropagation()}>
                                       <GroupActionButtons
@@ -650,7 +658,13 @@ const Return = () => {
                     <div className="flex justify-between items-start mb-3">
                       <div>
                         <p className="font-semibold text-gray-900">{grp.orderId}</p>
-                        <p className="text-xs text-gray-500 mt-0.5">{getReturnedFromName(grp.returnedFrom)}</p>
+                        <div className="flex items-center gap-1.5 mt-0.5">
+                          <p className="text-xs text-gray-500">{getReturnedFromName(grp.returnedFrom)}</p>
+                          {/* ✅ Order type badge on mobile */}
+                          <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${grp.orderType === "SPARE" ? "bg-purple-100 text-purple-700" : "bg-blue-100 text-blue-700"}`}>
+                            {grp.orderType || "FULL"}
+                          </span>
+                        </div>
                       </div>
                       <div className="flex flex-col items-end gap-1">
                         {grp.categories.map((cat) => (
@@ -662,7 +676,6 @@ const Return = () => {
                       </div>
                     </div>
 
-                    {/* All items */}
                     <div className="mb-3 flex flex-wrap gap-1.5">
                       {grp.allItems.map((item, i) => (
                         <span key={i} className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium border ${
@@ -739,10 +752,20 @@ const Return = () => {
                   <p className="font-semibold text-blue-800 mb-1.5">Order Details</p>
                   <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-blue-700">
                     <span className="text-blue-500">Model:</span>          <span className="font-medium">{orderPreview.chairModel}</span>
+                    <span className="text-blue-500">Order Type:</span>
+                    <span className={`font-bold text-xs px-2 py-0.5 rounded w-fit ${orderPreview.orderType === "SPARE" ? "bg-purple-100 text-purple-700" : "bg-blue-100 text-blue-800"}`}>
+                      {orderPreview.orderType || "FULL"}
+                    </span>
                     <span className="text-blue-500">Dispatched To:</span>  <span className="font-medium">{orderPreview.dispatchedTo || "—"}</span>
                     <span className="text-blue-500">Sales:</span>          <span className="font-medium">{orderPreview.salesPerson}</span>
                     <span className="text-blue-500">Status:</span>         <span className={`font-semibold ${orderPreview.progress === "DISPATCHED" ? "text-green-700" : "text-red-700"}`}>{orderPreview.progress}</span>
                   </div>
+                  {/* ✅ Info banner for spare orders */}
+                  {orderPreview.orderType === "SPARE" && (
+                    <div className="mt-2 bg-purple-50 border border-purple-200 rounded-lg px-3 py-2 text-xs text-purple-700">
+                      ℹ This is a <strong>spare parts order</strong> — returned items will go directly to inventory without fitting inspection.
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -810,8 +833,8 @@ const Return = () => {
                           </div>
                         </div>
 
-                        {/* Category toggle */}
-                        {item.quantity > 0 && (
+                        {/* ✅ Only show condition toggle for FULL orders, not SPARE */}
+                        {item.quantity > 0 && orderPreview?.orderType !== "SPARE" && (
                           <div className="mt-2.5 flex items-center gap-2">
                             <span className="text-xs text-gray-500 font-medium whitespace-nowrap">Condition:</span>
                             <div className="flex gap-1.5">
@@ -849,19 +872,27 @@ const Return = () => {
                   {/* Summary */}
                   {returnItems.some((i) => i.quantity > 0) && (
                     <div className="mt-2 px-3 py-2.5 bg-blue-50 border border-blue-100 rounded-lg space-y-1">
-                      {["Functional", "Non-Functional"].map((cat) => {
-                        const catItems = returnItems.filter((i) => i.quantity > 0 && i.category === cat);
-                        if (!catItems.length) return null;
-                        return (
-                          <p key={cat} className="text-xs font-medium text-blue-700">
-                            <span className={`inline-block mr-1.5 px-1.5 py-0.5 rounded text-[10px] font-bold ${cat === "Functional" ? "bg-green-100 text-green-700" : "bg-orange-100 text-orange-700"}`}>
-                              {cat}
-                            </span>
-                            {catItems.map((i) => `${i.name} ×${i.quantity}`).join(", ")}
-                          </p>
-                        );
-                      })}
-                      {new Set(returnItems.filter((i) => i.quantity > 0).map((i) => i.category)).size > 1 && (
+                      {orderPreview?.orderType === "SPARE" ? (
+                        // ✅ Simplified summary for spare orders
+                        <p className="text-xs font-medium text-blue-700">
+                          {returnItems.filter((i) => i.quantity > 0).map((i) => `${i.name} ×${i.quantity}`).join(", ")}
+                          <span className="ml-1 text-purple-600 font-semibold">→ Direct to inventory</span>
+                        </p>
+                      ) : (
+                        ["Functional", "Non-Functional"].map((cat) => {
+                          const catItems = returnItems.filter((i) => i.quantity > 0 && i.category === cat);
+                          if (!catItems.length) return null;
+                          return (
+                            <p key={cat} className="text-xs font-medium text-blue-700">
+                              <span className={`inline-block mr-1.5 px-1.5 py-0.5 rounded text-[10px] font-bold ${cat === "Functional" ? "bg-green-100 text-green-700" : "bg-orange-100 text-orange-700"}`}>
+                                {cat}
+                              </span>
+                              {catItems.map((i) => `${i.name} ×${i.quantity}`).join(", ")}
+                            </p>
+                          );
+                        })
+                      )}
+                      {orderPreview?.orderType !== "SPARE" && new Set(returnItems.filter((i) => i.quantity > 0).map((i) => i.category)).size > 1 && (
                         <p className="text-[10px] text-blue-500 pt-0.5">
                           ℹ Mixed conditions — will be grouped under this order
                         </p>
@@ -916,23 +947,27 @@ const Return = () => {
 };
 
 /* ─── GROUP ACTION BUTTONS ──────────────────────────────────────── */
-/**
- * Single action button for the whole order group.
- * Logic:
- *  - If ANY return in group is Pending  → show "Send to Fitting" (moves ALL pending at once)
- *  - If ALL are In-Fitting              → show "With Fitting Team" pill
- *  - If ANY is Accepted & not moved     → show "Move to Inventory"
- *  - If ALL Completed                   → show "Completed"
- *  - If ALL Rejected                    → show "Rejected"
- */
 const GroupActionButtons = ({ group, onMoveToFitting, onMoveToInventory, small }) => {
   const btnCls = small
     ? "text-xs font-medium px-3 py-1.5 rounded-lg transition"
     : "text-sm font-medium hover:underline transition";
 
-  const statuses = group.returns.map((r) => r.status);
+  const statuses  = group.returns.map((r) => r.status);
+  const isSpare   = group.orderType === "SPARE";
 
+  // ✅ SPARE + Pending → show "Add to Inventory" directly (skip fitting)
   if (statuses.includes("Pending")) {
+    if (isSpare) {
+      return (
+        <button
+          onClick={onMoveToInventory}
+          className={`${btnCls} text-green-600 hover:text-green-800 ${small ? "bg-green-50 hover:bg-green-100" : ""}`}
+        >
+          Add to Inventory
+        </button>
+      );
+    }
+
     const pendingCount = statuses.filter((s) => s === "Pending").length;
     return (
       <button
@@ -971,7 +1006,6 @@ const GroupActionButtons = ({ group, onMoveToFitting, onMoveToInventory, small }
     return <span className="text-xs text-red-400 font-medium">Rejected</span>;
   }
 
-  // Mixed states (some In-Fitting, some Accepted/Rejected, etc.)
   return (
     <span className="text-xs text-gray-400 font-medium bg-gray-100 px-2.5 py-1 rounded-full">
       In Progress

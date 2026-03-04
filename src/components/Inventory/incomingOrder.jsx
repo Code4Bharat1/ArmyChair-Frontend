@@ -238,6 +238,7 @@ export default function WarehouseOrders() {
       const parts = res.data.parts || [];
       const order = res.data.order;
 
+      // Pre-fill from partialParts (old flow)
       if (order.partialParts?.length) {
         parts.forEach((p) => {
           p.locations.forEach((l) => {
@@ -246,6 +247,33 @@ export default function WarehouseOrders() {
             );
             if (found) l.picked = found.qty;
           });
+        });
+      }
+
+      // ✅ For SPARE orders — mark already fully dispatched parts
+      // so warehouse knows not to pick them again
+      if (order.orderType === "SPARE" && order.dispatchedItems) {
+        const dispatchedMap = order.dispatchedItems; // { "633 handle": 10, ... }
+
+        parts.forEach((p) => {
+          const key = p.partName?.toLowerCase().trim();
+
+          // Get how much of this part was already dispatched
+          const alreadyDispatched =
+            dispatchedMap instanceof Map
+              ? dispatchedMap.get(key) || 0
+              : dispatchedMap[key] || 0;
+
+          // Find the required qty for this part from order items
+          const orderItem = order.items?.find(
+            (i) => i.name?.toLowerCase().trim() === key,
+          );
+          const required = orderItem?.quantity || 0;
+
+          // Mark part as fully done if already dispatched >= required
+          p.alreadyDispatched = alreadyDispatched;
+          p.required = required;
+          p.fullyDispatched = alreadyDispatched >= required;
         });
       }
 
@@ -441,15 +469,86 @@ export default function WarehouseOrders() {
     const order = orders.find((o) => o._id === orderId);
     if (!order) return alert("Order not found");
 
+    // ================= SPARE PARTS — dispatch whatever is picked immediately =================
     if (order.orderType === "SPARE") {
-      parts = parts.filter((p) =>
+      const filteredParts = parts.filter((p) =>
         order.items?.some(
           (i) =>
             i.name.toLowerCase().trim() === p.partName.toLowerCase().trim(),
         ),
       );
+
+      const items = filteredParts.flatMap((p) =>
+        p.locations
+          .filter((l) => Number(l.picked || 0) > 0)
+          .map((l) => ({ inventoryId: l.inventoryId, qty: Number(l.picked) })),
+      );
+
+      if (!items.length) return alert("Select inventory for at least one part");
+      // ✅ Check if THIS dispatch + already dispatched = fully complete
+      const isFullFill = order.items.every((item) => {
+        // How much already dispatched for this item
+        const alreadyDispatched = (order.dispatches || []).reduce((sum, d) => {
+          return sum + Number(d.itemQuantities?.[item.name] || 0);
+        }, 0);
+
+        // How much being picked now
+        const matchedPart = filteredParts.find(
+          (p) =>
+            p.partName?.toLowerCase().trim() ===
+            item.name?.toLowerCase().trim(),
+        );
+        const nowPicking = matchedPart
+          ? matchedPart.locations.reduce((s, l) => s + Number(l.picked || 0), 0)
+          : 0;
+
+        return alreadyDispatched + nowPicking >= item.quantity;
+      });
+
+      const confirmMsg = isFullFill
+        ? "This will complete the order. Confirm dispatch?"
+        : "Only some parts are available. Dispatch these now and keep order open for remaining parts?";
+      if (!confirm(confirmMsg)) return;
+
+      try {
+        setProcessingId(orderId);
+
+        // Build itemQuantities map for partialDispatch endpoint
+        const itemQuantities = {};
+        filteredParts.forEach((p) => {
+          const totalPicked = p.locations.reduce(
+            (s, l) => s + Number(l.picked || 0),
+            0,
+          );
+          if (totalPicked > 0) {
+            itemQuantities[p.partName] = totalPicked;
+          }
+        });
+
+        // ✅ Use partialDispatch endpoint — NOT warehouse/order/dispatch
+        await axios.post(
+          `${API}/orders/${orderId}/partial-dispatch`,
+          { itemQuantities, notes: "" },
+          { headers },
+        );
+
+        alert(
+          isFullFill
+            ? "Order fully dispatched!"
+            : "Available parts dispatched. Order remains open for remaining parts.",
+        );
+        fetchOrders();
+        setExpandedOrderId(null);
+        setShowDecisionPanel(false);
+      } catch (err) {
+        alert(err?.response?.data?.message || "Dispatch failed");
+      } finally {
+        setProcessingId(null);
+      }
+      return;
     }
 
+    // ================= FULL CHAIR ORDERS — existing logic unchanged =================
     let buildable;
     try {
       buildable = Math.min(
@@ -461,35 +560,18 @@ export default function WarehouseOrders() {
       return alert(e.message);
     }
 
-    if (buildable === 0) {
-      return alert("Not enough parts selected");
-    }
-    // 🔥 ADD THIS JUST ABOVE FULL ACCEPT
-    const requiredQty = order.items?.length
-      ? order.items.reduce((sum, i) => sum + i.quantity, 0)
-      : order.quantity;
+    if (buildable === 0) return alert("Not enough parts selected");
 
-    // ================= FULL ACCEPT (INVENTORY DEDUCTS) =================
-    // ================= FULL ACCEPT (INVENTORY DEDUCTS) =================
-    const isFullAccept =
-      order.orderType === "SPARE"
-        ? isSpareFullyPicked(order, parts)
-        : buildable >= order.quantity;
+    const isFullAccept = buildable >= order.quantity;
 
     if (isFullAccept) {
       const items = parts.flatMap((p) =>
         p.locations
           .filter((l) => l.picked > 0)
-          .map((l) => ({
-            inventoryId: l.inventoryId,
-            qty: l.picked,
-          })),
+          .map((l) => ({ inventoryId: l.inventoryId, qty: l.picked })),
       );
 
-      if (!items.length) {
-        return alert("No inventory selected");
-      }
-
+      if (!items.length) return alert("No inventory selected");
       if (!confirm("Confirm inventory deduction and dispatch?")) return;
 
       await axios.post(
@@ -505,27 +587,16 @@ export default function WarehouseOrders() {
       return;
     }
 
-    // ================= PARTIAL ACCEPT (NO INVENTORY TOUCH) =================
     if (
-      !confirm(
-        order.orderType === "SPARE"
-          ? "Some items are not fully fulfilled. Save partial acceptance?"
-          : `Only ${buildable} can be fulfilled. Save partial acceptance?`,
-      )
+      !confirm(`Only ${buildable} can be fulfilled. Save partial acceptance?`)
     )
       return;
 
-    const items = [];
-    parts.forEach((p) => {
-      p.locations.forEach((l) => {
-        if (l.picked > 0) {
-          items.push({
-            inventoryId: l.inventoryId,
-            qty: l.picked,
-          });
-        }
-      });
-    });
+    const items = parts.flatMap((p) =>
+      p.locations
+        .filter((l) => l.picked > 0)
+        .map((l) => ({ inventoryId: l.inventoryId, qty: l.picked })),
+    );
 
     try {
       await axios.post(
@@ -533,7 +604,6 @@ export default function WarehouseOrders() {
         { orderId, buildable, items },
         { headers },
       );
-
       alert(`Partial accepted for ${buildable}`);
       setExpandedOrderId(null);
       setShowDecisionPanel(false);
@@ -652,16 +722,32 @@ export default function WarehouseOrders() {
       o.progress === "READY_FOR_DISPATCH" ||
       o.progress === "PARTIALLY_DISPATCHED"
     ) {
+      // SPARE orders: recheck inventory panel for remaining parts
+      if (o.orderType === "SPARE" && o.progress === "PARTIALLY_DISPATCHED") {
+        return (
+          <div className="flex gap-2">
+            <button
+              onClick={() => {
+                if (expandedOrderId === o._id) {
+                  setExpandedOrderId(null);
+                  setShowDecisionPanel(false);
+                } else {
+                  setExpandedOrderId(o._id);
+                  setShowDecisionPanel(true);
+                  fetchPickPreview(o._id);
+                }
+              }}
+              className="bg-green-600 hover:bg-green-700 text-white px-3 py-2 rounded-lg text-xs sm:text-sm font-medium"
+            >
+              {expandedOrderId === o._id ? "Hide" : "Dispatch Remaining"}
+            </button>
+          </div>
+        );
+      }
+
+      // FULL chairs or READY_FOR_DISPATCH — normal dispatch modal
       return (
         <div className="flex gap-2">
-          {/* {o.progress === "READY_FOR_DISPATCH" && (
-        <button
-          onClick={() => setAmendOrder(o)}
-          className="bg-amber-600 hover:bg-amber-700 text-white px-3 py-2 rounded-lg text-xs sm:text-sm font-medium"
-        >
-          Change Order
-        </button>
-      )} */}
           <button
             onClick={() => setDispatchOrder(o)}
             className="bg-green-600 hover:bg-green-700 text-white px-3 py-2 rounded-lg text-xs sm:text-sm font-medium"
@@ -1409,19 +1495,21 @@ const OrdersTable = ({
                                 <span>
                                   {i.name} × {i.quantity}
                                 </span>
-                                {i.fittingStatus === "COMPLETED" ? (
-                                  <span className="px-1.5 py-0.5 bg-green-100 text-green-700 rounded text-[10px] font-semibold">
-                                    ✓ Ready
-                                  </span>
-                                ) : i.fittingStatus === "IN_PROGRESS" ? (
-                                  <span className="px-1.5 py-0.5 bg-amber-100 text-amber-700 rounded text-[10px] font-semibold">
-                                    Fitting...
-                                  </span>
-                                ) : (
-                                  <span className="px-1.5 py-0.5 bg-gray-100 text-gray-500 rounded text-[10px] font-semibold">
-                                    Pending Fitting
-                                  </span>
-                                )}
+                                {/* ✅ Only show fitting badges for FULL chair orders, not SPARE */}
+                                {o.orderType === "FULL" &&
+                                  (i.fittingStatus === "COMPLETED" ? (
+                                    <span className="px-1.5 py-0.5 bg-green-100 text-green-700 rounded text-[10px] font-semibold">
+                                      ✓ Ready
+                                    </span>
+                                  ) : i.fittingStatus === "IN_PROGRESS" ? (
+                                    <span className="px-1.5 py-0.5 bg-amber-100 text-amber-700 rounded text-[10px] font-semibold">
+                                      Fitting...
+                                    </span>
+                                  ) : (
+                                    <span className="px-1.5 py-0.5 bg-gray-100 text-gray-500 rounded text-[10px] font-semibold">
+                                      {/* Pending Fitting */}
+                                    </span>
+                                  ))}
                               </li>
                             ))}
                           </ul>
@@ -1463,7 +1551,11 @@ const OrdersTable = ({
 
                   {expandedOrderId === o._id &&
                     showDecisionPanel &&
-                    ["ORDER_PLACED", "PARTIAL"].includes(o.progress) && (
+                    [
+                      "ORDER_PLACED",
+                      "PARTIAL",
+                      "PARTIALLY_DISPATCHED",
+                    ].includes(o.progress) && (
                       <tr>
                         <td colSpan={8} className="p-0">
                           <ExpandedInventoryPanel
@@ -1545,7 +1637,9 @@ const OrdersTable = ({
 
             {expandedOrderId === o._id &&
               showDecisionPanel &&
-              ["ORDER_PLACED", "PARTIAL"].includes(o.progress) && (
+              ["ORDER_PLACED", "PARTIAL", "PARTIALLY_DISPATCHED"].includes(
+                o.progress,
+              ) && (
                 <div className="border-t border-gray-200">
                   <ExpandedInventoryPanel
                     order={o}
@@ -1643,6 +1737,60 @@ const ExpandedInventoryPanel = ({
                 </span>
               </div>
             )}
+            {/* ✅ Spare parts dispatch history summary */}
+            {o.orderType === "SPARE" && o.dispatches?.length > 0 && (
+              <div className="mt-4 w-full">
+                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
+                  Already Dispatched
+                </p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {o.items?.map((item) => {
+                    // Sum dispatched qty for this item across all dispatch batches
+                    const totalDispatched = (o.dispatches || []).reduce(
+                      (sum, d) => {
+                        const qty = d.itemQuantities?.[item.name] || 0;
+                        return sum + Number(qty);
+                      },
+                      0,
+                    );
+
+                    const remaining = item.quantity - totalDispatched;
+                    const isComplete = totalDispatched >= item.quantity;
+
+                    return (
+                      <div
+                        key={item.name}
+                        className={`flex items-center justify-between px-3 py-2 rounded-lg border text-xs ${
+                          isComplete
+                            ? "bg-green-50 border-green-200"
+                            : "bg-amber-50 border-amber-200"
+                        }`}
+                      >
+                        <span className="font-medium text-gray-800 truncate">
+                          {item.name}
+                        </span>
+                        <div className="flex items-center gap-2 ml-2 shrink-0">
+                          <span
+                            className={`font-bold ${isComplete ? "text-green-600" : "text-amber-600"}`}
+                          >
+                            {totalDispatched}/{item.quantity}
+                          </span>
+                          {isComplete ? (
+                            <span className="text-green-600 font-semibold">
+                              ✓ Done
+                            </span>
+                          ) : (
+                            <span className="text-amber-600 font-semibold">
+                              {remaining} left
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
           </div>
         </div>
 
@@ -1674,18 +1822,16 @@ const ExpandedInventoryPanel = ({
             <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-3 sm:gap-4">
               {inventoryPreview[o._id]
                 ?.filter((part) => {
-                  // ✅ FULL ORDER → show everything
                   if (o.orderType === "FULL") return true;
-
-                  // ✅ SPARE ORDER → strict case-insensitive match
                   if (o.orderType === "SPARE") {
+                    // ✅ Hide parts that are already fully dispatched
+                    if (part.fullyDispatched) return false;
                     return o.items?.some(
                       (i) =>
                         i.name.toLowerCase().trim() ===
                         part.partName.toLowerCase().trim(),
                     );
                   }
-
                   return false;
                 })
                 .map((part, idx) => (
@@ -1752,8 +1898,25 @@ const ExpandedInventoryPanel = ({
                                           i.name.toLowerCase().trim() ===
                                           p.partName.toLowerCase().trim(),
                                       );
-                                      requiredForPart =
+                                      const totalNeeded =
                                         matchedItem?.quantity ?? 0;
+
+                                      // ✅ Subtract already dispatched so cap = remaining only
+                                      const alreadyDispatched = (
+                                        o.dispatches || []
+                                      ).reduce((sum, d) => {
+                                        return (
+                                          sum +
+                                          Number(
+                                            d.itemQuantities?.[p.partName] || 0,
+                                          )
+                                        );
+                                      }, 0);
+
+                                      requiredForPart = Math.max(
+                                        0,
+                                        totalNeeded - alreadyDispatched,
+                                      );
                                     } else {
                                       requiredForPart = o.quantity;
                                     }
@@ -1824,7 +1987,26 @@ const ExpandedInventoryPanel = ({
             const totalPicked = pickedQtyPerPart.reduce((a, b) => a + b, 0);
 
             const spareFullyPicked = isSpare
-              ? isSpareFullyPicked(o, parts)
+              ? o.items?.every((item) => {
+                  const alreadyDispatched = (o.dispatches || []).reduce(
+                    (sum, d) => {
+                      return sum + Number(d.itemQuantities?.[item.name] || 0);
+                    },
+                    0,
+                  );
+                  const matchedPart = parts.find(
+                    (p) =>
+                      p.partName?.toLowerCase().trim() ===
+                      item.name?.toLowerCase().trim(),
+                  );
+                  const nowPicking = matchedPart
+                    ? matchedPart.locations.reduce(
+                        (s, l) => s + Number(l.picked || 0),
+                        0,
+                      )
+                    : 0;
+                  return alreadyDispatched + nowPicking >= item.quantity;
+                })
               : false;
 
             const liveBuildable = !isSpare ? getLiveBuildable(o._id, o) : 0;

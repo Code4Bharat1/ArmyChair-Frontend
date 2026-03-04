@@ -1,4 +1,5 @@
-//admin full chair inventory page - list, add, update, delete, export csv, bulk upload, filter by vendor/status/search
+//warehouse fullchair inventory page - list, add, update, delete, export csv, bulk upload, filter by vendor/status/search
+// GROUPED by product name with expandable rows (like spare parts page)
 "use client";
 import { useRouter } from "next/navigation";
 import React, { useEffect, useMemo, useRef, useState } from "react";
@@ -25,7 +26,7 @@ import {
   ChevronsRight,
   MapPin,
   CheckCircle,
-  Clock,
+  ChevronDown,
 } from "lucide-react";
 import axios from "axios";
 import InventorySidebar from "./sidebar";
@@ -43,7 +44,6 @@ const exportToCSV = (data) => {
       "Vendor",
       "Quantity",
       "Min Quantity",
-      "Max Quantity",
       "Status",
       "Location",
       "Chalan / Bill No",
@@ -51,13 +51,12 @@ const exportToCSV = (data) => {
     ],
     ...data.map((i) => [
       i.name,
-      i.colour || "",
+      i.color || "",
       i.mesh || "",
       i.remark || "",
       i.vendor?.name || "",
       i.quantity,
       i.minQuantity ?? "",
-      i.maxQuantity ?? "",
       i.status,
       i.location || "",
       i.chalanNo || "",
@@ -90,7 +89,9 @@ function SearchableDropdown({
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
 
-  useEffect(() => { setSearch(displayValue || ""); }, [displayValue]);
+  useEffect(() => {
+    setSearch(displayValue || "");
+  }, [displayValue]);
 
   useEffect(() => {
     const handleClick = (e) => {
@@ -106,9 +107,13 @@ function SearchableDropdown({
       .includes(search.toLowerCase())
   );
 
-  const getLabel = (o) => typeof o === "string" ? o : o.label || o.name || "";
-  const getValue = (o) => typeof o === "string" ? o : o.value || o._id || o;
-  const exactMatch = options.some((o) => getLabel(o).toLowerCase() === search.toLowerCase());
+  const getLabel = (o) =>
+    typeof o === "string" ? o : o.label || o.name || "";
+  const getValue = (o) => (typeof o === "string" ? o : o.value || o._id || o);
+
+  const exactMatch = options.some(
+    (o) => getLabel(o).toLowerCase() === search.toLowerCase()
+  );
 
   return (
     <div className="relative" ref={ref}>
@@ -116,18 +121,27 @@ function SearchableDropdown({
         placeholder={placeholder}
         value={search}
         onFocus={() => setOpen(true)}
-        onChange={(e) => { setSearch(e.target.value); setOpen(true); }}
+        onChange={(e) => {
+          setSearch(e.target.value);
+          setOpen(true);
+        }}
         className="w-full p-2.5 bg-white border border-gray-300 rounded-xl outline-none text-gray-900 placeholder-gray-400 focus:border-[#c62d23] focus:ring-2 focus:ring-[#c62d23]/20 transition text-sm"
       />
       {open && (
         <div className="absolute z-30 left-0 right-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-xl max-h-48 overflow-auto">
           {filtered.length === 0 && !search && (
-            <div className="px-4 py-3 text-sm text-gray-400">No options available</div>
+            <div className="px-4 py-3 text-sm text-gray-400">
+              No options available
+            </div>
           )}
           {filtered.map((o) => (
             <div
               key={getValue(o)}
-              onMouseDown={() => { onSelect(getValue(o), getLabel(o)); setSearch(getLabel(o)); setOpen(false); }}
+              onMouseDown={() => {
+                onSelect(getValue(o), getLabel(o));
+                setSearch(getLabel(o));
+                setOpen(false);
+              }}
               className={`px-4 py-2.5 text-sm cursor-pointer border-b border-gray-50 last:border-0 transition-colors hover:bg-gray-50 ${
                 getValue(o) === value ? "bg-red-50 text-[#c62d23] font-medium" : ""
               }`}
@@ -137,7 +151,11 @@ function SearchableDropdown({
           ))}
           {search && !exactMatch && onAddNew && (
             <div
-              onMouseDown={() => { onAddNew(search.trim()); setSearch(search.trim()); setOpen(false); }}
+              onMouseDown={() => {
+                onAddNew(search.trim());
+                setSearch(search.trim());
+                setOpen(false);
+              }}
               className="px-4 py-2.5 bg-gray-50 hover:bg-green-50 cursor-pointer text-green-700 font-medium text-sm transition-colors"
             >
               ➕ {addNewLabel} "{search.trim()}"
@@ -154,22 +172,29 @@ export default function InventoryPage() {
   const [loading, setLoading] = useState(true);
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
-  /* FILTERS */
   const [searchTerm, setSearchTerm] = useState("");
   const [filterVendor, setFilterVendor] = useState("All");
   const [filterStatus, setFilterStatus] = useState("All");
 
-  /* PAGINATION */
+  // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize, setPageSize] = useState(20);
+  const [pageSize, setPageSize] = useState(25);
 
-  /* MODAL STATE */
+  // Expanded rows (by product name key)
+  const [expandedProducts, setExpandedProducts] = useState(new Set());
+
   const [showForm, setShowForm] = useState(false);
   const [editId, setEditId] = useState(null);
   const [vendorsList, setVendorsList] = useState([]);
   const [chairModelsList, setChairModelsList] = useState([]);
-  const [locationsList, setLocationsList] = useState(["WAREHOUSE", "SHOWROOM", "FACTORY", "GODOWN"]);
+  const [locationsList, setLocationsList] = useState([
+    "WAREHOUSE",
+    "SHOWROOM",
+    "FACTORY",
+    "GODOWN",
+  ]);
 
+  // Form state
   const [form, setForm] = useState({
     chairType: "",
     chairTypeId: "",
@@ -178,7 +203,7 @@ export default function InventoryPage() {
     quantity: "",
     minQuantity: "",
     maxQuantity: "",
-    colour: "",
+    color: "",
     mesh: "",
     remark: "",
     location: "",
@@ -188,7 +213,8 @@ export default function InventoryPage() {
 
   const router = useRouter();
   const API = process.env.NEXT_PUBLIC_API_URL;
-  const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
+  const token =
+    typeof window !== "undefined" ? localStorage.getItem("token") : null;
   const headers = token ? { Authorization: `Bearer ${token}` } : {};
 
   /* ================= FETCH ================= */
@@ -196,7 +222,10 @@ export default function InventoryPage() {
     try {
       const res = await axios.get(`${API}/inventory`, { headers });
       const data = res.data.inventory || [];
-      const safeData = data.map((i) => ({ ...i, quantity: Number(i.quantity || 0) }));
+      const safeData = data.map((i) => ({
+        ...i,
+        quantity: Number(i.quantity || 0),
+      }));
       setInventory(safeData.filter((i) => i.type === "FULL"));
     } catch (err) {
       console.error("Fetch failed", err);
@@ -220,12 +249,13 @@ export default function InventoryPage() {
   }, []);
 
   useEffect(() => {
-    axios.get(`${API}/vendors`, { headers })
+    axios
+      .get(`${API}/vendors`, { headers })
       .then((res) => setVendorsList(res.data.vendors || res.data))
       .catch(console.error);
   }, []);
 
-  /* ================= ADD NEW HELPERS ================= */
+  /* ================= ADD NEW CHAIR MODEL ================= */
   const handleAddNewChairModel = async (name) => {
     try {
       await axios.post(`${API}/inventory/chair-models`, { name }, { headers });
@@ -236,9 +266,12 @@ export default function InventoryPage() {
     setForm((f) => ({ ...f, chairType: name, chairTypeId: name }));
   };
 
+  /* ================= ADD NEW LOCATION ================= */
   const handleAddNewLocation = (name) => {
     const upper = name.toUpperCase();
-    setLocationsList((prev) => prev.includes(upper) ? prev : [...prev, upper]);
+    setLocationsList((prev) =>
+      prev.includes(upper) ? prev : [...prev, upper]
+    );
     setForm((f) => ({ ...f, location: upper, locationDisplay: upper }));
   };
 
@@ -248,29 +281,29 @@ export default function InventoryPage() {
       if (
         !form.chairType ||
         !form.vendor ||
-        !form.colour ||
+        !form.color ||
         form.quantity === "" ||
-        !form.chalanNo ||
-        form.minQuantity === "" ||
-        form.maxQuantity === ""
+        !form.chalanNo
       ) {
-        return alert("Please fill all required fields including Min and Max Quantity");
+        return alert("Please fill all required fields");
       }
       const payload = {
         type: "FULL",
         chairType: form.chairType,
         vendor: form.vendor,
         quantity: Number(form.quantity),
-        minQuantity: Number(form.minQuantity),
-        maxQuantity: Number(form.maxQuantity),
-        colour: form.colour,
+        minQuantity: form.minQuantity !== "" ? Number(form.minQuantity) : 0,
+        colour: form.color,
         mesh: form.mesh,
         remark: form.remark,
         chalanNo: form.chalanNo,
+        maxQuantity: form.maxQuantity !== "" ? Number(form.maxQuantity) : 0,
         location: form.location || "WAREHOUSE",
       };
       if (editId) {
-        await axios.patch(`${API}/inventory/update/${editId}`, payload, { headers });
+        await axios.patch(`${API}/inventory/update/${editId}`, payload, {
+          headers,
+        });
       } else {
         await axios.post(`${API}/inventory`, payload, { headers });
       }
@@ -300,8 +333,8 @@ export default function InventoryPage() {
       vendor: item.vendor || null,
       quantity: Number(item.quantity || 0),
       minQuantity: item.minQuantity ?? 0,
-      maxQuantity: item.maxQuantity ?? 0,
-      colour: item.colour || "",
+      maxQuantity: item.maxQuantity ?? null,
+      color: item.colour || "",
       mesh: item.mesh || "",
       remark: item.remark || "",
       chalanNo: item.chalanNo || "",
@@ -311,6 +344,44 @@ export default function InventoryPage() {
     }));
   }, [inventory]);
 
+  /* ================= GROUP DATA (like spare parts) ================= */
+  const groupedProducts = useMemo(() => {
+    const grouped = new Map();
+    inventoryData.forEach((item) => {
+      const key = item.name.trim().toLowerCase();
+      if (!grouped.has(key)) {
+        grouped.set(key, {
+          productName: item.name,
+          entries: [],
+          totalQuantity: 0,
+          totalMinQuantity: 0,
+          totalMaxQuantity: 0,
+          worstStatus: "Healthy",
+          vendorNames: new Set(),
+          locationCount: 0,
+        });
+      }
+      const group = grouped.get(key);
+      group.entries.push(item);
+      group.totalQuantity += item.quantity;
+      group.totalMinQuantity += item.minQuantity || 0;
+      group.totalMaxQuantity += item.maxQuantity || 0;
+      group.vendorNames.add(item.vendor?.name || "");
+      group.locationCount = group.entries.length;
+
+      const statusPriority = {
+        Critical: 4,
+        "Low Stock": 3,
+        Overstocked: 2,
+        Healthy: 1,
+      };
+      if ((statusPriority[item.status] || 0) > (statusPriority[group.worstStatus] || 0)) {
+        group.worstStatus = item.status;
+      }
+    });
+    return Array.from(grouped.values());
+  }, [inventoryData]);
+
   const vendors = useMemo(() => {
     const names = inventoryData.map((i) => i.vendor?.name).filter(Boolean);
     return ["All", ...new Set(names)];
@@ -318,28 +389,37 @@ export default function InventoryPage() {
 
   const statuses = ["All", "Healthy", "Low Stock", "Critical"];
 
-  const filteredData = useMemo(() => {
+  /* ================= FILTER (on grouped) ================= */
+  const filteredGrouped = useMemo(() => {
     const term = (searchTerm || "").toLowerCase();
-    return inventoryData.filter((i) => {
-      return (
-        (i.name || "").toLowerCase().includes(term) &&
-        (filterVendor === "All" || (i.vendor?.name || "") === filterVendor) &&
-        (filterStatus === "All" || (i.status || "") === filterStatus)
-      );
+    return groupedProducts.filter((g) => {
+      const matchSearch = g.productName.toLowerCase().includes(term);
+      const matchVendor =
+        filterVendor === "All" ||
+        g.entries.some((e) => (e.vendor?.name || "") === filterVendor);
+      const matchStatus =
+        filterStatus === "All" ||
+        g.worstStatus === filterStatus ||
+        g.entries.some((e) => e.status === filterStatus);
+      return matchSearch && matchVendor && matchStatus;
     });
-  }, [inventoryData, searchTerm, filterVendor, filterStatus]);
+  }, [groupedProducts, searchTerm, filterVendor, filterStatus]);
 
-  useEffect(() => { setCurrentPage(1); }, [searchTerm, filterVendor, filterStatus, pageSize]);
+  // Reset to page 1 when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, filterVendor, filterStatus, pageSize]);
 
   /* ================= PAGINATION ================= */
-  const totalItems = filteredData.length;
+  const totalItems = filteredGrouped.length;
   const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
   const safePage = Math.min(currentPage, totalPages);
   const startIdx = (safePage - 1) * pageSize;
   const endIdx = Math.min(startIdx + pageSize, totalItems);
-  const paginatedData = filteredData.slice(startIdx, endIdx);
+  const paginatedGroups = filteredGrouped.slice(startIdx, endIdx);
 
-  const goToPage = (p) => setCurrentPage(Math.max(1, Math.min(p, totalPages)));
+  const goToPage = (p) =>
+    setCurrentPage(Math.max(1, Math.min(p, totalPages)));
 
   const pageNumbers = useMemo(() => {
     const pages = [];
@@ -350,26 +430,49 @@ export default function InventoryPage() {
     return pages;
   }, [safePage, totalPages]);
 
+  /* ================= TOGGLE EXPAND ================= */
+  const toggleExpand = (productName) => {
+    const newExpanded = new Set(expandedProducts);
+    newExpanded.has(productName)
+      ? newExpanded.delete(productName)
+      : newExpanded.add(productName);
+    setExpandedProducts(newExpanded);
+  };
+
   /* ================= STATS ================= */
-  const totalStock = useMemo(() => inventoryData.reduce((s, i) => s + Number(i.quantity || 0), 0), [inventoryData]);
-  const totalProducts = inventoryData.length;
-  const lowStockCount = useMemo(() => inventoryData.filter((i) => i.status !== "Healthy").length, [inventoryData]);
-  const healthyCount = useMemo(() => inventoryData.filter((i) => i.status === "Healthy").length, [inventoryData]);
+  const totalStock = useMemo(
+    () => inventoryData.reduce((s, i) => s + Number(i.quantity || 0), 0),
+    [inventoryData]
+  );
+  const totalProducts = groupedProducts.length;
+  const lowStockCount = useMemo(
+    () => groupedProducts.filter((g) => g.worstStatus === "Low Stock" || g.worstStatus === "Critical").length,
+    [groupedProducts]
+  );
+  const healthyCount = useMemo(
+    () => groupedProducts.filter((g) => g.worstStatus === "Healthy").length,
+    [groupedProducts]
+  );
 
   const closeModal = () => {
     setShowForm(false);
     setEditId(null);
     setForm({
-      chairType: "", chairTypeId: "", vendor: "", vendorName: "",
-      quantity: "", minQuantity: "", maxQuantity: "", colour: "", mesh: "", remark: "",
-      location: "", locationDisplay: "", chalanNo: "",
+      chairType: "",
+      chairTypeId: "",
+      vendor: "",
+      vendorName: "",
+      quantity: "",
+      minQuantity: "",
+      maxQuantity: "",
+      color: "",
+      mesh: "",
+      remark: "",
+      location: "",
+      locationDisplay: "",
+      chalanNo: "",
     });
   };
-
-  const TABLE_HEADERS = [
-    "Product", "Color", "Mesh", "Remark", "Vendor",
-    "Location", "Chalan No", "Quantity", "Min Qty", "Max Qty", "Status", "Created", "Actions",
-  ];
 
   /* ================= UI ================= */
   return (
@@ -377,7 +480,7 @@ export default function InventoryPage() {
       <input
         type="file"
         accept=".xlsx"
-        id="admin-bulk-upload"
+        id="full-bulk-upload"
         className="hidden"
         onChange={async (e) => {
           const file = e.target.files[0];
@@ -385,7 +488,9 @@ export default function InventoryPage() {
           const formData = new FormData();
           formData.append("file", file);
           try {
-            await axios.post(`${API}/inventory/bulk-upload`, formData, { headers });
+            await axios.post(`${API}/inventory/full/bulk-upload`, formData, {
+              headers,
+            });
             fetchInventory();
             e.target.value = "";
             alert("Bulk upload successful ✅");
@@ -397,7 +502,10 @@ export default function InventoryPage() {
       />
 
       {sidebarOpen && (
-        <div className="fixed inset-0 bg-black/50 z-40 lg:hidden" onClick={() => setSidebarOpen(false)} />
+        <div
+          className="fixed inset-0 bg-black/50 z-40 lg:hidden"
+          onClick={() => setSidebarOpen(false)}
+        />
       )}
 
       <div
@@ -409,7 +517,6 @@ export default function InventoryPage() {
       </div>
 
       <div className="flex-1 overflow-y-auto overflow-x-hidden w-full">
-
         {/* HEADER */}
         <div className="sticky top-0 z-10 bg-white/90 backdrop-blur-md border-b border-gray-200 px-4 py-3 sm:px-6 sm:py-4 shadow-sm">
           <div className="flex items-center justify-between gap-3">
@@ -433,7 +540,7 @@ export default function InventoryPage() {
 
             <div className="flex items-center gap-2 flex-shrink-0">
               <button
-                onClick={() => exportToCSV(filteredData)}
+                onClick={() => exportToCSV(inventoryData)}
                 className="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-2 sm:px-4 sm:py-2.5 rounded-lg sm:rounded-xl font-medium flex items-center gap-1.5 transition-all shadow-sm hover:shadow-md text-xs sm:text-sm"
                 title="Export to CSV"
               >
@@ -443,7 +550,9 @@ export default function InventoryPage() {
               </button>
 
               <button
-                onClick={() => document.getElementById("admin-bulk-upload").click()}
+                onClick={() =>
+                  document.getElementById("full-bulk-upload").click()
+                }
                 className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 sm:px-4 sm:py-2.5 rounded-lg sm:rounded-xl font-medium flex items-center gap-1.5 transition-all shadow-sm hover:shadow-md text-xs sm:text-sm"
               >
                 <Upload size={15} />
@@ -452,7 +561,10 @@ export default function InventoryPage() {
               </button>
 
               <button
-                onClick={() => { fetchChairModels(); setShowForm(true); }}
+                onClick={() => {
+                  fetchChairModels();
+                  setShowForm(true);
+                }}
                 className="bg-[#c62d23] hover:bg-[#a82419] text-white px-3 py-2 sm:px-4 sm:py-2.5 rounded-lg sm:rounded-xl font-medium flex items-center gap-1.5 transition-all shadow-sm hover:shadow-md text-xs sm:text-sm"
               >
                 <Plus size={15} />
@@ -460,7 +572,11 @@ export default function InventoryPage() {
                 <span className="sm:hidden">Add</span>
               </button>
 
-              <button onClick={() => router.push("/profile")} title="My Profile" className="text-gray-500 hover:text-[#c62d23] transition p-1">
+              <button
+                onClick={() => router.push("/profile")}
+                title="My Profile"
+                className="text-gray-500 hover:text-[#c62d23] transition p-1"
+              >
                 <UserCircle size={30} className="sm:w-8 sm:h-8" />
               </button>
             </div>
@@ -468,8 +584,7 @@ export default function InventoryPage() {
         </div>
 
         <div className="p-3 sm:p-5 md:p-6 lg:p-8 space-y-5 md:space-y-6">
-
-          {/* STATS */}
+          {/* STATS — clickable cards */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
             <StatCard
               title="Total Stock"
@@ -480,7 +595,7 @@ export default function InventoryPage() {
               accentColor="#c62d23"
             />
             <StatCard
-              title="Total Products"
+              title="Unique Products"
               value={totalProducts}
               icon={<Boxes className="text-[#c62d23]" />}
               onClick={() => setFilterStatus("All")}
@@ -510,7 +625,10 @@ export default function InventoryPage() {
           <div className="bg-white border border-gray-200 rounded-xl sm:rounded-2xl p-3 sm:p-4 shadow-sm">
             <div className="flex flex-col sm:flex-row gap-3">
               <div className="relative flex-1">
-                <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+                <Search
+                  size={15}
+                  className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none"
+                />
                 <input
                   placeholder="Search product..."
                   value={searchTerm}
@@ -520,7 +638,10 @@ export default function InventoryPage() {
               </div>
 
               <div className="relative sm:w-48">
-                <Building2 size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+                <Building2
+                  size={14}
+                  className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none"
+                />
                 <select
                   value={filterVendor}
                   onChange={(e) => setFilterVendor(e.target.value)}
@@ -528,22 +649,32 @@ export default function InventoryPage() {
                 >
                   <option value="All">All Vendors</option>
                   {vendorsList.map((v) => (
-                    <option key={v._id} value={v.name}>{v.name}</option>
+                    <option key={v._id} value={v.name}>
+                      {v.name}
+                    </option>
                   ))}
                 </select>
               </div>
 
               <div className="relative sm:w-40">
-                <Filter size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+                <Filter
+                  size={14}
+                  className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none"
+                />
                 <select
                   value={filterStatus}
                   onChange={(e) => setFilterStatus(e.target.value)}
                   className="w-full pl-8 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-[#c62d23]/20 focus:border-[#c62d23] outline-none bg-gray-50 appearance-none cursor-pointer"
                 >
-                  {statuses.map((s) => <option key={s} value={s}>{s}</option>)}
+                  {statuses.map((s) => (
+                    <option key={s} value={s}>
+                      {s}
+                    </option>
+                  ))}
                 </select>
               </div>
 
+              {/* Active filter pill */}
               {filterStatus !== "All" && (
                 <button
                   onClick={() => setFilterStatus("All")}
@@ -556,7 +687,7 @@ export default function InventoryPage() {
               )}
 
               <div className="flex items-center text-xs text-gray-400 font-medium whitespace-nowrap self-center">
-                {filteredData.length} item{filteredData.length !== 1 ? "s" : ""}
+                {filteredGrouped.length} product{filteredGrouped.length !== 1 ? "s" : ""} &bull; {inventoryData.length} entries
               </div>
             </div>
           </div>
@@ -564,130 +695,181 @@ export default function InventoryPage() {
           {/* ALERT */}
           {lowStockCount > 0 && (
             <div className="bg-amber-50 border border-amber-200 p-3 sm:p-4 flex gap-2 sm:gap-3 rounded-xl items-center">
-              <AlertCircle className="text-amber-600 flex-shrink-0" size={17} />
+              <AlertCircle
+                className="text-amber-600 flex-shrink-0"
+                size={17}
+              />
               <span className="text-xs sm:text-sm text-amber-800 font-medium">
-                {lowStockCount} item{lowStockCount !== 1 ? "s" : ""} need immediate restocking
+                {lowStockCount} product{lowStockCount !== 1 ? "s" : ""} need
+                immediate restocking
               </span>
             </div>
           )}
 
           {/* ===== DESKTOP TABLE ===== */}
-          <div className="hidden md:block bg-white rounded-2xl overflow-hidden border border-gray-200 shadow-sm">
+          <div className="hidden md:block bg-white border border-gray-200 rounded-2xl shadow-sm overflow-hidden">
             {loading ? (
               <div className="py-16 text-center">
                 <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-[#c62d23]"></div>
-                <p className="mt-3 text-gray-400 text-sm">Loading inventory...</p>
+                <p className="mt-3 text-gray-400 text-sm">
+                  Loading inventory...
+                </p>
               </div>
             ) : (
               <>
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm border-collapse">
                     <thead>
-                      <tr className="bg-gray-50 border-b border-gray-200">
-                        {TABLE_HEADERS.map((h) => (
-                          <th
-                            key={h}
-                            className={`px-3 py-2 text-xs font-semibold text-gray-600 whitespace-nowrap ${
-                              h === "Quantity" || h === "Min Qty" || h === "Max Qty" ? "text-right" : "text-left"
-                            }`}
-                          >
-                            {h}
-                          </th>
-                        ))}
-                      </tr>
-                    </thead>
+  <tr className="bg-gray-50 border-b border-gray-200">
+    <th className="w-10 px-3 py-2 text-left"></th>
+    <th className="px-3 py-2 text-left text-xs font-semibold text-gray-600 whitespace-nowrap">Product</th>
+    <th className="px-3 py-2 text-left text-xs font-semibold text-gray-600 whitespace-nowrap">Color</th>
+    <th className="px-3 py-2 text-left text-xs font-semibold text-gray-600 whitespace-nowrap">Mesh</th>
+    <th className="px-3 py-2 text-left text-xs font-semibold text-gray-600 whitespace-nowrap">Remark</th>
+    <th className="px-3 py-2 text-left text-xs font-semibold text-gray-600 whitespace-nowrap">Vendor</th>
+    <th className="px-3 py-2 text-left text-xs font-semibold text-gray-600 whitespace-nowrap">Location</th>
+    <th className="px-3 py-2 text-left text-xs font-semibold text-gray-600 whitespace-nowrap">Chalan No</th>
+    <th className="px-3 py-2 text-right text-xs font-semibold text-gray-600 whitespace-nowrap">Min Qty</th>
+    <th className="px-3 py-2 text-right text-xs font-semibold text-gray-600 whitespace-nowrap">Quantity</th>
+    <th className="px-3 py-2 text-right text-xs font-semibold text-gray-600 whitespace-nowrap">Max Qty</th>
+    <th className="px-3 py-2 text-left text-xs font-semibold text-gray-600 whitespace-nowrap">Status</th>
+    <th className="px-3 py-2 text-left text-xs font-semibold text-gray-600 whitespace-nowrap">Created</th>
+    <th className="px-3 py-2 text-left text-xs font-semibold text-gray-600 whitespace-nowrap">Actions</th>
+  </tr>
+</thead>
 
                     <tbody className="divide-y divide-gray-100">
-                      {paginatedData.length === 0 ? (
+                      {paginatedGroups.length === 0 ? (
                         <tr>
-                          <td colSpan={TABLE_HEADERS.length} className="py-14 text-center text-gray-400 text-sm">
+                          <td colSpan="8" className="py-14 text-center text-gray-400 text-sm">
                             No inventory found
                           </td>
                         </tr>
                       ) : (
-                        paginatedData.map((i, idx) => (
-                          <tr
-                            key={i.id}
-                            className={`transition-colors hover:bg-blue-50/30 ${idx % 2 === 1 ? "bg-gray-50/40" : "bg-white"}`}
-                          >
-                            <td className="px-3 py-2 font-semibold text-gray-900 text-sm whitespace-nowrap">{i.name}</td>
-                            <td className="px-3 py-2 text-gray-600 text-xs">{i.colour || "—"}</td>
-                            <td className="px-3 py-2 text-gray-600 text-xs">{i.mesh || "—"}</td>
-                            <td className="px-3 py-2 text-gray-500 text-xs max-w-[160px] truncate" title={i.remark}>
-                              {i.remark || "—"}
-                            </td>
-                            <td className="px-3 py-2">
-                              <div className="flex items-center gap-1.5 text-gray-600 text-xs">
-                                <Building2 size={12} className="text-gray-400 flex-shrink-0" />
-                                {i.vendor?.name || "—"}
-                              </div>
-                            </td>
-                            <td className="px-3 py-2">
-                              <div className="flex items-center gap-1 text-gray-600 text-xs">
-                                <MapPin size={11} className="text-gray-400 flex-shrink-0" />
-                                {i.location || "—"}
-                              </div>
-                            </td>
-                            <td className="px-3 py-2 text-gray-600 text-xs font-medium">{i.chalanNo || "—"}</td>
-                            <td className="px-3 py-2 font-bold text-gray-900 text-sm text-right tabular-nums">{i.quantity}</td>
-                            <td className="px-3 py-2 text-right tabular-nums">
-                              <span className={`text-xs font-semibold ${i.quantity <= i.minQuantity && i.minQuantity > 0 ? "text-red-600" : "text-gray-400"}`}>
-                                {i.minQuantity > 0 ? i.minQuantity : "—"}
-                              </span>
-                            </td>
-                            <td className="px-3 py-2 text-right tabular-nums">
-                              <span className="text-xs font-semibold text-gray-400">
-                                {i.maxQuantity > 0 ? i.maxQuantity : "—"}
-                              </span>
-                            </td>
-                            <td className="px-3 py-2"><StatusBadge status={i.status} /></td>
-                            <td className="px-3 py-2 text-gray-400 text-xs whitespace-nowrap">
-                              {i.createdAt ? new Date(i.createdAt).toLocaleDateString() : "—"}
-                            </td>
-                            <td className="px-3 py-2">
-                              <div className="flex items-center gap-1">
-                                <button
-                                  onClick={() => {
-                                    setEditId(i.id);
-                                    setForm({
-                                      chairType: i.name,
-                                      chairTypeId: i.name,
-                                      vendor: i.vendor?._id || "",
-                                      vendorName: i.vendor?.name || "",
-                                      quantity: i.quantity,
-                                      minQuantity: i.minQuantity ?? "",
-                                      maxQuantity: i.maxQuantity ?? "",
-                                      colour: i.colour || "",
-                                      mesh: i.mesh || "",
-                                      remark: i.remark || "",
-                                      location: i.location || "",
-                                      locationDisplay: i.location || "",
-                                      chalanNo: i.chalanNo || "",
-                                    });
-                                    setShowForm(true);
-                                  }}
-                                  className="p-1 hover:bg-blue-100 rounded-md transition"
-                                  title="Edit"
-                                >
-                                  <Pencil size={13} className="text-gray-400 hover:text-blue-600" />
-                                </button>
-                                <button
-                                  onClick={() => deleteInventory(i.id)}
-                                  className="p-1 hover:bg-red-100 rounded-md transition"
-                                  title="Delete"
-                                >
-                                  <Trash2 size={13} className="text-gray-400 hover:text-red-600" />
-                                </button>
-                              </div>
-                            </td>
-                          </tr>
+                        paginatedGroups.map((group) => (
+                          <React.Fragment key={group.productName}>
+                            {/* MASTER ROW */}
+<tr
+  className="hover:bg-blue-50/30 cursor-pointer transition-colors group"
+  onClick={() => toggleExpand(group.productName)}
+>
+  <td className="px-3 py-3 text-center">
+    <span className="text-gray-400 group-hover:text-gray-600 transition-colors">
+      {expandedProducts.has(group.productName) ? (
+        <ChevronDown size={15} />
+      ) : (
+        <ChevronRight size={15} />
+      )}
+    </span>
+  </td>
+  <td className="px-3 py-3 font-semibold text-gray-900 whitespace-nowrap">{group.productName}</td>
+  <td className="px-3 py-3 text-gray-400 text-xs italic">—</td>
+  <td className="px-3 py-3 text-gray-400 text-xs italic">—</td>
+  <td className="px-3 py-3 text-gray-400 text-xs italic">—</td>
+  <td className="px-3 py-3 text-gray-500 text-xs">{[...group.vendorNames].filter(Boolean).join(", ") || "—"}</td>
+  <td className="px-3 py-3">
+    <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-gray-100 text-gray-600 rounded-md text-xs font-medium">
+      <MapPin size={10} className="text-[#c62d23]" />
+      {group.locationCount} entr{group.locationCount !== 1 ? "ies" : "y"}
+    </span>
+  </td>
+  <td className="px-3 py-3 text-gray-400 text-xs italic">—</td>
+    <td className="px-3 py-3 text-right text-gray-500 text-xs">{group.totalMinQuantity || "—"}</td>
+  <td className="px-3 py-3 text-right font-bold text-gray-900 tabular-nums">{group.totalQuantity}</td>
+<td className="px-3 py-3 text-right text-gray-500 text-xs">{group.totalMaxQuantity || "—"}</td>
+  <td className="px-3 py-3"><StatusBadge status={group.worstStatus} /></td>
+  <td className="px-3 py-3 text-gray-400 text-xs">—</td>
+  <td className="px-3 py-3"></td>
+</tr>
+
+                            {/* DETAIL ROWS */}
+                            {expandedProducts.has(group.productName) &&
+                              group.entries.map((item, idx) => (
+                                <tr 
+  key={item.id}
+  className={`bg-slate-50/70 transition-colors hover:bg-slate-100/60 ${
+    idx === group.entries.length - 1 ? "border-b-2 border-gray-200" : ""
+  }`}
+>
+  <td className="px-3 py-2.5"></td>
+  <td className="px-3 py-2.5 text-gray-500 text-xs pl-6">—</td>
+  <td className="px-3 py-2.5 text-gray-600 text-xs">{item.color || "—"}</td>
+  <td className="px-3 py-2.5 text-gray-600 text-xs">{item.mesh || "—"}</td>
+  <td className="px-3 py-2.5 text-gray-500 text-xs max-w-[120px] truncate" title={item.remark}>{item.remark || "—"}</td>
+  <td className="px-3 py-2.5">
+    <div className="flex items-center gap-1.5 text-gray-600 text-xs">
+      <Building2 size={11} className="text-gray-400 flex-shrink-0" />
+      {item.vendor?.name || "—"}
+    </div>
+  </td>
+  <td className="px-3 py-2.5">
+    <div className="flex items-center gap-1 text-gray-600 text-xs">
+      <MapPin size={11} className="text-gray-400 flex-shrink-0" />
+      {item.location || "—"}
+    </div>
+  </td>
+  <td className="px-3 py-2.5 text-gray-600 text-xs font-medium">{item.chalanNo || "—"}</td>
+  <td className="px-3 py-2.5 text-right tabular-nums">
+    <span className={`text-xs font-semibold ${item.quantity <= item.minQuantity && item.minQuantity > 0 ? "text-red-600" : "text-gray-400"}`}>
+      {item.minQuantity > 0 ? item.minQuantity : "—"}
+    </span>
+  </td>
+  <td className="px-3 py-2.5 font-semibold text-gray-900 text-sm text-right tabular-nums">{item.quantity}</td>
+  <td className="px-3 py-2.5 text-right tabular-nums">
+  <span className="text-xs font-semibold text-gray-400">
+    {item.maxQuantity ?? "—"}
+  </span>
+</td>
+  <td className="px-3 py-2.5"><StatusBadge status={item.status} size="sm" /></td>
+  <td className="px-3 py-2.5 text-gray-400 text-xs whitespace-nowrap">
+    {item.createdAt ? new Date(item.createdAt).toLocaleDateString() : "—"}
+  </td>
+  <td className="px-3 py-2.5">
+    <div className="flex items-center gap-1">
+      <button
+        onClick={(e) => {
+          e.stopPropagation();
+          setEditId(item.id);
+          setForm({
+            chairType: item.name,
+            chairTypeId: item.name,
+            vendor: item.vendor?._id || "",
+            vendorName: item.vendor?.name || "",
+            quantity: item.quantity,
+            minQuantity: item.minQuantity ?? "",
+            color: item.color || "",
+            mesh: item.mesh || "",
+            remark: item.remark || "",
+            location: item.location || "",
+            locationDisplay: item.location || "",
+            chalanNo: item.chalanNo || "",
+          });
+          setShowForm(true);
+        }}
+        className="p-1.5 hover:bg-blue-100 rounded-md transition"
+        title="Edit"
+      >
+        <Pencil size={13} className="text-gray-400 hover:text-blue-600" />
+      </button>
+      <button
+        onClick={(e) => { e.stopPropagation(); deleteInventory(item.id); }}
+        className="p-1.5 hover:bg-red-100 rounded-md transition"
+        title="Delete"
+      >
+        <Trash2 size={13} className="text-gray-400 hover:text-red-600" />
+      </button>
+    </div>
+  </td>
+</tr>
+                              ))}
+                          </React.Fragment>
                         ))
                       )}
                     </tbody>
                   </table>
                 </div>
 
-                {/* PAGINATION BAR */}
+                {/* ===== PAGINATION BAR ===== */}
                 {totalItems > 0 && (
                   <div className="flex items-center justify-between px-4 py-3 border-t border-gray-100 bg-gray-50/50">
                     <div className="flex items-center gap-3">
@@ -698,34 +880,56 @@ export default function InventoryPage() {
                           onChange={(e) => setPageSize(Number(e.target.value))}
                           className="border border-gray-200 rounded-md px-2 py-1 text-xs text-gray-700 bg-white focus:outline-none focus:ring-1 focus:ring-[#c62d23] cursor-pointer"
                         >
-                          {PAGE_SIZE_OPTIONS.map((s) => <option key={s} value={s}>{s}</option>)}
+                          {PAGE_SIZE_OPTIONS.map((s) => (
+                            <option key={s} value={s}>
+                              {s}
+                            </option>
+                          ))}
                         </select>
                       </div>
-                      <span className="text-xs text-gray-400">{startIdx + 1}–{endIdx} of {totalItems}</span>
+                      <span className="text-xs text-gray-400">
+                        {startIdx + 1}–{endIdx} of {totalItems}
+                      </span>
                     </div>
 
                     <div className="flex items-center gap-1">
-                      <PagBtn onClick={() => goToPage(1)} disabled={safePage === 1} title="First page"><ChevronsLeft size={14} /></PagBtn>
-                      <PagBtn onClick={() => goToPage(safePage - 1)} disabled={safePage === 1} title="Previous page"><ChevronLeft size={14} /></PagBtn>
+                      <PagBtn onClick={() => goToPage(1)} disabled={safePage === 1} title="First page">
+                        <ChevronsLeft size={14} />
+                      </PagBtn>
+                      <PagBtn onClick={() => goToPage(safePage - 1)} disabled={safePage === 1} title="Previous page">
+                        <ChevronLeft size={14} />
+                      </PagBtn>
 
                       {pageNumbers[0] > 1 && (
                         <>
                           <PagBtn onClick={() => goToPage(1)}>1</PagBtn>
-                          {pageNumbers[0] > 2 && <span className="px-1 text-gray-400 text-xs">…</span>}
+                          {pageNumbers[0] > 2 && (
+                            <span className="px-1 text-gray-400 text-xs">…</span>
+                          )}
                         </>
                       )}
+
                       {pageNumbers.map((p) => (
-                        <PagBtn key={p} onClick={() => goToPage(p)} active={p === safePage}>{p}</PagBtn>
+                        <PagBtn key={p} onClick={() => goToPage(p)} active={p === safePage}>
+                          {p}
+                        </PagBtn>
                       ))}
+
                       {pageNumbers[pageNumbers.length - 1] < totalPages && (
                         <>
-                          {pageNumbers[pageNumbers.length - 1] < totalPages - 1 && <span className="px-1 text-gray-400 text-xs">…</span>}
+                          {pageNumbers[pageNumbers.length - 1] < totalPages - 1 && (
+                            <span className="px-1 text-gray-400 text-xs">…</span>
+                          )}
                           <PagBtn onClick={() => goToPage(totalPages)}>{totalPages}</PagBtn>
                         </>
                       )}
 
-                      <PagBtn onClick={() => goToPage(safePage + 1)} disabled={safePage === totalPages} title="Next page"><ChevronRight size={14} /></PagBtn>
-                      <PagBtn onClick={() => goToPage(totalPages)} disabled={safePage === totalPages} title="Last page"><ChevronsRight size={14} /></PagBtn>
+                      <PagBtn onClick={() => goToPage(safePage + 1)} disabled={safePage === totalPages} title="Next page">
+                        <ChevronRight size={14} />
+                      </PagBtn>
+                      <PagBtn onClick={() => goToPage(totalPages)} disabled={safePage === totalPages} title="Last page">
+                        <ChevronsRight size={14} />
+                      </PagBtn>
                     </div>
                   </div>
                 )}
@@ -735,133 +939,175 @@ export default function InventoryPage() {
 
           {/* ===== MOBILE CARDS ===== */}
           <div className="md:hidden space-y-3">
+            {/* Mobile Search */}
+            <div className="bg-white rounded-xl border border-gray-200 p-3 shadow-sm">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" size={15} />
+                <input
+                  type="text"
+                  placeholder="Search product..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-full pl-9 pr-9 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#c62d23]/20 focus:border-[#c62d23] outline-none text-sm bg-white"
+                />
+                {searchTerm && (
+                  <button onClick={() => setSearchTerm("")} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+                    <X size={13} />
+                  </button>
+                )}
+              </div>
+            </div>
+
             {loading ? (
               <div className="bg-white rounded-xl p-8 text-center border border-gray-200">
                 <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-[#c62d23]"></div>
                 <p className="mt-2 text-gray-500 text-sm">Loading...</p>
               </div>
-            ) : filteredData.length === 0 ? (
+            ) : paginatedGroups.length === 0 ? (
               <div className="bg-white rounded-xl p-8 text-center text-gray-400 border border-gray-200 text-sm">
                 No inventory found
               </div>
             ) : (
               <>
-                {paginatedData.map((i) => (
-                  <div key={i.id} className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
-                    <div className="flex items-start justify-between mb-3">
-                      <div className="flex-1 min-w-0">
-                        <h3 className="font-semibold text-gray-900 text-sm mb-1 truncate">{i.name}</h3>
-                        <div className="flex items-center gap-1.5 text-gray-500 text-xs">
-                          <Building2 size={11} className="text-gray-400 flex-shrink-0" />
-                          <span className="truncate">{i.vendor?.name || "—"}</span>
+                {paginatedGroups.map((group) => (
+                  <div
+                    key={group.productName}
+                    className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden"
+                  >
+                    <div
+                      className="p-4 cursor-pointer"
+                      onClick={() => toggleExpand(group.productName)}
+                    >
+                      <div className="flex items-start justify-between mb-2">
+                        <div className="flex items-center gap-2 flex-1 min-w-0">
+                          {expandedProducts.has(group.productName) ? (
+                            <ChevronDown size={15} className="text-gray-400 flex-shrink-0" />
+                          ) : (
+                            <ChevronRight size={15} className="text-gray-400 flex-shrink-0" />
+                          )}
+                          <h3 className="font-semibold text-gray-900 text-sm truncate">
+                            {group.productName}
+                          </h3>
                         </div>
-                        {i.location && (
-                          <div className="flex items-center gap-1 text-gray-400 text-xs mt-0.5">
-                            <MapPin size={10} className="flex-shrink-0" />
-                            {i.location}
-                          </div>
-                        )}
-                        {i.chalanNo && (
-                          <div className="text-gray-400 text-xs mt-0.5">
-                            Chalan: <span className="font-medium text-gray-600">{i.chalanNo}</span>
-                          </div>
-                        )}
+                        <StatusBadge status={group.worstStatus} />
                       </div>
-                      <StatusBadge status={i.status} />
-                    </div>
-
-                    {(i.colour || i.mesh || i.remark) && (
-                      <div className="grid grid-cols-3 gap-2 mb-3 text-xs">
-                        {i.colour && (
-                          <div>
-                            <p className="text-gray-400 mb-0.5">Color</p>
-                            <p className="font-medium text-gray-700">{i.colour}</p>
-                          </div>
-                        )}
-                        {i.mesh && (
-                          <div>
-                            <p className="text-gray-400 mb-0.5">Mesh</p>
-                            <p className="font-medium text-gray-700">{i.mesh}</p>
-                          </div>
-                        )}
-                        {i.remark && (
-                          <div>
-                            <p className="text-gray-400 mb-0.5">Remark</p>
-                            <p className="font-medium text-gray-700 truncate">{i.remark}</p>
-                          </div>
-                        )}
+                      <div className="flex items-center gap-1.5 text-gray-500 text-xs mb-3 pl-5">
+                        <Package size={11} className="text-gray-400" />
+                        <span>
+                          {group.locationCount} entr{group.locationCount !== 1 ? "ies" : "y"}
+                        </span>
                       </div>
-                    )}
-
-                    {i.createdAt && (
-                      <p className="text-[10px] text-gray-400 mb-2">
-                        Added: {new Date(i.createdAt).toLocaleDateString()}
-                      </p>
-                    )}
-
-                    <div className="flex items-center justify-between pt-3 border-t border-gray-100">
-                      <div className="flex items-end gap-4">
+                      <div className="grid grid-cols-2 gap-3 text-xs pl-5">
                         <div>
-                          <p className="text-xs text-gray-400 mb-0.5">Quantity</p>
-                          <p className="font-bold text-gray-900 text-xl leading-none">{i.quantity}</p>
+                          <p className="text-gray-400 mb-0.5">Total Stock</p>
+                          <p className="font-bold text-gray-900 text-lg leading-none">
+                            {group.totalQuantity}
+                          </p>
                         </div>
-                        {i.minQuantity > 0 && (
-                          <div>
-                            <p className="text-xs text-gray-400 mb-0.5">Min Qty</p>
-                            <p className={`font-semibold text-sm leading-none ${i.quantity <= i.minQuantity ? "text-red-600" : "text-gray-500"}`}>
-                              {i.minQuantity}
-                            </p>
-                          </div>
-                        )}
-                        {i.maxQuantity > 0 && (
-                          <div>
-                            <p className="text-xs text-gray-400 mb-0.5">Max Qty</p>
-                            <p className="font-semibold text-sm leading-none text-gray-500">
-                              {i.maxQuantity}
-                            </p>
-                          </div>
-                        )}
-                      </div>
-                      <div className="flex gap-2">
-                        <button
-                          onClick={() => {
-                            setEditId(i.id);
-                            setForm({
-                              chairType: i.name,
-                              chairTypeId: i.name,
-                              vendor: i.vendor?._id || "",
-                              vendorName: i.vendor?.name || "",
-                              quantity: i.quantity,
-                              minQuantity: i.minQuantity ?? "",
-                              maxQuantity: i.maxQuantity ?? "",
-                              colour: i.colour || "",
-                              mesh: i.mesh || "",
-                              remark: i.remark || "",
-                              location: i.location || "",
-                              locationDisplay: i.location || "",
-                              chalanNo: i.chalanNo || "",
-                            });
-                            setShowForm(true);
-                          }}
-                          className="p-2.5 bg-blue-50 hover:bg-blue-100 text-blue-600 rounded-lg transition flex items-center gap-1.5 text-xs font-medium"
-                        >
-                          <Pencil size={13} /> Edit
-                        </button>
-                        <button
-                          onClick={() => deleteInventory(i.id)}
-                          className="p-2.5 bg-red-50 hover:bg-red-100 text-red-600 rounded-lg transition"
-                        >
-                          <Trash2 size={13} />
-                        </button>
+                        <div>
+                          <p className="text-gray-400 mb-0.5">Vendors</p>
+                          <p className="font-semibold text-gray-900 text-xs">
+                            {[...group.vendorNames].filter(Boolean).join(", ") || "—"}
+                          </p>
+                        </div>
                       </div>
                     </div>
+
+                    {expandedProducts.has(group.productName) && (
+                      <div className="border-t border-gray-200 divide-y divide-gray-100 bg-gray-50/50">
+                        {group.entries.map((item) => (
+                          <div key={item.id} className="p-4">
+                            <div className="flex items-center justify-between mb-2">
+                              <div className="flex items-center gap-1.5">
+                                <MapPin size={13} className="text-[#c62d23]" />
+                                <span className="font-medium text-sm">{item.location || "—"}</span>
+                              </div>
+                              <StatusBadge status={item.status} size="sm" />
+                            </div>
+                            <div className="grid grid-cols-2 gap-3 mb-2 text-xs">
+                              <div>
+                                <p className="text-gray-400 mb-0.5">Quantity</p>
+                                <p className="font-bold text-gray-900">{item.quantity}</p>
+                              </div>
+                              <div>
+                                <p className="text-gray-400 mb-0.5">Min Qty</p>
+                                <p className={`font-semibold ${item.quantity <= item.minQuantity && item.minQuantity > 0 ? "text-red-600" : "text-gray-900"}`}>
+                                  {item.minQuantity > 0 ? item.minQuantity : "—"}
+                                </p>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-1.5 text-xs text-gray-500 mb-1">
+                              <Building2 size={11} />
+                              <span>{item.vendor?.name || "—"}</span>
+                            </div>
+                            {(item.color || item.mesh) && (
+                              <div className="flex gap-1.5 mb-1">
+                                {item.color && <span className="text-xs bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded">{item.color}</span>}
+                                {item.mesh && <span className="text-xs bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded">{item.mesh}</span>}
+                              </div>
+                            )}
+                            {item.chalanNo && (
+                              <p className="text-xs text-gray-400 mb-1">
+                                Chalan: <span className="font-medium text-gray-600">{item.chalanNo}</span>
+                              </p>
+                            )}
+                            {item.remark && (
+                              <p className="text-xs text-gray-400 italic mb-1">{item.remark}</p>
+                            )}
+                            {item.createdAt && (
+                              <p className="text-[10px] text-gray-400 mb-2">
+                                Added: {new Date(item.createdAt).toLocaleDateString()}
+                              </p>
+                            )}
+                            <div className="flex gap-2 mt-3">
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setEditId(item.id);
+                                  setForm({
+                                    chairType: item.name,
+                                    chairTypeId: item.name,
+                                    vendor: item.vendor?._id || "",
+                                    vendorName: item.vendor?.name || "",
+                                    quantity: item.quantity,
+                                    minQuantity: item.minQuantity ?? "",
+                                    maxQuantity: item.maxQuantity ?? "",
+                                    color: item.color || "",
+                                    mesh: item.mesh || "",
+                                    remark: item.remark || "",
+                                    location: item.location || "",
+                                    locationDisplay: item.location || "",
+                                    chalanNo: item.chalanNo || "",
+                                  });
+                                  setShowForm(true);
+                                }}
+                                className="flex-1 bg-blue-50 hover:bg-blue-100 text-blue-700 py-2 px-3 rounded-lg transition flex items-center justify-center gap-1.5 text-xs font-medium"
+                              >
+                                <Pencil size={13} /> Edit
+                              </button>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  deleteInventory(item.id);
+                                }}
+                                className="bg-red-50 hover:bg-red-100 text-red-700 py-2 px-3 rounded-lg transition flex items-center justify-center"
+                              >
+                                <Trash2 size={13} />
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 ))}
 
                 {/* Mobile Pagination */}
                 {totalItems > 0 && (
                   <div className="bg-white rounded-xl border border-gray-200 p-3 flex items-center justify-between shadow-sm">
-                    <span className="text-xs text-gray-500">{startIdx + 1}–{endIdx} of {totalItems}</span>
+                    <span className="text-xs text-gray-500">
+                      {startIdx + 1}–{endIdx} of {totalItems}
+                    </span>
                     <div className="flex items-center gap-1.5">
                       <button
                         onClick={() => goToPage(safePage - 1)}
@@ -910,7 +1156,7 @@ export default function InventoryPage() {
               </div>
 
               <div className="px-5 py-4 space-y-4">
-                {/* Chair Type */}
+                {/* Chair Type — searchable dropdown */}
                 <div>
                   <label className="block text-sm font-semibold text-gray-900 mb-1.5">
                     Chair Type <span className="text-red-500">*</span>
@@ -919,14 +1165,29 @@ export default function InventoryPage() {
                     value={form.chairTypeId}
                     displayValue={form.chairType}
                     options={chairModelsList}
-                    onSelect={(val, label) => setForm((f) => ({ ...f, chairType: label || val, chairTypeId: val }))}
+                    onSelect={(val, label) => {
+  const normalized = (label || val).trim().toLowerCase();
+  const entryWithMin = inventoryData.find(
+    (i) => i.name.trim().toLowerCase() === normalized && i.minQuantity
+  );
+  const entryWithMax = inventoryData.find(
+    (i) => i.name.trim().toLowerCase() === normalized && i.maxQuantity
+  );
+  setForm((f) => ({
+    ...f,
+    chairType: label || val,
+    chairTypeId: val,
+    minQuantity: entryWithMin ? String(entryWithMin.minQuantity) : f.minQuantity,
+    maxQuantity: entryWithMax ? String(entryWithMax.maxQuantity) : f.maxQuantity,
+  }));
+}}
                     onAddNew={handleAddNewChairModel}
                     placeholder="Search chair type..."
                     addNewLabel="Add new chair type"
                   />
                 </div>
 
-                {/* Vendor */}
+                {/* Vendor — searchable dropdown */}
                 <div>
                   <label className="block text-sm font-semibold text-gray-900 mb-1.5">
                     Vendor <span className="text-red-500">*</span>
@@ -934,13 +1195,32 @@ export default function InventoryPage() {
                   <SearchableDropdown
                     value={form.vendor}
                     displayValue={form.vendorName}
-                    options={vendorsList.map((v) => ({ value: v._id, label: v.name, _id: v._id, name: v.name }))}
-                    onSelect={(val, label) => setForm((f) => ({ ...f, vendor: val, vendorName: label }))}
+                    options={vendorsList.map((v) => ({
+                      value: v._id,
+                      label: v.name,
+                      _id: v._id,
+                      name: v.name,
+                    }))}
+                    onSelect={(val, label) =>
+                      setForm((f) => ({
+                        ...f,
+                        vendor: val,
+                        vendorName: label,
+                      }))
+                    }
                     onAddNew={async (name) => {
-                      const res = await axios.post(`${API}/vendors`, { name }, { headers });
+                      const res = await axios.post(
+                        `${API}/vendors`,
+                        { name },
+                        { headers }
+                      );
                       const vendor = res.data.vendor;
                       setVendorsList((prev) => [...prev, vendor]);
-                      setForm((f) => ({ ...f, vendor: vendor._id, vendorName: vendor.name }));
+                      setForm((f) => ({
+                        ...f,
+                        vendor: vendor._id,
+                        vendorName: vendor.name,
+                      }));
                     }}
                     placeholder="Search vendor..."
                     addNewLabel="Add new vendor"
@@ -950,8 +1230,8 @@ export default function InventoryPage() {
                 {/* Color */}
                 <Input
                   label="Color"
-                  value={form.colour}
-                  onChange={(v) => setForm({ ...form, colour: v })}
+                  value={form.color}
+                  onChange={(v) => setForm({ ...form, color: v })}
                   placeholder="Enter chair color"
                   required
                 />
@@ -982,27 +1262,25 @@ export default function InventoryPage() {
                   required
                 />
 
-                {/* Min Quantity — compulsory for admin */}
+                {/* Min Quantity */}
                 <Input
                   label="Min Quantity"
                   type="number"
                   value={form.minQuantity}
                   onChange={(v) => setForm({ ...form, minQuantity: v })}
-                  placeholder="Low stock alert threshold"
-                  required
+                  placeholder="Alert threshold (optional)"
                 />
 
-                {/* Max Quantity — compulsory for admin */}
+                {/* Max Quantity */}
                 <Input
                   label="Max Quantity"
                   type="number"
                   value={form.maxQuantity}
                   onChange={(v) => setForm({ ...form, maxQuantity: v })}
-                  placeholder="Maximum stock capacity"
-                  required
+                  placeholder="Enter max stock level"
                 />
 
-                {/* Chalan / Bill No — admin-specific */}
+                {/* Chalan / Bill No */}
                 <Input
                   label="Chalan / Bill No"
                   value={form.chalanNo}
@@ -1011,14 +1289,22 @@ export default function InventoryPage() {
                   required
                 />
 
-                {/* Location */}
+                {/* Location — searchable dropdown */}
                 <div>
-                  <label className="block text-sm font-semibold text-gray-900 mb-1.5">Location</label>
+                  <label className="block text-sm font-semibold text-gray-900 mb-1.5">
+                    Location
+                  </label>
                   <SearchableDropdown
                     value={form.location}
                     displayValue={form.locationDisplay}
                     options={locationsList}
-                    onSelect={(val) => setForm((f) => ({ ...f, location: val, locationDisplay: val }))}
+                    onSelect={(val) =>
+                      setForm((f) => ({
+                        ...f,
+                        location: val,
+                        locationDisplay: val,
+                      }))
+                    }
                     onAddNew={handleAddNewLocation}
                     placeholder="Search location..."
                     addNewLabel="Add new location"
@@ -1055,8 +1341,13 @@ const PagBtn = ({ children, onClick, disabled, active, title }) => (
     disabled={disabled}
     title={title}
     className={`min-w-[28px] h-7 px-1.5 rounded-md text-xs font-medium transition-all flex items-center justify-center
-      ${active ? "bg-[#c62d23] text-white shadow-sm" : "text-gray-600 hover:bg-gray-100 border border-transparent hover:border-gray-200"}
-      ${disabled ? "opacity-35 cursor-not-allowed pointer-events-none" : "cursor-pointer"}`}
+      ${
+        active
+          ? "bg-[#c62d23] text-white shadow-sm"
+          : "text-gray-600 hover:bg-gray-100 border border-transparent hover:border-gray-200"
+      }
+      ${disabled ? "opacity-35 cursor-not-allowed pointer-events-none" : "cursor-pointer"}
+    `}
   >
     {children}
   </button>
@@ -1064,20 +1355,29 @@ const PagBtn = ({ children, onClick, disabled, active, title }) => (
 
 /* ================= STAT CARD ================= */
 const StatCard = ({ title, value, icon, danger, onClick, active, accentColor }) => {
-  const safeValue = typeof value === "number" && !Number.isNaN(value) ? value : 0;
+  const safeValue =
+    typeof value === "number" && !Number.isNaN(value) ? value : 0;
   return (
     <div
       onClick={onClick}
       className={`bg-white border rounded-2xl p-4 sm:p-5 transition-all shadow-sm cursor-pointer group
         ${danger ? "border-amber-200 bg-amber-50/50" : "border-gray-200"}
-        ${active ? "ring-2 ring-offset-1" : "hover:shadow-md hover:border-gray-300"}`}
-      style={{ borderLeft: `4px solid ${accentColor || "#c62d23"}`, ...(active ? { "--tw-ring-color": accentColor || "#c62d23" } : {}) }}
+        ${active ? "ring-2 ring-offset-1" : "hover:shadow-md hover:border-gray-300"}
+      `}
+      style={{
+        borderLeft: `4px solid ${accentColor || "#c62d23"}`,
+        ...(active ? { "--tw-ring-color": accentColor || "#c62d23" } : {}),
+      }}
     >
       <div className="flex justify-between items-start mb-3">
         <p className="text-xs sm:text-sm text-gray-500 font-medium">{title}</p>
         {React.cloneElement(icon, { size: 20 })}
       </div>
-      <p className={`text-2xl sm:text-3xl font-bold ${danger ? "text-amber-700" : "text-gray-900"}`}>
+      <p
+        className={`text-2xl sm:text-3xl font-bold ${
+          danger ? "text-amber-700" : "text-gray-900"
+        }`}
+      >
         {safeValue}
       </p>
       <p className="text-[10px] text-gray-400 mt-1 group-hover:text-gray-500 transition-colors">
@@ -1088,28 +1388,42 @@ const StatCard = ({ title, value, icon, danger, onClick, active, accentColor }) 
 };
 
 /* ================= STATUS BADGE ================= */
-const StatusBadge = ({ status }) => {
+const StatusBadge = ({ status, size = "default" }) => {
   const map = {
     Healthy: "bg-green-100 text-green-800",
     "Low Stock": "bg-amber-100 text-amber-800",
     Critical: "bg-red-100 text-red-800",
+    Overstocked: "bg-blue-100 text-blue-800",
   };
+  const sizeClasses =
+    size === "sm" ? "px-2 py-0.5 text-[10px]" : "px-2.5 py-1 text-[11px]";
   return (
-    <span className={`px-2.5 py-1 rounded-full text-[11px] font-semibold whitespace-nowrap ${map[status] || "bg-gray-100 text-gray-700"}`}>
+    <span
+      className={`${sizeClasses} rounded-full font-semibold whitespace-nowrap ${
+        map[status] || "bg-gray-100 text-gray-700"
+      }`}
+    >
       {status}
     </span>
   );
 };
 
 /* ================= INPUT ================= */
-const Input = ({ label, value, onChange, type = "text", placeholder = "", required = false }) => (
+const Input = ({
+  label,
+  value,
+  onChange,
+  type = "text",
+  placeholder = "",
+  required = false,
+}) => (
   <div>
     <label className="block text-sm font-semibold text-gray-900 mb-1.5">
       {label} {required && <span className="text-red-500">*</span>}
     </label>
     <input
       type={type}
-      value={value}
+      value={value ?? ""}
       onChange={(e) => onChange(e.target.value)}
       placeholder={placeholder}
       className="w-full p-2.5 bg-white border border-gray-300 rounded-xl outline-none text-gray-900 placeholder-gray-400 focus:border-[#c62d23] focus:ring-2 focus:ring-[#c62d23]/20 transition text-sm"

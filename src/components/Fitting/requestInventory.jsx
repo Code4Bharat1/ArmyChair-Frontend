@@ -4,7 +4,7 @@ import React, { useState, useEffect, useMemo } from "react";
 import axios from "axios";
 import {
   Package, Send, Loader2, Box, Clock, CheckCircle2,
-  Plus, X, Menu, AlertTriangle, AlertCircle,
+  Plus, X, Menu, AlertTriangle, AlertCircle, Pencil,
 } from "lucide-react";
 import FittingSidebar from "./sidebar";
 
@@ -22,6 +22,11 @@ export default function FittingInventoryRequest() {
   const [loading, setLoading]                   = useState(false);
   const [showModal, setShowModal]               = useState(false);
   const [showAddModal, setShowAddModal]         = useState(false);
+  const [showEditModal, setShowEditModal]       = useState(false);
+  const [editItem, setEditItem]                 = useState(null);
+  const [editQuantity, setEditQuantity]         = useState("");
+  const [editRemark, setEditRemark]             = useState("");
+  const [editLoading, setEditLoading]           = useState(false);
   const [sidebarOpen, setSidebarOpen]           = useState(false);
   const [submitting, setSubmitting]             = useState(false);
   const [stockFilter, setStockFilter]           = useState("all");
@@ -40,7 +45,7 @@ export default function FittingInventoryRequest() {
 
   const fetchStock = async () => {
     try {
-      const res = await axios.get(`${API}/production/stock?location=FITTING_SECTION`, { headers });
+      const res = await axios.get(`${API}/inventory/fitting-stock`, { headers });
       setStock(res.data.data || []);
     } catch (err) { console.error("Fetch stock error", err); }
   };
@@ -111,6 +116,56 @@ export default function FittingInventoryRequest() {
     finally { setSubmitting(false); }
   };
 
+  /* ── open edit modal ── */
+  const openEditModal = (item) => {
+    setEditItem(item);
+    setEditQuantity(String(item.quantity));
+    setEditRemark(item.remark || "");
+    setShowEditModal(true);
+  };
+
+  /* ── submit: edit inventory ── */
+  const handleEditSubmit = async () => {
+    if (editQuantity === "" || Number(editQuantity) < 0)
+      return alert("Please enter a valid quantity");
+    try {
+      setEditLoading(true);
+      const isSpare = editItem.type === "SPARE";
+
+      // SPARE → PUT /inventory/spare-parts/:id  (needs partName + location)
+      // FULL  → PUT /inventory/:id
+      const endpoint = isSpare
+        ? `${API}/inventory/spare-parts/update/${editItem._id}`
+        : `${API}/inventory/update/${editItem._id}`;
+
+      const payload = isSpare
+        ? {
+            partName: editItem.partName,       // required by updateSparePart
+            location: editItem.location,       // required by updateSparePart
+            quantity: Number(editQuantity),
+            remark: editRemark.trim(),
+          }
+        : {
+            quantity: Number(editQuantity),
+            remark: editRemark.trim(),
+          };
+
+      await axios.patch(endpoint, payload, { headers });
+
+      // logActivity is already called inside the backend controllers,
+      // so no separate /activity-log call needed here.
+
+      alert("Inventory updated successfully");
+      setShowEditModal(false);
+      setEditItem(null);
+      fetchStock();
+    } catch (err) {
+      alert(err.response?.data?.message || "Failed to update inventory");
+    } finally {
+      setEditLoading(false);
+    }
+  };
+
   /* ── derived ── */
   const totalStock = stock.reduce((s, i) => s + i.quantity, 0);
   const totalItems = stock.length;
@@ -165,12 +220,10 @@ export default function FittingInventoryRequest() {
 
   return (
     <div className="flex min-h-screen bg-gray-50 text-gray-900">
-      {/* Mobile Sidebar Overlay */}
       {sidebarOpen && (
         <div className="fixed inset-0 bg-black/50 z-40 lg:hidden" onClick={() => setSidebarOpen(false)} />
       )}
 
-      {/* Sidebar */}
       <div className={`fixed lg:static inset-y-0 left-0 z-50 transform transition-transform duration-300 lg:transform-none ${sidebarOpen ? "translate-x-0" : "-translate-x-full"} lg:translate-x-0`}>
         <FittingSidebar />
       </div>
@@ -269,7 +322,7 @@ export default function FittingInventoryRequest() {
                   <div className="flex flex-wrap gap-2">
                     {lowStockItems.slice(0, 5).map((item, idx) => (
                       <span key={idx} className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800 border border-yellow-300">
-                        {item.partName}: {item.quantity}
+                        {item.partName || item.chairType}: {item.quantity}
                       </span>
                     ))}
                     {lowStockItems.length > 5 && <span className="text-xs text-yellow-700 py-1">+{lowStockItems.length - 5} more</span>}
@@ -289,7 +342,7 @@ export default function FittingInventoryRequest() {
                   <div className="flex flex-wrap gap-2">
                     {overstockItems.slice(0, 5).map((item, idx) => (
                       <span key={idx} className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800 border border-blue-300">
-                        {item.partName}: {item.quantity}
+                        {item.partName || item.chairType}: {item.quantity}
                       </span>
                     ))}
                     {overstockItems.length > 5 && <span className="text-xs text-blue-700 py-1">+{overstockItems.length - 5} more</span>}
@@ -335,7 +388,7 @@ export default function FittingInventoryRequest() {
                     return (
                       <div
                         key={item._id || index}
-                        className={`border rounded-xl p-3 md:p-4 transition-all ${
+                        className={`relative border rounded-xl p-3 md:p-4 transition-all group ${
                           stockStatus === "low"
                             ? "border-yellow-300 bg-yellow-50 hover:border-yellow-400 hover:shadow-lg"
                             : stockStatus === "overstock"
@@ -343,6 +396,15 @@ export default function FittingInventoryRequest() {
                             : "border-gray-200 hover:border-[#c62d23] hover:shadow-md"
                         }`}
                       >
+                        {/* Edit button — appears on hover */}
+                        <button
+                          onClick={() => openEditModal(item)}
+                          className="absolute top-2 right-2 p-1.5 rounded-lg bg-white border border-gray-200 shadow-sm opacity-0 group-hover:opacity-100 transition-opacity hover:bg-gray-50 hover:border-[#c62d23]"
+                          title="Edit quantity"
+                        >
+                          <Pencil size={12} className="text-gray-500 hover:text-[#c62d23]" />
+                        </button>
+
                         {stockStatus !== "normal" && (
                           <div className="mb-2">
                             {stockStatus === "low" ? (
@@ -356,8 +418,10 @@ export default function FittingInventoryRequest() {
                             )}
                           </div>
                         )}
-                        <div className="flex justify-between items-start mb-2 md:mb-3">
-                          <h3 className="font-semibold text-gray-900 text-xs md:text-sm capitalize flex-1 pr-2 leading-tight">{item.partName}</h3>
+                        <div className="flex justify-between items-start mb-2 md:mb-3 pr-5">
+                          <h3 className="font-semibold text-gray-900 text-xs md:text-sm capitalize flex-1 pr-2 leading-tight">
+                            {item.partName || item.chairType}
+                          </h3>
                           <span className={`text-xl md:text-2xl font-bold ml-1 flex-shrink-0 ${
                             stockStatus === "low" ? "text-yellow-600" : stockStatus === "overstock" ? "text-blue-600" : "text-[#c62d23]"
                           }`}>{item.quantity}</span>
@@ -578,6 +642,107 @@ export default function FittingInventoryRequest() {
               </button>
               <button onClick={handleAddInventorySubmit} disabled={submitting} className="bg-green-600 hover:bg-green-700 disabled:bg-gray-300 text-white px-6 py-2.5 rounded-xl transition-all font-semibold shadow-sm disabled:cursor-not-allowed inline-flex items-center gap-2">
                 {submitting ? <><Loader2 size={16} className="animate-spin" /> Adding...</> : <><Plus size={16} /> Add to Inventory</>}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ══ EDIT INVENTORY MODAL ══ */}
+      {showEditModal && editItem && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl w-full max-w-md flex flex-col border border-gray-200 shadow-2xl">
+            <div className="flex items-center justify-between px-8 pt-8 pb-4 border-b border-gray-200">
+              <div>
+                <h2 className="text-2xl font-bold text-gray-900">Edit Inventory</h2>
+                <p className="text-xs text-gray-500 mt-1">
+                  Changes will be logged and notified to admin
+                </p>
+              </div>
+              <button
+                onClick={() => { setShowEditModal(false); setEditItem(null); }}
+                className="text-gray-400 hover:text-gray-600 hover:bg-gray-100 p-2 rounded-lg transition-colors"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="p-8 space-y-4">
+              {/* Item name — read only */}
+              <div>
+                <label className="text-sm text-gray-700 font-semibold block mb-2">Part / Item</label>
+                <div className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-gray-700 text-sm font-medium capitalize">
+                  {editItem.partName || editItem.chairType}
+                  <span className="ml-2 text-xs text-gray-400 font-normal">
+                    ({editItem.type === "SPARE" ? "Spare Part" : "Full Chair"})
+                  </span>
+                </div>
+              </div>
+
+              {/* Current → New qty */}
+              <div>
+                <label className="text-sm text-gray-700 font-semibold block mb-2">
+                  Quantity
+                  <span className="ml-2 text-xs font-normal text-gray-400">
+                    Current: <span className="font-semibold text-[#c62d23]">{editItem.quantity}</span>
+                  </span>
+                </label>
+                <input
+                  type="number"
+                  value={editQuantity}
+                  onChange={(e) => setEditQuantity(e.target.value)}
+                  min="0"
+                  className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl outline-none focus:border-[#c62d23] focus:ring-2 focus:ring-[#c62d23]/20 transition-all text-gray-900"
+                />
+                {editQuantity !== "" && Number(editQuantity) !== editItem.quantity && (
+                  <p className="text-xs mt-1.5 font-medium">
+                    {Number(editQuantity) > editItem.quantity
+                      ? <span className="text-green-600">▲ +{Number(editQuantity) - editItem.quantity} units</span>
+                      : <span className="text-red-500">▼ -{editItem.quantity - Number(editQuantity)} units</span>
+                    }
+                  </p>
+                )}
+              </div>
+
+              {/* Remark */}
+              <div>
+                <label className="text-sm text-gray-700 font-semibold block mb-2">
+                  Reason for Edit <span className="text-gray-400 font-normal text-xs">(recommended)</span>
+                </label>
+                <input
+                  type="text"
+                  value={editRemark}
+                  onChange={(e) => setEditRemark(e.target.value)}
+                  placeholder="e.g. Physical count correction, damaged stock removed"
+                  className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl outline-none focus:border-[#c62d23] focus:ring-2 focus:ring-[#c62d23]/20 transition-all text-gray-900"
+                />
+              </div>
+
+              {/* Admin notice */}
+              <div className="flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3">
+                <AlertTriangle size={16} className="text-amber-500 flex-shrink-0 mt-0.5" />
+                <p className="text-xs text-amber-700">
+                  This edit will be recorded in the activity log and visible to the admin.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-3 px-8 py-4 border-t border-gray-200">
+              <button
+                onClick={() => { setShowEditModal(false); setEditItem(null); }}
+                className="px-6 py-2.5 text-gray-700 hover:bg-gray-100 rounded-xl transition-all font-medium border border-gray-200"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleEditSubmit}
+                disabled={editLoading}
+                className="bg-[#c62d23] hover:bg-[#a82419] disabled:bg-gray-300 text-white px-6 py-2.5 rounded-xl transition-all font-semibold shadow-sm disabled:cursor-not-allowed inline-flex items-center gap-2"
+              >
+                {editLoading
+                  ? <><Loader2 size={16} className="animate-spin" /> Saving...</>
+                  : <><Pencil size={16} /> Save Changes</>
+                }
               </button>
             </div>
           </div>
