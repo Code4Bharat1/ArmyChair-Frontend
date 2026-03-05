@@ -67,9 +67,20 @@ export default function Fitting() {
   const fetchOrders = async () => {
   try {
     const res = await axios.get(`${API}/orders`, { headers });
-    const fittingOrders = (res.data.orders || res.data).filter((o) =>
-      FITTING_STATUSES.includes(o.progress) && o.orderType !== "SPARE" // ✅ exclude spare
-    );
+    const fittingOrders = (res.data.orders || res.data).filter((o) => {
+  if (!FITTING_STATUSES.includes(o.progress)) return false;
+  if (o.orderType === "SPARE") return false;
+  if (o.warehouseDirect === true) return false;
+  
+  // Exclude if no item has ever been touched by fitting AND no production worker
+  // (these are warehouse-direct orders created before warehouseDirect flag existed)
+  const hasAnyFittingActivity = o.items?.some(
+    (i) => i.fittingStatus === "IN_PROGRESS" || i.fittingStatus === "COMPLETED"
+  );
+  if (!o.productionWorker && !hasAnyFittingActivity) return false;
+
+  return true;
+});
     setOrders(fittingOrders);
   } catch (err) { console.error(err); }
   finally { setLoading(false); }
