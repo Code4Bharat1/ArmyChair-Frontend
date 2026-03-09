@@ -48,7 +48,7 @@ export default function RootLayout({ children }) {
 
         <Toaster position="top-right" toastOptions={{ duration: 4000 }} />
         {children}
-        <WhatsAppFloat />
+        {/* <WhatsAppFloat /> */}
 
         {/* 🔹 Google Translate Script */}
         <Script id="google-translate-init" strategy="afterInteractive">

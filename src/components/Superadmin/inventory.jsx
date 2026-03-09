@@ -177,8 +177,8 @@ export default function InventoryPage() {
   const [filterStatus, setFilterStatus] = useState("All");
 
   // Pagination state
-  const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize, setPageSize] = useState(25);
+  // const [currentPage, setCurrentPage] = useState(1);
+  // const [pageSize, setPageSize] = useState(25);
 
   // Expanded rows (by product name key)
   const [expandedProducts, setExpandedProducts] = useState(new Set());
@@ -405,30 +405,32 @@ export default function InventoryPage() {
     });
   }, [groupedProducts, searchTerm, filterVendor, filterStatus]);
 
+  const paginatedGroups = filteredGrouped;
+  
   // Reset to page 1 when filters change
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [searchTerm, filterVendor, filterStatus, pageSize]);
+  // useEffect(() => {
+  //   setCurrentPage(1);
+  // }, [searchTerm, filterVendor, filterStatus, pageSize]);
 
   /* ================= PAGINATION ================= */
-  const totalItems = filteredGrouped.length;
-  const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
-  const safePage = Math.min(currentPage, totalPages);
-  const startIdx = (safePage - 1) * pageSize;
-  const endIdx = Math.min(startIdx + pageSize, totalItems);
-  const paginatedGroups = filteredGrouped.slice(startIdx, endIdx);
+  // const totalItems = filteredGrouped.length;
+  // const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
+  // const safePage = Math.min(currentPage, totalPages);
+  // const startIdx = (safePage - 1) * pageSize;
+  // const endIdx = Math.min(startIdx + pageSize, totalItems);
+  // const paginatedGroups = filteredGrouped.slice(startIdx, endIdx);
 
-  const goToPage = (p) =>
-    setCurrentPage(Math.max(1, Math.min(p, totalPages)));
+  // const goToPage = (p) =>
+  //   setCurrentPage(Math.max(1, Math.min(p, totalPages)));
 
-  const pageNumbers = useMemo(() => {
-    const pages = [];
-    const delta = 2;
-    const left = Math.max(1, safePage - delta);
-    const right = Math.min(totalPages, safePage + delta);
-    for (let i = left; i <= right; i++) pages.push(i);
-    return pages;
-  }, [safePage, totalPages]);
+  // const pageNumbers = useMemo(() => {
+  //   const pages = [];
+  //   const delta = 2;
+  //   const left = Math.max(1, safePage - delta);
+  //   const right = Math.min(totalPages, safePage + delta);
+  //   for (let i = left; i <= right; i++) pages.push(i);
+  //   return pages;
+  // }, [safePage, totalPages]);
 
   /* ================= TOGGLE EXPAND ================= */
   const toggleExpand = (productName) => {
@@ -870,7 +872,7 @@ export default function InventoryPage() {
                 </div>
 
                 {/* ===== PAGINATION BAR ===== */}
-                {totalItems > 0 && (
+                {/* {totalItems > 0 && (
                   <div className="flex items-center justify-between px-4 py-3 border-t border-gray-100 bg-gray-50/50">
                     <div className="flex items-center gap-3">
                       <div className="flex items-center gap-2 text-xs text-gray-500">
@@ -932,7 +934,7 @@ export default function InventoryPage() {
                       </PagBtn>
                     </div>
                   </div>
-                )}
+                )} */}
               </>
             )}
           </div>
@@ -1103,7 +1105,7 @@ export default function InventoryPage() {
                 ))}
 
                 {/* Mobile Pagination */}
-                {totalItems > 0 && (
+                {/* {totalItems > 0 && (
                   <div className="bg-white rounded-xl border border-gray-200 p-3 flex items-center justify-between shadow-sm">
                     <span className="text-xs text-gray-500">
                       {startIdx + 1}–{endIdx} of {totalItems}
@@ -1128,7 +1130,7 @@ export default function InventoryPage() {
                       </button>
                     </div>
                   </div>
-                )}
+                )} */}
               </>
             )}
           </div>

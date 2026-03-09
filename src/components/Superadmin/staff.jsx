@@ -19,6 +19,8 @@ import {
   UserCog,
   ChevronDown,
   Menu,
+  Pencil,
+  Trash2,
 } from "lucide-react";
 
 export default function Staff() {
@@ -33,6 +35,16 @@ export default function Staff() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const API = process.env.NEXT_PUBLIC_API_URL;
 
+  /* ==========================
+     EDIT / DELETE STATE
+  ========================== */
+  const [editStaff, setEditStaff] = useState(null);
+  const [editForm, setEditForm] = useState({});
+  const [editLoading, setEditLoading] = useState(false);
+  const [editMessage, setEditMessage] = useState("");
+  const [deleteConfirm, setDeleteConfirm] = useState(null);
+  const [deleteLoading, setDeleteLoading] = useState(false);
+
   const fetchStaffs = async () => {
     try {
       const res = await axios.get(`${API}/auth/staff`, {
@@ -40,7 +52,7 @@ export default function Staff() {
           Authorization: `Bearer ${localStorage.getItem("token")}`,
         },
       });
-      console.log("Staff data:", res.data); 
+      console.log("Staff data:", res.data);
       setStaffs(res.data);
     } catch (err) {
       console.error("Failed to fetch staff");
@@ -56,28 +68,28 @@ export default function Staff() {
   useEffect(() => {
     fetchStaffs();
   }, []);
-  
+
   useEffect(() => {
-    if (selectedStaff || showForm) {
+    if (selectedStaff || showForm || editStaff || deleteConfirm) {
       document.body.style.overflow = "hidden";
     } else {
       document.body.style.overflow = "auto";
     }
-  }, [selectedStaff, showForm]);
+  }, [selectedStaff, showForm, editStaff, deleteConfirm]);
 
   /* ==========================
      FILTER
   ========================== */
   const filteredStaff = staffs.filter((s) => {
-  const matchesSearch = 
-    s.name.toLowerCase().includes(search.toLowerCase()) ||
-    s.email.toLowerCase().includes(search.toLowerCase()) ||
-    s.role.toLowerCase().includes(search.toLowerCase());
-  
-  const matchesRole = roleFilter === "All" || s.role === roleFilter;
-  
-  return matchesSearch && matchesRole;
-});
+    const matchesSearch =
+      s.name.toLowerCase().includes(search.toLowerCase()) ||
+      s.email.toLowerCase().includes(search.toLowerCase()) ||
+      s.role.toLowerCase().includes(search.toLowerCase());
+
+    const matchesRole = roleFilter === "All" || s.role === roleFilter;
+
+    return matchesSearch && matchesRole;
+  });
 
   /* ==========================
      STATS
@@ -101,8 +113,8 @@ export default function Staff() {
     dateOfBirth: "",
     bloodGroup: "",
     photo: "",
-    aadharPhotoFront: "", 
-    aadharPhotoBack: "", 
+    aadharPhotoFront: "",
+    aadharPhotoBack: "",
   });
 
   const [loading, setLoading] = useState(false);
@@ -134,7 +146,7 @@ export default function Staff() {
     setPreview(URL.createObjectURL(file));
     setForm({ ...form, photo: base64 });
   };
-  
+
   const handleAadharFrontUpload = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -175,7 +187,7 @@ export default function Staff() {
     setMessage("");
 
     const { name, email, password, mobile, aadharNumber, dateOfBirth, bloodGroup } = form;
-    
+
     if (!form.aadharPhotoFront || !form.aadharPhotoBack) {
       setMessage("Please upload both front and back Aadhar photos");
       return;
@@ -187,7 +199,7 @@ export default function Staff() {
       !password ||
       !mobile ||
       !aadharNumber ||
-      !dateOfBirth || 
+      !dateOfBirth ||
       !bloodGroup
     ) {
       setMessage("All required fields must be filled");
@@ -232,6 +244,68 @@ export default function Staff() {
     }
   };
 
+  /* ==========================
+     EDIT HANDLERS
+  ========================== */
+  const handleEditOpen = (staff) => {
+    setEditStaff(staff);
+    setEditForm({
+      name: staff.name,
+      email: staff.email,
+      mobile: staff.mobile,
+      role: staff.role,
+      dateOfBirth: staff.dateOfBirth
+        ? new Date(staff.dateOfBirth).toISOString().split("T")[0]
+        : "",
+      bloodGroup: staff.bloodGroup,
+      aadharNumber: staff.aadharNumber,
+      photo: staff.photo || "",
+      aadharPhotoFront: staff.aadharPhotoFront || "",
+      aadharPhotoBack: staff.aadharPhotoBack || "",
+    });
+    setEditMessage("");
+  };
+
+  const handleEditChange = (e) =>
+    setEditForm({ ...editForm, [e.target.name]: e.target.value });
+
+  const handleEditSubmit = async (e) => {
+    e.preventDefault();
+    setEditLoading(true);
+    setEditMessage("");
+    try {
+      await axios.put(`${API}/auth/staff/${editStaff._id}`, editForm, {
+        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+      });
+      setEditMessage("Staff updated successfully");
+      fetchStaffs();
+      setTimeout(() => setEditStaff(null), 1000);
+    } catch (err) {
+      setEditMessage(err.response?.data?.message || "Update failed");
+    } finally {
+      setEditLoading(false);
+    }
+  };
+
+  /* ==========================
+     DELETE HANDLER
+  ========================== */
+  const handleDelete = async () => {
+    if (!deleteConfirm) return;
+    setDeleteLoading(true);
+    try {
+      await axios.delete(`${API}/auth/staff/${deleteConfirm._id}`, {
+        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+      });
+      fetchStaffs();
+      setDeleteConfirm(null);
+    } catch (err) {
+      alert(err.response?.data?.message || "Delete failed");
+    } finally {
+      setDeleteLoading(false);
+    }
+  };
+
   return (
     <div className="flex h-screen bg-gray-50 text-gray-900">
       {/* Mobile Sidebar Overlay */}
@@ -260,9 +334,7 @@ export default function Staff() {
           >
             <Menu size={24} className="text-gray-700" />
           </button>
-          <h1 className="text-lg font-bold text-gray-900 truncate">
-            Staff
-          </h1>
+          <h1 className="text-lg font-bold text-gray-900 truncate">Staff</h1>
           <button
             onClick={() => setShowForm(true)}
             className="bg-[#c62d23] text-white p-2 rounded-lg transition-colors"
@@ -282,12 +354,15 @@ export default function Staff() {
                 Manage and track all staff members
               </p>
             </div>
-            
+
             <button
               onClick={() => setShowForm(true)}
               className="bg-white px-5 py-3 rounded-xl border-2 border-gray-200 shadow-sm hover:border-[#c62d23] hover:shadow-md transition-all duration-200 cursor-pointer group flex items-center gap-2 font-medium"
             >
-              <Plus size={18} className="text-[#c62d23] group-hover:scale-110 transition-transform" />
+              <Plus
+                size={18}
+                className="text-[#c62d23] group-hover:scale-110 transition-transform"
+              />
               Add Staff
             </button>
           </div>
@@ -387,12 +462,28 @@ export default function Staff() {
                         </span>
                       </td>
                       <td className="p-4">
-                        <button
-                          onClick={() => setSelectedStaff(s)}
-                          className="text-[#c62d23] hover:text-[#a8241c] text-sm font-medium hover:underline cursor-pointer"
-                        >
-                          View Details
-                        </button>
+                        <div className="flex items-center gap-3">
+                          <button
+                            onClick={() => setSelectedStaff(s)}
+                            className="text-[#c62d23] hover:text-[#a8241c] text-sm font-medium hover:underline cursor-pointer"
+                          >
+                            View
+                          </button>
+                          <button
+                            onClick={() => handleEditOpen(s)}
+                            className="text-gray-400 hover:text-blue-600 transition-colors cursor-pointer p-1 rounded hover:bg-blue-50"
+                            title="Edit"
+                          >
+                            <Pencil size={15} />
+                          </button>
+                          <button
+                            onClick={() => setDeleteConfirm(s)}
+                            className="text-gray-400 hover:text-red-600 transition-colors cursor-pointer p-1 rounded hover:bg-red-50"
+                            title="Delete"
+                          >
+                            <Trash2 size={15} />
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -448,12 +539,30 @@ export default function Staff() {
                       </div>
                     </div>
 
-                    <button
-                      onClick={() => setSelectedStaff(s)}
-                      className="w-full mt-3 text-xs sm:text-sm text-[#c62d23] hover:text-[#a8241c] font-medium hover:underline"
-                    >
-                      View Full Details
-                    </button>
+                    <div className="flex items-center justify-between mt-3">
+                      <button
+                        onClick={() => setSelectedStaff(s)}
+                        className="text-xs sm:text-sm text-[#c62d23] hover:text-[#a8241c] font-medium hover:underline"
+                      >
+                        View Details
+                      </button>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => handleEditOpen(s)}
+                          className="text-gray-400 hover:text-blue-600 transition-colors p-1.5 rounded hover:bg-blue-50"
+                          title="Edit"
+                        >
+                          <Pencil size={15} />
+                        </button>
+                        <button
+                          onClick={() => setDeleteConfirm(s)}
+                          className="text-gray-400 hover:text-red-600 transition-colors p-1.5 rounded hover:bg-red-50"
+                          title="Delete"
+                        >
+                          <Trash2 size={15} />
+                        </button>
+                      </div>
+                    </div>
                   </div>
                 ))
               )}
@@ -493,7 +602,9 @@ export default function Staff() {
                   alt={selectedStaff.name}
                 />
 
-                <h2 className="mt-4 text-lg sm:text-xl font-bold text-gray-900">{selectedStaff.name}</h2>
+                <h2 className="mt-4 text-lg sm:text-xl font-bold text-gray-900">
+                  {selectedStaff.name}
+                </h2>
                 <span className="mt-2 px-4 py-1 rounded-full text-xs sm:text-sm font-medium bg-gray-100 text-gray-800">
                   {selectedStaff.role}
                 </span>
@@ -502,15 +613,21 @@ export default function Staff() {
               <div className="mt-6 space-y-3 sm:space-y-4">
                 <div className="flex justify-between py-2 border-b border-gray-200">
                   <span className="text-xs sm:text-sm text-gray-600">Email</span>
-                  <span className="text-xs sm:text-sm font-medium text-gray-900 truncate ml-2">{selectedStaff.email}</span>
+                  <span className="text-xs sm:text-sm font-medium text-gray-900 truncate ml-2">
+                    {selectedStaff.email}
+                  </span>
                 </div>
                 <div className="flex justify-between py-2 border-b border-gray-200">
                   <span className="text-xs sm:text-sm text-gray-600">Mobile</span>
-                  <span className="text-xs sm:text-sm font-medium text-gray-900">{selectedStaff.mobile}</span>
+                  <span className="text-xs sm:text-sm font-medium text-gray-900">
+                    {selectedStaff.mobile}
+                  </span>
                 </div>
                 <div className="flex justify-between py-2 border-b border-gray-200">
                   <span className="text-xs sm:text-sm text-gray-600">Aadhar</span>
-                  <span className="text-xs sm:text-sm font-medium text-gray-900">{selectedStaff.aadharNumber}</span>
+                  <span className="text-xs sm:text-sm font-medium text-gray-900">
+                    {selectedStaff.aadharNumber}
+                  </span>
                 </div>
                 <div className="flex justify-between py-2 border-b border-gray-200">
                   <span className="text-xs sm:text-sm text-gray-600">Date of Birth</span>
@@ -520,7 +637,9 @@ export default function Staff() {
                 </div>
                 <div className="flex justify-between py-2">
                   <span className="text-xs sm:text-sm text-gray-600">Blood Group</span>
-                  <span className="text-xs sm:text-sm font-medium text-gray-900">{selectedStaff.bloodGroup}</span>
+                  <span className="text-xs sm:text-sm font-medium text-gray-900">
+                    {selectedStaff.bloodGroup}
+                  </span>
                 </div>
               </div>
 
@@ -576,7 +695,9 @@ export default function Staff() {
           </button>
 
           <div className="max-w-3xl w-full">
-            <p className="text-center text-gray-300 mb-3 text-sm sm:text-base">{imageViewer.title}</p>
+            <p className="text-center text-gray-300 mb-3 text-sm sm:text-base">
+              {imageViewer.title}
+            </p>
             <img
               src={imageViewer.src}
               className="w-full max-h-[80vh] object-contain rounded-lg border border-gray-700"
@@ -592,7 +713,9 @@ export default function Staff() {
           <div className="bg-white rounded-2xl w-full max-w-lg border border-gray-200 shadow-lg max-h-[90vh] flex flex-col">
             <div className="p-4 sm:p-6 border-b border-gray-200">
               <div className="flex justify-between items-center">
-                <h2 className="text-lg sm:text-xl font-bold text-gray-900">Add New Staff Member</h2>
+                <h2 className="text-lg sm:text-xl font-bold text-gray-900">
+                  Add New Staff Member
+                </h2>
                 <button
                   onClick={() => {
                     setShowForm(false);
@@ -847,11 +970,13 @@ export default function Staff() {
                 )}
 
                 {message && (
-                  <div className={`text-xs sm:text-sm px-3 sm:px-4 py-2.5 sm:py-3 rounded-lg ${
-                    message.includes("success")
-                      ? "bg-green-50 text-green-700 border border-green-200"
-                      : "bg-red-50 text-red-700 border border-red-200"
-                  }`}>
+                  <div
+                    className={`text-xs sm:text-sm px-3 sm:px-4 py-2.5 sm:py-3 rounded-lg ${
+                      message.includes("success")
+                        ? "bg-green-50 text-green-700 border border-green-200"
+                        : "bg-red-50 text-red-700 border border-red-200"
+                    }`}
+                  >
                     {message}
                   </div>
                 )}
@@ -868,6 +993,190 @@ export default function Staff() {
           </div>
         </div>
       )}
+
+      {/* ===== EDIT STAFF MODAL ===== */}
+      {editStaff && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl w-full max-w-lg border border-gray-200 shadow-lg max-h-[90vh] flex flex-col">
+            <div className="p-4 sm:p-6 border-b border-gray-200">
+              <div className="flex justify-between items-center">
+                <h2 className="text-lg sm:text-xl font-bold text-gray-900">
+                  Edit Staff Member
+                </h2>
+                <button
+                  onClick={() => setEditStaff(null)}
+                  className="p-2 rounded-lg hover:bg-gray-100 transition-colors cursor-pointer"
+                >
+                  <X size={20} className="text-gray-500" />
+                </button>
+              </div>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-4 sm:p-6">
+              <form onSubmit={handleEditSubmit} className="space-y-4 sm:space-y-5">
+                <div className="relative">
+                  <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                  <input
+                    name="name"
+                    value={editForm.name || ""}
+                    onChange={handleEditChange}
+                    placeholder="Full Name"
+                    required
+                    className="w-full pl-10 pr-4 py-2.5 sm:py-3 bg-white rounded-lg sm:rounded-xl border-2 border-gray-200 focus:border-[#c62d23] focus:ring-2 focus:ring-[#c62d23]/20 outline-none transition-all text-sm sm:text-base"
+                  />
+                </div>
+
+                <div className="relative">
+                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                  <input
+                    name="email"
+                    type="email"
+                    value={editForm.email || ""}
+                    onChange={handleEditChange}
+                    placeholder="Email"
+                    required
+                    className="w-full pl-10 pr-4 py-2.5 sm:py-3 bg-white rounded-lg sm:rounded-xl border-2 border-gray-200 focus:border-[#c62d23] focus:ring-2 focus:ring-[#c62d23]/20 outline-none transition-all text-sm sm:text-base"
+                  />
+                </div>
+
+                <div className="relative">
+                  <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                  <input
+                    name="mobile"
+                    value={editForm.mobile || ""}
+                    onChange={handleEditChange}
+                    placeholder="Mobile Number"
+                    required
+                    className="w-full pl-10 pr-4 py-2.5 sm:py-3 bg-white rounded-lg sm:rounded-xl border-2 border-gray-200 focus:border-[#c62d23] focus:ring-2 focus:ring-[#c62d23]/20 outline-none transition-all text-sm sm:text-base"
+                  />
+                </div>
+
+                <div className="relative">
+                  <CreditCard className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                  <input
+                    name="aadharNumber"
+                    value={editForm.aadharNumber || ""}
+                    onChange={handleEditChange}
+                    placeholder="Aadhar Number"
+                    required
+                    className="w-full pl-10 pr-4 py-2.5 sm:py-3 bg-white rounded-lg sm:rounded-xl border-2 border-gray-200 focus:border-[#c62d23] focus:ring-2 focus:ring-[#c62d23]/20 outline-none transition-all text-sm sm:text-base"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-2">
+                    Date of Birth
+                  </label>
+                  <input
+                    type="date"
+                    name="dateOfBirth"
+                    value={editForm.dateOfBirth || ""}
+                    onChange={handleEditChange}
+                    className="w-full p-2.5 sm:p-3 bg-white rounded-lg sm:rounded-xl border-2 border-gray-200 focus:border-[#c62d23] focus:ring-2 focus:ring-[#c62d23]/20 outline-none transition-all text-sm sm:text-base"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-2">
+                    Blood Group
+                  </label>
+                  <select
+                    name="bloodGroup"
+                    value={editForm.bloodGroup || ""}
+                    onChange={handleEditChange}
+                    className="w-full p-2.5 sm:p-3 bg-white rounded-lg sm:rounded-xl border-2 border-gray-200 focus:border-[#c62d23] focus:ring-2 focus:ring-[#c62d23]/20 outline-none transition-all text-sm sm:text-base"
+                  >
+                    <option value="">Select Blood Group</option>
+                    <option value="A+">A+</option>
+                    <option value="A-">A-</option>
+                    <option value="B+">B+</option>
+                    <option value="B-">B-</option>
+                    <option value="O+">O+</option>
+                    <option value="O-">O-</option>
+                    <option value="AB+">AB+</option>
+                    <option value="AB-">AB-</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-2">
+                    Role
+                  </label>
+                  <select
+                    name="role"
+                    value={editForm.role || ""}
+                    onChange={handleEditChange}
+                    className="w-full p-2.5 sm:p-3 bg-white rounded-lg sm:rounded-xl border-2 border-gray-200 focus:border-[#c62d23] focus:ring-2 focus:ring-[#c62d23]/20 outline-none transition-all text-sm sm:text-base"
+                  >
+                    <option value="sales">Sales</option>
+                    <option value="warehouse">Warehouse</option>
+                    <option value="fitting">Fitting</option>
+                    <option value="production">Production</option>
+                  </select>
+                </div>
+
+                {editMessage && (
+                  <div
+                    className={`text-xs sm:text-sm px-3 sm:px-4 py-2.5 sm:py-3 rounded-lg ${
+                      editMessage.includes("success")
+                        ? "bg-green-50 text-green-700 border border-green-200"
+                        : "bg-red-50 text-red-700 border border-red-200"
+                    }`}
+                  >
+                    {editMessage}
+                  </div>
+                )}
+
+                <button
+                  type="submit"
+                  disabled={editLoading}
+                  className="w-full bg-[#c62d23] hover:bg-[#a8241c] disabled:opacity-50 disabled:cursor-not-allowed text-white py-2.5 sm:py-3 rounded-lg sm:rounded-xl font-medium transition-all duration-200 shadow-sm hover:shadow-md cursor-pointer text-sm sm:text-base"
+                >
+                  {editLoading ? "Saving Changes..." : "Save Changes"}
+                </button>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ===== DELETE CONFIRM MODAL ===== */}
+      {deleteConfirm && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl w-full max-w-sm border border-gray-200 shadow-lg p-6 sm:p-8">
+            <div className="text-center">
+              <div className="w-14 h-14 rounded-full bg-red-100 flex items-center justify-center mx-auto mb-4">
+                <Trash2 size={24} className="text-red-600" />
+              </div>
+              <h2 className="text-lg sm:text-xl font-bold text-gray-900 mb-2">
+                Delete Staff Member
+              </h2>
+              <p className="text-sm text-gray-600 mb-6">
+                Are you sure you want to delete{" "}
+                <span className="font-semibold text-gray-900">
+                  {deleteConfirm.name}
+                </span>
+                ? This action cannot be undone.
+              </p>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setDeleteConfirm(null)}
+                  className="flex-1 px-4 py-2.5 sm:py-3 border-2 border-gray-200 rounded-xl text-sm font-medium text-gray-700 hover:border-gray-300 hover:bg-gray-50 transition-all cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleDelete}
+                  disabled={deleteLoading}
+                  className="flex-1 px-4 py-2.5 sm:py-3 bg-red-600 hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl text-sm font-medium transition-all cursor-pointer"
+                >
+                  {deleteLoading ? "Deleting..." : "Delete"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -878,13 +1187,16 @@ const KpiCard = ({ title, value, icon, onClick, isClickable }) => (
     onClick={onClick}
     disabled={!isClickable}
     className={`bg-white border border-gray-200 rounded-xl sm:rounded-2xl p-3 sm:p-4 lg:p-6 transition-all duration-200 shadow-sm hover:shadow-md flex flex-col justify-between h-full text-left ${
-      isClickable ? 'cursor-pointer hover:border-[#c62d23]' : ''
+      isClickable ? "cursor-pointer hover:border-[#c62d23]" : ""
     }`}
-    style={{ borderLeft: '4px solid #c62d23' }}
+    style={{ borderLeft: "4px solid #c62d23" }}
   >
     <div className="flex justify-between items-start mb-2 sm:mb-3 lg:mb-4">
       <p className="text-xs sm:text-sm text-gray-600 font-medium">{title}</p>
-      {React.cloneElement(icon, { size: 18, className: "sm:w-5 sm:h-5 lg:w-6 lg:h-6" })}
+      {React.cloneElement(icon, {
+        size: 18,
+        className: "sm:w-5 sm:h-5 lg:w-6 lg:h-6",
+      })}
     </div>
     <p className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900">{value}</p>
   </button>

@@ -230,7 +230,11 @@ export default function Login() {
                 </div>
               </div>
             )}
-
+<div className="mt-4 text-center">
+  <Link href="/forgot-password" className="text-sm text-[#c62d23] hover:underline">
+    Forgot password?
+  </Link>
+</div>
             {/* Submit Button */}
             <button
               type="button"

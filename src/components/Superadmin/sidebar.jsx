@@ -15,13 +15,16 @@ import {
   LogOut,
   History,
   XCircle,
+  MessageCircle,
 } from "lucide-react";
 import LanguageToggle from "@/components/LanguageToggle";
 
+const WHATSAPP_NUMBER = "919594430295";
+
 export default function Sidebar() {
   const pathname = usePathname();
-const menuItem = (href) =>
 
+  const menuItem = (href) =>
     `w-full flex items-center gap-3 px-6 py-3 text-sm font-medium transition-all duration-200
      ${
        pathname === href
@@ -29,19 +32,23 @@ const menuItem = (href) =>
          : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
      }`;
 
+  // Shared visual style for non-route items (like WhatsApp support)
+  const externalItem =
+    "w-full flex items-center gap-3 px-6 py-3 text-sm font-medium transition-all duration-200 text-gray-600 hover:bg-gray-50 hover:text-gray-900";
+
   return (
-    <div className="w-64 bg-white border-r border-gray-200 shadow-sm relative h-screen overflow-visible">
+    <div className="w-64 bg-white border-r border-gray-200 shadow-sm relative h-screen flex flex-col overflow-hidden">
 
       {/* Logo */}
-      <div className="p-6 border-b border-gray-100">
+      <div className="p-6 border-b border-gray-100 flex-shrink-0">
         <h1 className="text-2xl font-bold flex items-center gap-2">
           <span className="text-gray-900">Army</span>
           <span className="text-[#c62d23]">Industries</span>
         </h1>
       </div>
 
-      {/* Navigation */}
-      <nav className="p-4 space-y-1 overflow-y-auto pb-24">
+      {/* Navigation — scrollable, fills remaining space above footer */}
+      <nav className="flex-1 overflow-y-auto py-4 space-y-1 min-h-0">
         <Link href="/superadmin/dashboard" className={menuItem("/superadmin/dashboard")}>
           <LayoutDashboard size={18} />
           Dashboard
@@ -66,14 +73,17 @@ const menuItem = (href) =>
           <RotateCcw size={18} />
           Returns
         </Link>
+
         <Link href="/superadmin/BadReturn" className={menuItem("/superadmin/BadReturn")}>
           <XCircle size={18} />
           Bad Returns
         </Link>
+
         <Link href="/superadmin/ClientReport" className={menuItem("/superadmin/ClientReport")}>
           <Users size={18} />
           Client List
         </Link>
+
         <Link href="/superadmin/order-history" className={menuItem("/superadmin/order-history")}>
           <History size={18} />
           Order History
@@ -93,6 +103,17 @@ const menuItem = (href) =>
           <Activity size={18} />
           Activity
         </Link>
+
+        {/* Support — opens WhatsApp, styled identically to other nav items */}
+        <a
+          href={`https://wa.me/${WHATSAPP_NUMBER}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className={externalItem}
+        >
+          <MessageCircle size={18} />
+          Support
+        </a>
       </nav>
 
       {/* 🔔 NOTIFICATION BELL */}
@@ -100,8 +121,8 @@ const menuItem = (href) =>
         <NotificationBell />
       </div>
 
-      {/* Footer */}
-      <div className="absolute bottom-0 w-full border-t border-gray-200 bg-gray-50">
+      {/* Footer — always pinned at bottom */}
+      <div className="flex-shrink-0 border-t border-gray-200 bg-gray-50">
         <LanguageToggle />
         <button
           onClick={() => {
@@ -113,9 +134,9 @@ const menuItem = (href) =>
           <LogOut size={18} />
           Logout
         </button>
-         <p className="text-xs py-4 text-gray-500 text-center font-medium">
-            Army Industries © 2026
-          </p>
+        <p className="text-xs py-4 text-gray-500 text-center font-medium">
+          Army Industries © 2026
+        </p>
       </div>
     </div>
   );

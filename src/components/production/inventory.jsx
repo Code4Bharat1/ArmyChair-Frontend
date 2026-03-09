@@ -2,7 +2,10 @@
 
 import React, { useEffect, useMemo, useState } from "react";
 import axios from "axios";
-import { Package, MapPin, Plus, X, Send, Loader2, Box, Clock, CheckCircle2, UserCircle, AlertTriangle, AlertCircle, Pencil } from "lucide-react";
+import {
+  Package, MapPin, Plus, X, Send, Loader2, Box, Clock, CheckCircle2,
+  UserCircle, AlertTriangle, AlertCircle, Pencil, ChevronDown, ChevronRight, Search,
+} from "lucide-react";
 import { useRouter } from "next/navigation";
 
 export default function ProductionStockPage() {
@@ -24,15 +27,18 @@ export default function ProductionStockPage() {
   const [requests, setRequests] = useState([]);
   const [submitting, setSubmitting] = useState(false);
   const [stockFilter, setStockFilter] = useState("all");
+  const [expandedParts, setExpandedParts] = useState(new Set());
+
+  // Search & filter state
+  const [search, setSearch] = useState("");
+  const [filterLocation, setFilterLocation] = useState("ALL");
+  const [filterStatus, setFilterStatus] = useState("ALL");
 
   const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
-
   const [spareParts, setSpareParts] = useState([]);
   const [showPartDropdown, setShowPartDropdown] = useState(false);
 
-  const headers = {
-    Authorization: `Bearer ${token}`,
-  };
+  const headers = { Authorization: `Bearer ${token}` };
 
   const fetchRequests = async () => {
     try {
@@ -44,9 +50,8 @@ export default function ProductionStockPage() {
   };
 
   const handleSubmit = async () => {
-    if (!partName || !quantity || quantity <= 0) {
+    if (!partName || !quantity || quantity <= 0)
       return alert("Please enter valid product and quantity");
-    }
     try {
       setSubmitting(true);
       const user = JSON.parse(localStorage.getItem("user"));
@@ -56,9 +61,7 @@ export default function ProductionStockPage() {
         { headers }
       );
       alert("Inventory request sent to Warehouse successfully");
-      setPartName("");
-      setQuantity("");
-      setShowModal(false);
+      setPartName(""); setQuantity(""); setShowModal(false);
       fetchRequests();
     } catch (err) {
       alert(err.response?.data?.message || "Request failed");
@@ -75,22 +78,12 @@ export default function ProductionStockPage() {
       const user = JSON.parse(localStorage.getItem("user"));
       await axios.post(
         `${API}/inventory/spare-parts`,
-        {
-          partName: partName.trim(),
-          quantity: Number(quantity),
-          location: `PROD_${user.name}`,
-          remark: addRemark.trim() || "",
-          minQuantity: 0,
-        },
+        { partName: partName.trim(), quantity: Number(quantity), location: `PROD_${user.name}`, remark: addRemark.trim() || "", minQuantity: 0 },
         { headers }
       );
       alert("Inventory added successfully");
-      setShowAddModal(false);
-      setPartName("");
-      setQuantity("");
-      setAddRemark("");
-      fetchInventory();
-      fetchSpareParts();
+      setShowAddModal(false); setPartName(""); setQuantity(""); setAddRemark("");
+      fetchInventory(); fetchSpareParts();
     } catch (err) {
       alert(err.response?.data?.message || "Failed to add inventory");
     } finally {
@@ -115,20 +108,11 @@ export default function ProductionStockPage() {
         ? `${API}/inventory/spare-parts/update/${editItem._id}`
         : `${API}/inventory/update/${editItem._id}`;
       const payload = isSpare
-        ? {
-            partName: editItem.part,
-            location: editItem.location,
-            quantity: Number(editQuantity),
-            remark: editRemark.trim(),
-          }
-        : {
-            quantity: Number(editQuantity),
-            remark: editRemark.trim(),
-          };
+        ? { partName: editItem.part, location: editItem.location, quantity: Number(editQuantity), remark: editRemark.trim() }
+        : { quantity: Number(editQuantity), remark: editRemark.trim() };
       await axios.patch(endpoint, payload, { headers });
       alert("Inventory updated successfully");
-      setShowEditModal(false);
-      setEditItem(null);
+      setShowEditModal(false); setEditItem(null);
       fetchInventory();
     } catch (err) {
       alert(err.response?.data?.message || "Failed to update inventory");
@@ -139,18 +123,12 @@ export default function ProductionStockPage() {
 
   useEffect(() => {
     const user = JSON.parse(localStorage.getItem("user"));
-    if (!user || user.role !== "production") {
-      router.push("/login");
-    }
+    if (!user || user.role !== "production") router.push("/login");
   }, [router]);
 
   const fetchInventory = async () => {
     try {
-      const user = JSON.parse(localStorage.getItem("user"));
-      const res = await axios.get(
-        `${API}/inventory/production-stock?location=PROD_${user.name}`,
-        { headers }
-      );
+      const res = await axios.get(`${API}/inventory/production-stock`, { headers });
       setInventory(res.data.inventory || []);
     } catch (err) {
       console.error("Fetch inventory failed", err);
@@ -159,11 +137,7 @@ export default function ProductionStockPage() {
     }
   };
 
-  useEffect(() => {
-    fetchInventory();
-    fetchRequests();
-    fetchSpareParts();
-  }, []);
+  useEffect(() => { fetchInventory(); fetchRequests(); fetchSpareParts(); }, []);
 
   const fetchSpareParts = async () => {
     try {
@@ -174,29 +148,22 @@ export default function ProductionStockPage() {
         const name = item.partName?.trim();
         if (name) qtyMap[name] = (qtyMap[name] || 0) + (item.quantity || 0);
       });
-      const parts = Object.entries(qtyMap)
-        .sort(([a], [b]) => a.localeCompare(b))
-        .map(([name, qty]) => ({ name, qty }));
+      const parts = Object.entries(qtyMap).sort(([a], [b]) => a.localeCompare(b)).map(([name, qty]) => ({ name, qty }));
       setSpareParts(parts);
     } catch (err) {
       console.error("Fetch spare parts failed", err);
     }
   };
 
-  const productionStock = useMemo(() => {
-    return inventory.filter((item) => item.location?.startsWith("PROD_"));
-  }, [inventory]);
+  const productionStock = useMemo(() => inventory.filter((item) => item.location?.startsWith("PROD_")), [inventory]);
 
-  const grouped = useMemo(() => {
-    return productionStock.map((item) => ({
-      _id: item._id,
-      type: item.type,
-      part: item.partName || item.chairType,
-      location: item.location,
-      quantity: item.quantity,
-      remark: item.remark || "",
-    }));
-  }, [productionStock]);
+  const grouped = useMemo(() => productionStock.map((item) => ({
+    _id: item._id, type: item.type,
+    part: item.partName || item.chairType,
+    location: item.location,
+    quantity: item.quantity,
+    remark: item.remark || "",
+  })), [productionStock]);
 
   const totalStock = grouped.reduce((sum, item) => sum + item.quantity, 0);
   const totalItems = grouped.length;
@@ -204,53 +171,70 @@ export default function ProductionStockPage() {
   const LOW_STOCK_THRESHOLD = 10;
   const OVERSTOCK_THRESHOLD = 100;
 
-  const lowStockItems = useMemo(() => {
-    return grouped.filter((item) => item.quantity > 0 && item.quantity <= LOW_STOCK_THRESHOLD);
-  }, [grouped]);
-
-  const overstockItems = useMemo(() => {
-    return grouped.filter((item) => item.quantity >= OVERSTOCK_THRESHOLD);
-  }, [grouped]);
-
-  const getStockStatus = (quantity) => {
-    if (quantity <= LOW_STOCK_THRESHOLD) return "low";
-    if (quantity >= OVERSTOCK_THRESHOLD) return "overstock";
+  const getStockStatus = (qty) => {
+    if (qty <= LOW_STOCK_THRESHOLD) return "low";
+    if (qty >= OVERSTOCK_THRESHOLD) return "overstock";
     return "normal";
   };
 
-  const filteredStock = useMemo(() => {
-    if (stockFilter === "all") return grouped;
-    if (stockFilter === "low") return lowStockItems;
-    if (stockFilter === "overstock") return overstockItems;
-    if (stockFilter === "normal") {
-      return grouped.filter(
-        (item) => item.quantity > LOW_STOCK_THRESHOLD && item.quantity < OVERSTOCK_THRESHOLD
-      );
-    }
-    return grouped;
-  }, [grouped, stockFilter, lowStockItems, overstockItems]);
+  const lowStockItems = useMemo(() => grouped.filter((i) => i.quantity > 0 && i.quantity <= LOW_STOCK_THRESHOLD), [grouped]);
+  const overstockItems = useMemo(() => grouped.filter((i) => i.quantity >= OVERSTOCK_THRESHOLD), [grouped]);
 
-  const renderDropdown = (focusColor = "[#c62d23]") => (
+  const uniqueLocations = useMemo(() => [...new Set(grouped.map((i) => i.location).filter(Boolean))].sort(), [grouped]);
+
+  const filteredStock = useMemo(() => {
+    let items = grouped;
+    if (stockFilter === "low") items = lowStockItems;
+    else if (stockFilter === "overstock") items = overstockItems;
+    else if (stockFilter === "normal") items = grouped.filter((i) => i.quantity > LOW_STOCK_THRESHOLD && i.quantity < OVERSTOCK_THRESHOLD);
+
+    if (search.trim()) {
+      const s = search.toLowerCase().trim();
+      items = items.filter((i) => i.part?.toLowerCase().includes(s));
+    }
+    if (filterLocation !== "ALL") items = items.filter((i) => i.location === filterLocation);
+    if (filterStatus !== "ALL") items = items.filter((i) => getStockStatus(i.quantity) === filterStatus);
+    return items;
+  }, [grouped, stockFilter, lowStockItems, overstockItems, search, filterLocation, filterStatus]);
+
+  const filteredGroupedByPart = useMemo(() => {
+    const map = new Map();
+    filteredStock.forEach((item) => {
+      const key = item.part?.trim().toLowerCase();
+      if (!map.has(key)) map.set(key, { partName: item.part, rows: [], totalQuantity: 0, worstStatus: "normal" });
+      const g = map.get(key);
+      g.rows.push(item);
+      g.totalQuantity += item.quantity;
+      const s = getStockStatus(item.quantity);
+      if (s === "low") g.worstStatus = "low";
+      else if (s === "overstock" && g.worstStatus !== "low") g.worstStatus = "overstock";
+    });
+    return Array.from(map.values());
+  }, [filteredStock]);
+
+  const toggleExpand = (name) => {
+    const s = new Set(expandedParts);
+    s.has(name) ? s.delete(name) : s.add(name);
+    setExpandedParts(s);
+  };
+
+  const activeFilterCount = [filterLocation, filterStatus].filter((f) => f !== "ALL").length;
+  const clearFilters = () => { setFilterLocation("ALL"); setFilterStatus("ALL"); setSearch(""); };
+
+  const renderDropdown = () => (
     <div className="absolute z-20 left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg max-h-48 overflow-auto shadow-xl">
-      {spareParts
-        .filter((p) => p.name.toLowerCase().includes(partName.toLowerCase()))
-        .map((p) => (
-          <div
-            key={p.name}
-            onMouseDown={() => { setPartName(p.name); setShowPartDropdown(false); }}
-            className="flex items-center justify-between px-4 py-2.5 hover:bg-gray-50 cursor-pointer border-b border-gray-50 last:border-0"
-          >
-            <span className="text-sm text-gray-800">{p.name}</span>
-          </div>
-        ))}
+      {spareParts.filter((p) => p.name.toLowerCase().includes(partName.toLowerCase())).map((p) => (
+        <div key={p.name} onMouseDown={() => { setPartName(p.name); setShowPartDropdown(false); }}
+          className="flex items-center justify-between px-4 py-2.5 hover:bg-gray-50 cursor-pointer border-b border-gray-50 last:border-0">
+          <span className="text-sm text-gray-800">{p.name}</span>
+        </div>
+      ))}
       {spareParts.filter((p) => p.name.toLowerCase().includes(partName.toLowerCase())).length === 0 && partName && (
         <div className="px-4 py-2.5 text-xs text-gray-400">No matching parts</div>
       )}
       {partName && !spareParts.some((p) => p.name.toLowerCase() === partName.toLowerCase()) && (
-        <div
-          onMouseDown={() => { setPartName(partName.trim()); setShowPartDropdown(false); }}
-          className="px-4 py-2.5 bg-gray-50 hover:bg-green-50 cursor-pointer text-green-700 font-semibold text-sm border-t border-gray-100"
-        >
+        <div onMouseDown={() => { setPartName(partName.trim()); setShowPartDropdown(false); }}
+          className="px-4 py-2.5 bg-gray-50 hover:bg-green-50 cursor-pointer text-green-700 font-semibold text-sm border-t border-gray-100">
           ➕ Add "{partName}"
         </div>
       )}
@@ -260,76 +244,47 @@ export default function ProductionStockPage() {
   return (
     <div className="flex min-h-screen bg-gray-50 text-gray-900">
       <div className="flex-1 overflow-auto">
-        {/* HEADER */}
+
+        {/* ── HEADER ── */}
         <div className="sticky top-0 z-10 bg-white/80 backdrop-blur border-b border-gray-200 shadow-sm">
-          {/* Desktop Header */}
+          {/* Desktop */}
           <div className="hidden md:block p-6">
             <div className="flex items-center justify-between">
               <div>
                 <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-2">
-                  <Package size={32} className="text-[#c62d23]" />
-                  <span>Production Stock</span>
+                  <Package size={32} className="text-[#c62d23]" /><span>Production Stock</span>
                 </h1>
                 <p className="text-sm text-gray-600 mt-1">Manage inventory and request materials</p>
               </div>
               <div className="flex items-center gap-3">
-                <button
-                  onClick={() => { setPartName(""); setQuantity(""); setShowModal(true); }}
-                  className="bg-[#c62d23] hover:bg-[#a82419] text-white px-4 py-2.5 rounded-xl flex items-center gap-2 shadow-sm font-medium transition-all"
-                >
-                  <Send size={18} />
-                  Request Stock
+                <button onClick={() => { setPartName(""); setQuantity(""); setShowModal(true); }}
+                  className="bg-[#c62d23] hover:bg-[#a82419] text-white px-4 py-2.5 rounded-xl flex items-center gap-2 shadow-sm font-medium transition-all">
+                  <Send size={18} /> Request Stock
                 </button>
-                <button
-                  onClick={() => { setPartName(""); setQuantity(""); setAddRemark(""); setShowAddModal(true); }}
-                  className="bg-green-600 hover:bg-green-700 text-white px-4 py-2.5 rounded-xl flex items-center gap-2 shadow-sm font-medium transition-all"
-                >
-                  <Plus size={18} />
-                  Add Inventory
+                <button onClick={() => { setPartName(""); setQuantity(""); setAddRemark(""); setShowAddModal(true); }}
+                  className="bg-green-600 hover:bg-green-700 text-white px-4 py-2.5 rounded-xl flex items-center gap-2 shadow-sm font-medium transition-all">
+                  <Plus size={18} /> Add Inventory
                 </button>
-                <button
-                  onClick={() => router.push("/profile")}
-                  title="My Profile"
-                  className="text-gray-600 hover:text-[#c62d23] transition"
-                >
+                <button onClick={() => router.push("/profile")} title="My Profile" className="text-gray-600 hover:text-[#c62d23] transition">
                   <UserCircle size={34} />
                 </button>
               </div>
             </div>
           </div>
-
-          {/* Mobile Header */}
+          {/* Mobile */}
           <div className="md:hidden p-4">
             <div className="flex items-center justify-between mb-3">
               <h1 className="text-xl font-bold text-gray-900 flex items-center gap-2">
-                <Package size={24} className="text-[#c62d23]" />
-                <span>Stock</span>
+                <Package size={24} className="text-[#c62d23]" /><span>Stock</span>
               </h1>
               <div className="flex items-center gap-2">
-                <button
-                  onClick={() => { setPartName(""); setQuantity(""); setShowModal(true); }}
-                  className="bg-[#c62d23] hover:bg-[#a82419] text-white p-2 rounded-lg shadow-sm transition-all"
-                  title="Request Stock"
-                >
-                  <Send size={18} />
-                </button>
-                <button
-                  onClick={() => { setPartName(""); setQuantity(""); setAddRemark(""); setShowAddModal(true); }}
-                  className="bg-green-600 hover:bg-green-700 text-white p-2 rounded-lg shadow-sm transition-all"
-                  title="Add Inventory"
-                >
-                  <Plus size={20} />
-                </button>
-                <button
-                  onClick={() => router.push("/profile")}
-                  className="text-gray-600 hover:text-[#c62d23] transition p-2"
-                >
-                  <UserCircle size={28} />
-                </button>
+                <button onClick={() => { setPartName(""); setQuantity(""); setShowModal(true); }}
+                  className="bg-[#c62d23] text-white p-2 rounded-lg shadow-sm" title="Request Stock"><Send size={18} /></button>
+                <button onClick={() => { setPartName(""); setQuantity(""); setAddRemark(""); setShowAddModal(true); }}
+                  className="bg-green-600 text-white p-2 rounded-lg shadow-sm" title="Add Inventory"><Plus size={20} /></button>
+                <button onClick={() => router.push("/profile")} className="text-gray-600 p-2"><UserCircle size={28} /></button>
               </div>
             </div>
-
-            {/* Mobile Stats Row */}
             <div className="grid grid-cols-2 gap-2">
               <div className="bg-gradient-to-br from-[#c62d23] to-[#a01f17] text-white p-3 rounded-xl">
                 <div className="text-xs opacity-80 mb-1">Total Stock</div>
@@ -343,8 +298,8 @@ export default function ProductionStockPage() {
           </div>
         </div>
 
-        {/* BODY */}
-        <div className="p-8 space-y-8">
+        {/* ── BODY ── */}
+        <div className="p-4 md:p-8 space-y-6 md:space-y-8">
           {loading ? (
             <div className="p-8 text-center">
               <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-[#c62d23]"></div>
@@ -352,8 +307,8 @@ export default function ProductionStockPage() {
             </div>
           ) : (
             <>
-              {/* STATS - Desktop Only */}
-              <div className="hidden md:grid grid-cols-1 md:grid-cols-4 gap-6">
+              {/* STATS — Desktop */}
+              <div className="hidden md:grid grid-cols-4 gap-6">
                 <StatCard title="Total Stock Quantity" value={totalStock} icon={<Box className="text-[#c62d23]" />} subtitle="units in production" onClick={() => setStockFilter("all")} active={stockFilter === "all"} />
                 <StatCard title="Unique Items" value={totalItems} icon={<Package className="text-[#c62d23]" />} subtitle="different parts" onClick={() => setStockFilter("normal")} active={stockFilter === "normal"} />
                 <StatCard title="Low Stock Alert" value={lowStockItems.length} icon={<AlertTriangle className="text-[#c62d23]" />} subtitle="needs restocking" alert={lowStockItems.length > 0 ? "warning" : null} onClick={() => setStockFilter("low")} active={stockFilter === "low"} />
@@ -361,26 +316,31 @@ export default function ProductionStockPage() {
               </div>
 
               {/* Mobile Filter Chips */}
-              <div className="md:hidden flex gap-2 overflow-x-auto pb-2">
-                <button onClick={() => setStockFilter("all")} className={`px-4 py-2 rounded-lg text-sm font-semibold whitespace-nowrap transition-all ${stockFilter === "all" ? "bg-[#c62d23] text-white shadow-sm" : "bg-white text-gray-600 border border-gray-200"}`}>
-                  All ({totalItems})
-                </button>
-                <button onClick={() => setStockFilter("normal")} className={`px-4 py-2 rounded-lg text-sm font-semibold whitespace-nowrap transition-all ${stockFilter === "normal" ? "bg-[#c62d23] text-white shadow-sm" : "bg-white text-gray-600 border border-gray-200"}`}>
-                  Normal ({grouped.filter((item) => item.quantity > LOW_STOCK_THRESHOLD && item.quantity < OVERSTOCK_THRESHOLD).length})
-                </button>
+              <div className="md:hidden flex gap-2 overflow-x-auto pb-1">
+                {[
+                  { key: "all", label: `All (${totalItems})` },
+                  { key: "normal", label: `Normal (${grouped.filter(i => i.quantity > LOW_STOCK_THRESHOLD && i.quantity < OVERSTOCK_THRESHOLD).length})` },
+                ].map(({ key, label }) => (
+                  <button key={key} onClick={() => setStockFilter(key)}
+                    className={`px-4 py-2 rounded-lg text-sm font-semibold whitespace-nowrap transition-all ${stockFilter === key ? "bg-[#c62d23] text-white shadow-sm" : "bg-white text-gray-600 border border-gray-200"}`}>
+                    {label}
+                  </button>
+                ))}
                 {lowStockItems.length > 0 && (
-                  <button onClick={() => setStockFilter("low")} className={`px-4 py-2 rounded-lg text-sm font-semibold whitespace-nowrap transition-all inline-flex items-center gap-1 ${stockFilter === "low" ? "bg-yellow-500 text-white shadow-sm" : "bg-yellow-50 text-yellow-700 border border-yellow-200"}`}>
+                  <button onClick={() => setStockFilter("low")}
+                    className={`px-4 py-2 rounded-lg text-sm font-semibold whitespace-nowrap inline-flex items-center gap-1 transition-all ${stockFilter === "low" ? "bg-yellow-500 text-white shadow-sm" : "bg-yellow-50 text-yellow-700 border border-yellow-200"}`}>
                     <AlertTriangle size={14} />Low ({lowStockItems.length})
                   </button>
                 )}
                 {overstockItems.length > 0 && (
-                  <button onClick={() => setStockFilter("overstock")} className={`px-4 py-2 rounded-lg text-sm font-semibold whitespace-nowrap transition-all inline-flex items-center gap-1 ${stockFilter === "overstock" ? "bg-blue-500 text-white shadow-sm" : "bg-blue-50 text-blue-700 border border-blue-200"}`}>
+                  <button onClick={() => setStockFilter("overstock")}
+                    className={`px-4 py-2 rounded-lg text-sm font-semibold whitespace-nowrap inline-flex items-center gap-1 transition-all ${stockFilter === "overstock" ? "bg-blue-500 text-white shadow-sm" : "bg-blue-50 text-blue-700 border border-blue-200"}`}>
                     <AlertCircle size={14} />Overstock ({overstockItems.length})
                   </button>
                 )}
               </div>
 
-              {/* ALERT BANNERS */}
+              {/* Alert banners */}
               {stockFilter === "all" && lowStockItems.length > 0 && (
                 <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 rounded-xl">
                   <div className="flex items-start">
@@ -398,7 +358,6 @@ export default function ProductionStockPage() {
                   </div>
                 </div>
               )}
-
               {stockFilter === "all" && overstockItems.length > 0 && (
                 <div className="bg-blue-50 border-l-4 border-blue-400 p-4 rounded-xl">
                   <div className="flex items-start">
@@ -416,8 +375,6 @@ export default function ProductionStockPage() {
                   </div>
                 </div>
               )}
-
-              {/* Active Filter Indicator */}
               {stockFilter !== "all" && (
                 <div className="bg-gray-100 border border-gray-200 p-3 rounded-xl flex items-center justify-between">
                   <span className="text-sm text-gray-700">
@@ -431,76 +388,206 @@ export default function ProductionStockPage() {
                 </div>
               )}
 
-              {/* CURRENT STOCK LEVELS */}
+              {/* ── CURRENT STOCK LEVELS ── */}
               <div className="bg-white rounded-2xl overflow-hidden border border-gray-200 shadow-sm">
-                <div className="p-6 border-b border-gray-200">
-                  <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
-                    <Box size={20} className="text-[#c62d23]" />
-                    Current Stock Levels
+                <div className="p-4 md:p-6 border-b border-gray-200">
+                  <h2 className="text-lg md:text-xl font-bold text-gray-900 flex items-center gap-2">
+                    <Box size={20} className="text-[#c62d23]" />Current Stock Levels
                   </h2>
                 </div>
 
-                {filteredStock.length === 0 ? (
+                {/* SEARCH + FILTER TOOLBAR (shared for both desktop & mobile) */}
+                <div className="px-4 md:px-5 py-3 border-b border-gray-100 bg-gray-50/50 space-y-2">
+                  <div className="flex items-center gap-3">
+                    <div className="relative flex-1 max-w-xs">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" size={15} />
+                      <input type="text" placeholder="Search part name..."
+                        value={search} onChange={(e) => setSearch(e.target.value)}
+                        className="w-full pl-9 pr-8 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-[#c62d23]/20 focus:border-[#c62d23] outline-none bg-white" />
+                      {search && (
+                        <button onClick={() => setSearch("")} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+                          <X size={13} />
+                        </button>
+                      )}
+                    </div>
+                    <div className="ml-auto text-xs text-gray-500">
+                      <span className="font-semibold text-gray-700">{filteredGroupedByPart.length}</span> of{" "}
+                      <span className="font-semibold text-gray-700">{grouped.length}</span> parts
+                    </div>
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-2">
+                    <div className="flex items-center gap-1.5">
+                      <MapPin size={13} className="text-gray-400 flex-shrink-0" />
+                      <select value={filterLocation} onChange={(e) => setFilterLocation(e.target.value)}
+                        className={`py-1.5 px-2 border rounded-lg text-xs outline-none cursor-pointer transition ${filterLocation !== "ALL" ? "border-[#c62d23] text-[#c62d23] bg-red-50 font-medium" : "border-gray-200 text-gray-600 bg-white hover:border-gray-300"}`}>
+                        <option value="ALL">All Locations</option>
+                        {uniqueLocations.map((loc) => <option key={loc} value={loc}>{loc}</option>)}
+                      </select>
+                    </div>
+
+                    <div className="flex items-center gap-1.5">
+                      <AlertCircle size={13} className="text-gray-400 flex-shrink-0" />
+                      <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)}
+                        className={`py-1.5 px-2 border rounded-lg text-xs outline-none cursor-pointer transition ${filterStatus !== "ALL" ? "border-[#c62d23] text-[#c62d23] bg-red-50 font-medium" : "border-gray-200 text-gray-600 bg-white hover:border-gray-300"}`}>
+                        <option value="ALL">All Statuses</option>
+                        <option value="normal">Healthy</option>
+                        <option value="low">Low Stock</option>
+                        <option value="overstock">Overstocked</option>
+                      </select>
+                    </div>
+
+                    {(activeFilterCount > 0 || search) && (
+                      <button onClick={clearFilters}
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gray-100 hover:bg-red-50 hover:text-[#c62d23] text-gray-500 text-xs font-medium transition border border-gray-200 hover:border-[#c62d23]/30">
+                        <X size={12} /> Clear filters
+                        {activeFilterCount > 0 && (
+                          <span className="ml-0.5 bg-[#c62d23] text-white rounded-full w-4 h-4 flex items-center justify-center text-[10px] font-bold">{activeFilterCount}</span>
+                        )}
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {filteredGroupedByPart.length === 0 ? (
                   <div className="text-center text-gray-500 py-16">
                     <Box size={48} className="mx-auto mb-4 text-gray-300" />
                     <p className="text-lg font-medium">No stock items found</p>
-                    <p className="text-sm text-gray-400 mt-1">{stockFilter !== "all" ? "Try changing the filter" : "Stock items will appear here"}</p>
+                    <p className="text-sm text-gray-400 mt-1">Try adjusting your search or filters</p>
                   </div>
                 ) : (
-                  <div className="p-4 md:p-6">
-                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 md:gap-4">
-                      {filteredStock.map((item, index) => {
-                        const stockStatus = getStockStatus(item.quantity);
-                        return (
-                          <div key={item._id || index} className={`relative border rounded-xl p-3 md:p-4 transition-all group ${
-                            stockStatus === "low" ? "border-yellow-300 bg-yellow-50 hover:border-yellow-400 hover:shadow-lg"
-                            : stockStatus === "overstock" ? "border-blue-300 bg-blue-50 hover:border-blue-400 hover:shadow-lg"
-                            : "border-gray-200 hover:border-[#c62d23] hover:shadow-md"
-                          }`}>
-                            {/* Edit button */}
-                            <button
-                              onClick={() => openEditModal(item)}
-                              className="absolute top-2 right-2 p-1.5 rounded-lg bg-white border border-gray-200 shadow-sm opacity-0 group-hover:opacity-100 transition-opacity hover:bg-gray-50 hover:border-[#c62d23]"
-                              title="Edit quantity"
-                            >
-                              <Pencil size={12} className="text-gray-500 hover:text-[#c62d23]" />
-                            </button>
+                  <>
+                    {/* ── DESKTOP TABLE ── */}
+                    <div className="hidden md:block overflow-x-auto">
+                      <table className="w-full text-sm border-collapse">
+                        <thead>
+                          <tr className="bg-gray-50 border-b border-gray-200">
+                            <th className="w-10 px-4 py-3"></th>
+                            <th className="px-4 py-3 text-left font-semibold text-gray-600 whitespace-nowrap">Part Name</th>
+                            <th className="px-4 py-3 text-left font-semibold text-gray-600 whitespace-nowrap">Location</th>
+                            <th className="px-4 py-3 text-left font-semibold text-gray-600 whitespace-nowrap">Type</th>
+                            <th className="px-4 py-3 text-right font-semibold text-gray-600 whitespace-nowrap">Total Qty</th>
+                            <th className="px-4 py-3 text-left font-semibold text-gray-600 whitespace-nowrap">Status</th>
+                            <th className="px-4 py-3 text-left font-semibold text-gray-600 whitespace-nowrap">Actions</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-100">
+                          {filteredGroupedByPart.map((group) => (
+                            <React.Fragment key={group.partName}>
+                              <tr className="hover:bg-blue-50/30 cursor-pointer transition-colors group" onClick={() => toggleExpand(group.partName)}>
+                                <td className="px-4 py-3 text-center">
+                                  <span className="text-gray-400 group-hover:text-gray-600 transition-colors">
+                                    {expandedParts.has(group.partName) ? <ChevronDown size={15} /> : <ChevronRight size={15} />}
+                                  </span>
+                                </td>
+                                <td className="px-4 py-3 font-semibold text-gray-900 capitalize whitespace-nowrap">{group.partName}</td>
+                                <td className="px-4 py-3">
+                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-gray-100 text-gray-600 rounded-md text-sm font-medium">
+                                    <MapPin size={11} className="text-[#c62d23]" />{group.rows.length} location{group.rows.length !== 1 ? "s" : ""}
+                                  </span>
+                                </td>
+                                <td className="px-4 py-3 text-gray-400 text-sm italic">—</td>
+                                <td className="px-4 py-3 text-right font-bold text-gray-900 tabular-nums">{group.totalQuantity}</td>
+                                <td className="px-4 py-3"><StockStatusBadge status={group.worstStatus} /></td>
+                                <td className="px-4 py-3"></td>
+                              </tr>
+                              {expandedParts.has(group.partName) && group.rows.map((item, idx) => (
+                                <tr key={item._id || idx}
+                                  className={`bg-slate-50/70 hover:bg-slate-100/60 transition-colors ${idx === group.rows.length - 1 ? "border-b-2 border-gray-200" : ""}`}>
+                                  <td className="px-4 py-2.5"></td>
+                                  <td className="px-4 py-2.5 text-sm text-gray-400 italic">{item.remark || "—"}</td>
+                                  <td className="px-4 py-2.5">
+                                    <span className="inline-flex items-center gap-1 text-sm font-medium text-gray-700">
+                                      <MapPin size={12} className="text-[#c62d23]" />{item.location}
+                                    </span>
+                                  </td>
+                                  <td className="px-4 py-2.5 text-sm text-gray-500">{item.type === "SPARE" ? "Spare Part" : "Full Chair"}</td>
+                                  <td className="px-4 py-2.5 text-right font-semibold text-gray-900 tabular-nums text-sm">{item.quantity}</td>
+                                  <td className="px-4 py-2.5"><StockStatusBadge status={getStockStatus(item.quantity)} /></td>
+                                  <td className="px-4 py-2.5">
+                                    <button onClick={(e) => { e.stopPropagation(); openEditModal(item); }} className="p-1.5 hover:bg-blue-100 rounded-md transition" title="Edit">
+                                      <Pencil size={13} className="text-gray-400 hover:text-blue-600" />
+                                    </button>
+                                  </td>
+                                </tr>
+                              ))}
+                            </React.Fragment>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
 
-                            {stockStatus !== "normal" && (
-                              <div className="mb-2">
-                                {stockStatus === "low" ? (
-                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-yellow-200 text-yellow-800 border border-yellow-400"><AlertTriangle size={10} />LOW</span>
-                                ) : (
-                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-200 text-blue-800 border border-blue-400"><AlertCircle size={10} />HIGH</span>
-                                )}
+                    {/* ── MOBILE EXPANDABLE CARDS ── */}
+                    <div className="md:hidden divide-y divide-gray-100">
+                      {filteredGroupedByPart.map((group) => (
+                        <div key={group.partName} className="bg-white">
+                          <div className="p-4 cursor-pointer" onClick={() => toggleExpand(group.partName)}>
+                            <div className="flex items-start justify-between mb-2">
+                              <div className="flex items-center gap-2 flex-1 min-w-0">
+                                {expandedParts.has(group.partName)
+                                  ? <ChevronDown size={15} className="text-gray-400 flex-shrink-0" />
+                                  : <ChevronRight size={15} className="text-gray-400 flex-shrink-0" />}
+                                <h3 className="font-semibold text-gray-900 text-sm truncate capitalize">{group.partName}</h3>
                               </div>
-                            )}
-                            <div className="flex justify-between items-start mb-2 md:mb-3 pr-5">
-                              <h3 className="font-semibold text-gray-900 text-xs md:text-sm capitalize flex-1 pr-2 leading-tight">{item.part}</h3>
-                              <span className={`text-xl md:text-2xl font-bold ml-1 flex-shrink-0 ${stockStatus === "low" ? "text-yellow-600" : stockStatus === "overstock" ? "text-blue-600" : "text-[#c62d23]"}`}>{item.quantity}</span>
+                              <StockStatusBadge status={group.worstStatus} />
                             </div>
-                            <div className="flex items-center gap-1.5 text-[10px] md:text-xs text-gray-500 mb-1.5 md:mb-2">
-                              <Box size={10} className="md:w-3 md:h-3 flex-shrink-0" /><span>units</span>
+                            <div className="flex items-center gap-1.5 text-gray-500 text-xs mb-3 pl-5">
+                              <MapPin size={11} className="text-gray-400" />
+                              <span>{group.rows.length} location{group.rows.length !== 1 ? "s" : ""}</span>
                             </div>
-                            <div className="flex items-center gap-1.5 text-[10px] md:text-xs text-gray-500">
-                              <MapPin size={10} className="md:w-3 md:h-3 flex-shrink-0 text-[#c62d23]" />
-                              <span className="truncate font-medium">{item.location}</span>
+                            <div className="grid grid-cols-2 gap-3 text-xs pl-5">
+                              <div>
+                                <p className="text-gray-400 mb-0.5">Total Stock</p>
+                                <p className="font-bold text-gray-900 text-lg leading-none">{group.totalQuantity}</p>
+                              </div>
+                              <div>
+                                <p className="text-gray-400 mb-0.5">Entries</p>
+                                <p className="font-semibold text-gray-900">{group.rows.length}</p>
+                              </div>
                             </div>
                           </div>
-                        );
-                      })}
+
+                          {expandedParts.has(group.partName) && (
+                            <div className="border-t border-gray-200 divide-y divide-gray-100 bg-gray-50/50">
+                              {group.rows.map((item) => (
+                                <div key={item._id} className="p-4">
+                                  <div className="flex items-center justify-between mb-2">
+                                    <div className="flex items-center gap-1.5">
+                                      <MapPin size={13} className="text-[#c62d23]" />
+                                      <span className="font-medium text-sm">{item.location}</span>
+                                    </div>
+                                    <StockStatusBadge status={getStockStatus(item.quantity)} />
+                                  </div>
+                                  <div className="grid grid-cols-2 gap-3 mb-2 text-xs">
+                                    <div>
+                                      <p className="text-gray-400 mb-0.5">Quantity</p>
+                                      <p className="font-bold text-gray-900 text-base">{item.quantity}</p>
+                                    </div>
+                                    <div>
+                                      <p className="text-gray-400 mb-0.5">Type</p>
+                                      <p className="font-semibold text-gray-700">{item.type === "SPARE" ? "Spare Part" : "Full Chair"}</p>
+                                    </div>
+                                  </div>
+                                  {item.remark && <p className="text-xs text-gray-400 italic mb-2">{item.remark}</p>}
+                                  <button onClick={() => openEditModal(item)}
+                                    className="w-full bg-blue-50 hover:bg-blue-100 text-blue-700 py-2 px-3 rounded-lg transition flex items-center justify-center gap-1.5 text-xs font-medium mt-2">
+                                    <Pencil size={13} /> Edit
+                                  </button>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      ))}
                     </div>
-                  </div>
+                  </>
                 )}
               </div>
 
-              {/* REQUEST HISTORY - DESKTOP TABLE */}
+              {/* REQUEST HISTORY — Desktop */}
               <div className="hidden md:block bg-white rounded-2xl overflow-hidden border border-gray-200 shadow-sm">
                 <div className="p-6 border-b border-gray-200">
-                  <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
-                    <Clock size={20} className="text-[#c62d23]" />
-                    Request History
-                  </h2>
+                  <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2"><Clock size={20} className="text-[#c62d23]" />Request History</h2>
                 </div>
                 {requests.length === 0 ? (
                   <div className="text-center text-gray-500 py-16">
@@ -524,11 +611,9 @@ export default function ProductionStockPage() {
                             <td className="p-4 font-semibold text-gray-900 capitalize">{r.partName}</td>
                             <td className="p-4 font-bold text-[#c62d23]">{r.quantity}</td>
                             <td className="p-4">
-                              {r.status === "PENDING" ? (
-                                <span className="px-3 py-1 rounded-full text-xs font-medium bg-yellow-50 text-yellow-700 border border-yellow-200 inline-flex items-center gap-1"><Clock size={12} />Pending</span>
-                              ) : (
-                                <span className="px-3 py-1 rounded-full text-xs font-medium bg-green-50 text-green-700 border border-green-200 inline-flex items-center gap-1"><CheckCircle2 size={12} />{r.status}</span>
-                              )}
+                              {r.status === "PENDING"
+                                ? <span className="px-3 py-1 rounded-full text-xs font-medium bg-yellow-50 text-yellow-700 border border-yellow-200 inline-flex items-center gap-1"><Clock size={12} />Pending</span>
+                                : <span className="px-3 py-1 rounded-full text-xs font-medium bg-green-50 text-green-700 border border-green-200 inline-flex items-center gap-1"><CheckCircle2 size={12} />{r.status}</span>}
                             </td>
                             <td className="p-4 text-gray-600">{new Date(r.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</td>
                           </tr>
@@ -539,13 +624,10 @@ export default function ProductionStockPage() {
                 )}
               </div>
 
-              {/* REQUEST HISTORY - MOBILE CARDS */}
+              {/* REQUEST HISTORY — Mobile */}
               <div className="md:hidden bg-white rounded-2xl overflow-hidden border border-gray-200 shadow-sm">
                 <div className="p-4 border-b border-gray-200">
-                  <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
-                    <Clock size={18} className="text-[#c62d23]" />
-                    Request History
-                  </h2>
+                  <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2"><Clock size={18} className="text-[#c62d23]" />Request History</h2>
                 </div>
                 {requests.length === 0 ? (
                   <div className="text-center text-gray-500 py-12">
@@ -562,11 +644,9 @@ export default function ProductionStockPage() {
                         </div>
                         <div className="flex items-center justify-between gap-2">
                           <div className="flex-shrink-0">
-                            {r.status === "PENDING" ? (
-                              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-yellow-50 text-yellow-700 border border-yellow-200"><Clock size={10} />Pending</span>
-                            ) : (
-                              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-green-50 text-green-700 border border-green-200"><CheckCircle2 size={10} />{r.status}</span>
-                            )}
+                            {r.status === "PENDING"
+                              ? <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-yellow-50 text-yellow-700 border border-yellow-200"><Clock size={10} />Pending</span>
+                              : <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-green-50 text-green-700 border border-green-200"><CheckCircle2 size={10} />{r.status}</span>}
                           </div>
                           <span className="text-xs text-gray-500 flex-shrink-0">{new Date(r.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric" })}</span>
                         </div>
@@ -580,30 +660,22 @@ export default function ProductionStockPage() {
         </div>
       </div>
 
-      {/* REQUEST FROM WAREHOUSE MODAL */}
+      {/* REQUEST MODAL */}
       {showModal && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl w-full max-w-md max-h-[90vh] flex flex-col border border-gray-200 shadow-2xl">
             <div className="flex items-center justify-between px-8 pt-8 pb-4 border-b border-gray-200">
-              <div>
-                <h2 className="text-2xl font-bold text-gray-900">Request Stock</h2>
-                <p className="text-xs text-gray-500 mt-1">Send a material request to warehouse</p>
-              </div>
-              <button onClick={() => setShowModal(false)} className="text-gray-400 hover:text-gray-600 hover:bg-gray-100 p-2 rounded-lg transition-colors">
-                <X size={20} />
-              </button>
+              <div><h2 className="text-2xl font-bold text-gray-900">Request Stock</h2><p className="text-xs text-gray-500 mt-1">Send a material request to warehouse</p></div>
+              <button onClick={() => setShowModal(false)} className="text-gray-400 hover:text-gray-600 hover:bg-gray-100 p-2 rounded-lg transition-colors"><X size={20} /></button>
             </div>
             <div className="p-8 flex-1 space-y-4">
               <div>
                 <label className="text-sm text-gray-700 font-semibold block mb-2">Product / Part Name</label>
                 <div className="relative">
-                  <input
-                    type="text" value={partName} placeholder="Search or add part name"
-                    onFocus={() => setShowPartDropdown(true)}
-                    onBlur={() => setTimeout(() => setShowPartDropdown(false), 150)}
+                  <input type="text" value={partName} placeholder="Search or add part name"
+                    onFocus={() => setShowPartDropdown(true)} onBlur={() => setTimeout(() => setShowPartDropdown(false), 150)}
                     onChange={(e) => { setPartName(e.target.value); setShowPartDropdown(true); }}
-                    className="w-full border border-gray-300 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#c62d23]"
-                  />
+                    className="w-full border border-gray-300 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#c62d23]" />
                   {showPartDropdown && renderDropdown()}
                 </div>
               </div>
@@ -613,9 +685,7 @@ export default function ProductionStockPage() {
                   className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl outline-none focus:border-[#c62d23] focus:ring-2 focus:ring-[#c62d23]/20 transition-all text-gray-900" />
               </div>
               <div>
-                <label className="text-sm text-gray-700 font-semibold block mb-2">
-                  Remark <span className="text-gray-400 font-normal text-xs">(optional)</span>
-                </label>
+                <label className="text-sm text-gray-700 font-semibold block mb-2">Remark <span className="text-gray-400 font-normal text-xs">(optional)</span></label>
                 <input type="text" value={addRemark} onChange={(e) => setAddRemark(e.target.value)} placeholder="e.g. Urgent, needed for production today"
                   className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl outline-none focus:border-[#c62d23] focus:ring-2 focus:ring-[#c62d23]/20 transition-all text-gray-900" />
               </div>
@@ -630,29 +700,23 @@ export default function ProductionStockPage() {
         </div>
       )}
 
-      {/* ADD EXISTING INVENTORY MODAL */}
+      {/* ADD INVENTORY MODAL */}
       {showAddModal && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl w-full max-w-md max-h-[90vh] flex flex-col border border-gray-200 shadow-2xl">
             <div className="flex items-center justify-between px-8 pt-8 pb-4 border-b border-gray-200">
-              <div>
-                <h2 className="text-2xl font-bold text-gray-900">Add Inventory</h2>
-                <p className="text-xs text-gray-500 mt-1">Record stock already at production</p>
-              </div>
-              <button onClick={() => setShowAddModal(false)} className="text-gray-400 hover:text-gray-600 hover:bg-gray-100 p-2 rounded-lg transition-colors">
-                <X size={20} />
-              </button>
+              <div><h2 className="text-2xl font-bold text-gray-900">Add Inventory</h2><p className="text-xs text-gray-500 mt-1">Record stock already at production</p></div>
+              <button onClick={() => setShowAddModal(false)} className="text-gray-400 hover:text-gray-600 hover:bg-gray-100 p-2 rounded-lg transition-colors"><X size={20} /></button>
             </div>
             <div className="p-8 flex-1 space-y-4">
               <div>
                 <label className="text-sm text-gray-700 font-semibold block mb-2">Part Name</label>
                 <div className="relative">
                   <input type="text" value={partName} placeholder="Search or enter part name"
-                    onFocus={() => setShowPartDropdown(true)}
-                    onBlur={() => setTimeout(() => setShowPartDropdown(false), 150)}
+                    onFocus={() => setShowPartDropdown(true)} onBlur={() => setTimeout(() => setShowPartDropdown(false), 150)}
                     onChange={(e) => { setPartName(e.target.value); setShowPartDropdown(true); }}
                     className="w-full border border-gray-300 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
-                  {showPartDropdown && renderDropdown("green-500")}
+                  {showPartDropdown && renderDropdown()}
                 </div>
               </div>
               <div>
@@ -661,9 +725,7 @@ export default function ProductionStockPage() {
                   className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl outline-none focus:border-green-500 focus:ring-2 focus:ring-green-500/20 transition-all text-gray-900" />
               </div>
               <div>
-                <label className="text-sm text-gray-700 font-semibold block mb-2">
-                  Remark <span className="text-gray-400 font-normal text-xs">(optional)</span>
-                </label>
+                <label className="text-sm text-gray-700 font-semibold block mb-2">Remark <span className="text-gray-400 font-normal text-xs">(optional)</span></label>
                 <input type="text" value={addRemark} onChange={(e) => setAddRemark(e.target.value)} placeholder="e.g. Leftover from last batch"
                   className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl outline-none focus:border-green-500 focus:ring-2 focus:ring-green-500/20 transition-all text-gray-900" />
               </div>
@@ -678,25 +740,19 @@ export default function ProductionStockPage() {
         </div>
       )}
 
-      {/* EDIT INVENTORY MODAL */}
+      {/* EDIT MODAL */}
       {showEditModal && editItem && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl w-full max-w-md flex flex-col border border-gray-200 shadow-2xl">
             <div className="flex items-center justify-between px-8 pt-8 pb-4 border-b border-gray-200">
-              <div>
-                <h2 className="text-2xl font-bold text-gray-900">Edit Inventory</h2>
-                <p className="text-xs text-gray-500 mt-1">Changes will be logged and notified to admin</p>
-              </div>
-              <button onClick={() => { setShowEditModal(false); setEditItem(null); }} className="text-gray-400 hover:text-gray-600 hover:bg-gray-100 p-2 rounded-lg transition-colors">
-                <X size={20} />
-              </button>
+              <div><h2 className="text-2xl font-bold text-gray-900">Edit Inventory</h2><p className="text-xs text-gray-500 mt-1">Changes will be logged and notified to admin</p></div>
+              <button onClick={() => { setShowEditModal(false); setEditItem(null); }} className="text-gray-400 hover:text-gray-600 hover:bg-gray-100 p-2 rounded-lg transition-colors"><X size={20} /></button>
             </div>
             <div className="p-8 space-y-4">
               <div>
                 <label className="text-sm text-gray-700 font-semibold block mb-2">Part / Item</label>
                 <div className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-gray-700 text-sm font-medium capitalize">
-                  {editItem.part}
-                  <span className="ml-2 text-xs text-gray-400 font-normal">({editItem.type === "SPARE" ? "Spare Part" : "Full Chair"})</span>
+                  {editItem.part}<span className="ml-2 text-xs text-gray-400 font-normal">({editItem.type === "SPARE" ? "Spare Part" : "Full Chair"})</span>
                 </div>
               </div>
               <div>
@@ -707,8 +763,7 @@ export default function ProductionStockPage() {
               </div>
               <div>
                 <label className="text-sm text-gray-700 font-semibold block mb-2">
-                  Quantity
-                  <span className="ml-2 text-xs font-normal text-gray-400">Current: <span className="font-semibold text-[#c62d23]">{editItem.quantity}</span></span>
+                  Quantity <span className="ml-2 text-xs font-normal text-gray-400">Current: <span className="font-semibold text-[#c62d23]">{editItem.quantity}</span></span>
                 </label>
                 <input type="number" value={editQuantity} onChange={(e) => setEditQuantity(e.target.value)} min="0"
                   className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl outline-none focus:border-[#c62d23] focus:ring-2 focus:ring-[#c62d23]/20 transition-all text-gray-900" />
@@ -721,9 +776,7 @@ export default function ProductionStockPage() {
                 )}
               </div>
               <div>
-                <label className="text-sm text-gray-700 font-semibold block mb-2">
-                  Reason for Edit <span className="text-gray-400 font-normal text-xs">(recommended)</span>
-                </label>
+                <label className="text-sm text-gray-700 font-semibold block mb-2">Reason for Edit <span className="text-gray-400 font-normal text-xs">(recommended)</span></label>
                 <input type="text" value={editRemark} onChange={(e) => setEditRemark(e.target.value)}
                   placeholder="e.g. Physical count correction, damaged stock removed"
                   className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl outline-none focus:border-[#c62d23] focus:ring-2 focus:ring-[#c62d23]/20 transition-all text-gray-900" />
@@ -746,6 +799,16 @@ export default function ProductionStockPage() {
   );
 }
 
+const StockStatusBadge = ({ status }) => {
+  const map = { low: "bg-yellow-100 text-yellow-800", overstock: "bg-blue-100 text-blue-800", normal: "bg-green-100 text-green-800" };
+  const labels = { low: "Low Stock", overstock: "Overstocked", normal: "Healthy" };
+  return (
+    <span className={`px-2.5 py-1 rounded-full text-[11px] font-semibold whitespace-nowrap ${map[status] || "bg-gray-100 text-gray-700"}`}>
+      {labels[status] || status}
+    </span>
+  );
+};
+
 const StatCard = ({ title, value, icon, subtitle, alert, onClick, active }) => {
   const getAlertStyles = () => {
     if (alert === "warning") return { border: "border-yellow-300 bg-yellow-50", borderLeft: "4px solid #fbbf24", valueColor: "text-yellow-700", hover: "hover:border-yellow-400" };
@@ -754,11 +817,8 @@ const StatCard = ({ title, value, icon, subtitle, alert, onClick, active }) => {
   };
   const styles = getAlertStyles();
   return (
-    <div
-      onClick={onClick}
-      className={`bg-white border rounded-2xl p-6 transition-all duration-200 shadow-sm hover:shadow-md flex flex-col justify-between h-full cursor-pointer ${styles.border} ${styles.hover} ${active ? "ring-2 ring-[#c62d23] ring-offset-2" : ""}`}
-      style={{ borderLeft: styles.borderLeft }}
-    >
+    <div onClick={onClick} className={`bg-white border rounded-2xl p-6 transition-all duration-200 shadow-sm hover:shadow-md flex flex-col justify-between h-full cursor-pointer ${styles.border} ${styles.hover} ${active ? "ring-2 ring-[#c62d23] ring-offset-2" : ""}`}
+      style={{ borderLeft: styles.borderLeft }}>
       <div className="flex justify-between items-start mb-4">
         <p className="text-sm text-gray-600 font-medium">{title}</p>
         {React.cloneElement(icon, { size: 24 })}
@@ -766,8 +826,7 @@ const StatCard = ({ title, value, icon, subtitle, alert, onClick, active }) => {
       <p className={`text-3xl font-bold mb-1 ${styles.valueColor}`}>{value}</p>
       {subtitle && (
         <div className="mt-2 text-xs text-gray-500 flex items-center gap-1">
-          <span>{subtitle}</span>
-          {active && <span className="text-[#c62d23]">→</span>}
+          <span>{subtitle}</span>{active && <span className="text-[#c62d23]">→</span>}
         </div>
       )}
     </div>

@@ -13,8 +13,11 @@ import {
   FileCheck,
   X,
   RotateCcw,
+  MessageCircle,
 } from "lucide-react";
 import LanguageToggle from "@/components/LanguageToggle";
+
+const WHATSAPP_NUMBER = "919594430295";
 
 export default function InventorySidebar({ onClose }) {
   const pathname = usePathname();
@@ -27,11 +30,11 @@ export default function InventorySidebar({ onClose }) {
          : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
      }`;
 
+  const externalMenuItem =
+    "w-full flex items-center gap-3 px-4 sm:px-6 py-3 text-sm font-medium transition-all duration-200 text-gray-600 hover:bg-gray-50 hover:text-gray-900";
+
   const handleLinkClick = () => {
-    // Close sidebar on mobile when a link is clicked
-    if (onClose && typeof onClose === 'function') {
-      onClose();
-    }
+    if (onClose && typeof onClose === "function") onClose();
   };
 
   return (
@@ -56,81 +59,62 @@ export default function InventorySidebar({ onClose }) {
         <p className="text-xs text-gray-500 ml-10 sm:ml-12">Stock Management</p>
       </div>
 
-      {/* Navigation */}
-      <nav className="p-3 sm:p-4 space-y-1 overflow-y-auto flex-1">
-        <Link 
-          href="/inventory/full-chair" 
-          className={menuItem("/inventory/full-chair")}
-          onClick={handleLinkClick}
-        >
+      {/* Navigation — scrollable */}
+      <nav className="flex-1 min-h-0 p-3 sm:p-4 space-y-1 overflow-y-auto">
+        <Link href="/inventory/full-chair" className={menuItem("/inventory/full-chair")} onClick={handleLinkClick}>
           <Package size={18} className="flex-shrink-0" />
           <span className="truncate">Full Chair</span>
         </Link>
 
-        <Link 
-          href="/inventory/spare-parts" 
-          className={menuItem("/inventory/spare-parts")}
-          onClick={handleLinkClick}
-        >
+        <Link href="/inventory/spare-parts" className={menuItem("/inventory/spare-parts")} onClick={handleLinkClick}>
           <Wrench size={18} className="flex-shrink-0" />
           <span className="truncate">Spare Parts</span>
         </Link>
 
-        <Link 
-          href="/inventory/order" 
-          className={menuItem("/inventory/order")}
-          onClick={handleLinkClick}
-        >
+        <Link href="/inventory/order" className={menuItem("/inventory/order")} onClick={handleLinkClick}>
           <ShoppingCart size={18} className="flex-shrink-0" />
           <span className="truncate">Incoming Orders</span>
         </Link>
 
-        <Link 
-          href="/inventory/completed" 
-          className={menuItem("/inventory/completed")}
-          onClick={handleLinkClick}
-        >
+        <Link href="/inventory/completed" className={menuItem("/inventory/completed")} onClick={handleLinkClick}>
           <CheckCircle size={18} className="flex-shrink-0" />
           <span className="truncate">Completed Orders</span>
         </Link>
 
-        <Link 
-          href="/inventory/transfer" 
-          className={menuItem("/inventory/transfer")}
-          onClick={handleLinkClick}
-        >
+        <Link href="/inventory/transfer" className={menuItem("/inventory/transfer")} onClick={handleLinkClick}>
           <ArrowLeftRight size={18} className="flex-shrink-0" />
           <span className="truncate">Transfer</span>
         </Link>
-        <Link 
-          href="/inventory/return" 
-          className={menuItem("/inventory/return")}
-          onClick={handleLinkClick}
-        >
+
+        <Link href="/inventory/return" className={menuItem("/inventory/return")} onClick={handleLinkClick}>
           <RotateCcw size={18} className="flex-shrink-0" />
           <span className="truncate">Returns</span>
         </Link>
 
-        <Link 
-          href="/inventory/inward-pending" 
-          className={menuItem("/inventory/inward-pending")}
-          onClick={handleLinkClick}
-        >
+        <Link href="/inventory/inward-pending" className={menuItem("/inventory/inward-pending")} onClick={handleLinkClick}>
           <FileCheck size={18} className="flex-shrink-0" />
           <span className="truncate">Pending Approval</span>
         </Link>
 
-        <Link 
-          href="/inventory/task" 
-          className={menuItem("/inventory/task")}
-          onClick={handleLinkClick}
-        >
+        <Link href="/inventory/task" className={menuItem("/inventory/task")} onClick={handleLinkClick}>
           <ClipboardList size={18} className="flex-shrink-0" />
           <span className="truncate">My Tasks</span>
         </Link>
+
+        {/* Support — WhatsApp */}
+        <a
+          href={`https://wa.me/${WHATSAPP_NUMBER}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className={externalMenuItem}
+          onClick={handleLinkClick}
+        >
+          <MessageCircle size={18} className="flex-shrink-0" />
+          <span className="truncate">Support</span>
+        </a>
       </nav>
 
-      {/* Footer */}
+      {/* Footer — always pinned */}
       <div className="border-t border-gray-200 bg-gray-50 flex-shrink-0">
         <LanguageToggle />
         <button
@@ -148,29 +132,11 @@ export default function InventorySidebar({ onClose }) {
       </div>
 
       <style jsx global>{`
-        /* Custom scrollbar for sidebar nav */
-        nav::-webkit-scrollbar {
-          width: 6px;
-        }
-
-        nav::-webkit-scrollbar-track {
-          background: transparent;
-        }
-
-        nav::-webkit-scrollbar-thumb {
-          background: #d1d5db;
-          border-radius: 3px;
-        }
-
-        nav::-webkit-scrollbar-thumb:hover {
-          background: #9ca3af;
-        }
-
-        /* Hide scrollbar for Firefox */
-        nav {
-          scrollbar-width: thin;
-          scrollbar-color: #d1d5db transparent;
-        }
+        nav::-webkit-scrollbar { width: 6px; }
+        nav::-webkit-scrollbar-track { background: transparent; }
+        nav::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 3px; }
+        nav::-webkit-scrollbar-thumb:hover { background: #9ca3af; }
+        nav { scrollbar-width: thin; scrollbar-color: #d1d5db transparent; }
       `}</style>
     </div>
   );

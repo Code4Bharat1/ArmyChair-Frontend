@@ -13,7 +13,10 @@ import {
   Menu,
   X,
   LogOut,
+  MessageCircle,
 } from "lucide-react";
+
+const WHATSAPP_NUMBER = "919594430295";
 
 export default function SalesSidebar() {
   const pathname = usePathname();
@@ -27,8 +30,11 @@ export default function SalesSidebar() {
          : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
      }`;
 
+  const externalItemClass =
+    "flex items-center gap-3 px-6 py-3 text-sm font-medium transition-all duration-200 rounded-lg mx-2 text-gray-600 hover:bg-gray-100 hover:text-gray-900";
+
   const handleLinkClick = () => {
-    setIsOpen(false); // Close sidebar on mobile when a link is clicked
+    setIsOpen(false);
   };
 
   const handleLogout = () => {
@@ -69,13 +75,12 @@ export default function SalesSidebar() {
         `}
       >
         {/* HEADER */}
-        <div className="p-6 border-b border-gray-200">
+        <div className="p-6 border-b border-gray-200 flex-shrink-0">
           <div className="flex items-center justify-between">
             <div>
               <h2 className="text-xl font-bold text-gray-900">Sales</h2>
               <p className="text-xs text-gray-500 mt-1">Sales Management</p>
             </div>
-            {/* Close button for mobile - only shows when sidebar is open */}
             <button
               onClick={() => setIsOpen(false)}
               className="lg:hidden text-gray-400 hover:text-gray-600 transition-colors"
@@ -86,8 +91,8 @@ export default function SalesSidebar() {
           </div>
         </div>
 
-        {/* NAV */}
-        <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
+        {/* NAV — scrollable, never overlaps footer */}
+        <nav className="flex-1 min-h-0 overflow-y-auto p-4 space-y-2">
           <Link
             href="/sales/order"
             className={itemClass("/sales/order")}
@@ -141,10 +146,22 @@ export default function SalesSidebar() {
             <Users size={18} />
             Client List
           </Link>
+
+          {/* Support — opens WhatsApp, styled identically to other nav items */}
+          <a
+            href={`https://wa.me/${WHATSAPP_NUMBER}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className={externalItemClass}
+            onClick={handleLinkClick}
+          >
+            <MessageCircle size={18} />
+            Support
+          </a>
         </nav>
 
-        {/* FOOTER */}
-        <div className="p-4 border-t border-gray-200">
+        {/* FOOTER — always pinned, never overlapped */}
+        <div className="flex-shrink-0 p-4 border-t border-gray-200">
           <button
             onClick={handleLogout}
             className="w-full flex items-center gap-3 px-6 py-3 text-sm font-medium text-gray-600 hover:bg-gray-100 hover:text-gray-900 transition-colors rounded-lg"

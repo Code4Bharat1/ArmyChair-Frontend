@@ -30,7 +30,7 @@ import axios from "axios";
 import InventorySidebar from "./sidebar";
 import { useRouter } from "next/navigation";
 
-const PAGE_SIZE_OPTIONS = [10, 25, 50, 100];
+// const PAGE_SIZE_OPTIONS = [10, 25, 50, 100];
 
 /* ================= SEARCHABLE DROPDOWN ================= */
 function SearchableDropdown({
@@ -183,12 +183,18 @@ export default function SparePartsInventory() {
   const [serverTotalPages, setServerTotalPages] = useState(1);
   const SERVER_LIMIT = 100;
 
-  // Client-side pagination
-  const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize, setPageSize] = useState(25);
+  // Client-side pagination (commented out)
+  // const [currentPage, setCurrentPage] = useState(1);
+  // const [pageSize, setPageSize] = useState(25);
 
   const [expandedParts, setExpandedParts] = useState(new Set());
   const [statusFilter, setStatusFilter] = useState("ALL");
+
+  // Filter bar state
+  const [filterVendor, setFilterVendor] = useState("ALL");
+  const [filterLocation, setFilterLocation] = useState("ALL");
+  const [filterPartName, setFilterPartName] = useState("ALL");
+  const [filterStatus, setFilterStatus] = useState("ALL");
 
   const role =
     typeof window !== "undefined"
@@ -264,9 +270,9 @@ export default function SparePartsInventory() {
     }
   }, [items]);
 
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [search, statusFilter, pageSize]);
+  // useEffect(() => {
+  //   setCurrentPage(1);
+  // }, [search, statusFilter, pageSize]);
 
   /* ================= SAVE ================= */
   const submitPart = async () => {
@@ -446,18 +452,53 @@ export default function SparePartsInventory() {
   /* ================= FILTER ================= */
   const filteredGroupedParts = useMemo(() => {
     let filtered = groupedParts;
+
+    // Search bar (part name text search)
     if (search.trim()) {
       const s = search.toLowerCase().trim();
       filtered = filtered.filter((p) => p.partName.toLowerCase().includes(s));
     }
+
+    // KPI card status filter (ALL / LOW / OVERSTOCK)
     if (statusFilter === "LOW")
       filtered = filtered.filter(
         (p) => p.worstStatus === "Low Stock" || p.worstStatus === "Critical",
       );
     else if (statusFilter === "OVERSTOCK")
       filtered = filtered.filter((p) => p.worstStatus === "Overstocked");
+
+    // Filter bar — Part Name dropdown
+    if (filterPartName !== "ALL") {
+      filtered = filtered.filter(
+        (p) => p.partName.trim().toLowerCase() === filterPartName.trim().toLowerCase(),
+      );
+    }
+
+    // Filter bar — Vendor dropdown (match if any location of this part has that vendor)
+    if (filterVendor !== "ALL") {
+      filtered = filtered.filter((p) =>
+        p.locations.some(
+          (l) => l.vendorName.trim().toLowerCase() === filterVendor.trim().toLowerCase(),
+        ),
+      );
+    }
+
+    // Filter bar — Location dropdown (match if any location of this part is that location)
+    if (filterLocation !== "ALL") {
+      filtered = filtered.filter((p) =>
+        p.locations.some(
+          (l) => l.location.trim().toLowerCase() === filterLocation.trim().toLowerCase(),
+        ),
+      );
+    }
+
+    // Filter bar — Status dropdown
+    if (filterStatus !== "ALL") {
+      filtered = filtered.filter((p) => p.worstStatus === filterStatus);
+    }
+
     return filtered;
-  }, [groupedParts, statusFilter, search]);
+  }, [groupedParts, statusFilter, search, filterVendor, filterLocation, filterPartName, filterStatus]);
 
   /* ================= LOCATIONS FROM DATA ================= */
   const locations = useMemo(
@@ -465,24 +506,52 @@ export default function SparePartsInventory() {
     [items],
   );
 
-  /* ================= CLIENT PAGINATION ================= */
-  const totalItems = filteredGroupedParts.length;
-  const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
-  const safePage = Math.min(currentPage, totalPages);
-  const startIdx = (safePage - 1) * pageSize;
-  const endIdx = Math.min(startIdx + pageSize, totalItems);
-  const paginatedParts = filteredGroupedParts.slice(startIdx, endIdx);
+  // Unique vendor names for filter bar
+  const vendorNames = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          items.map((i) => i.vendor?.name).filter(Boolean),
+        ),
+      ).sort(),
+    [items],
+  );
 
-  const goToPage = (p) => setCurrentPage(Math.max(1, Math.min(p, totalPages)));
+  // Unique part names for filter bar (same as partNamesList but derived from grouped)
+  const uniquePartNames = useMemo(
+    () => groupedParts.map((p) => p.partName).sort(),
+    [groupedParts],
+  );
 
-  const pageNumbers = useMemo(() => {
-    const pages = [];
-    const delta = 2;
-    const left = Math.max(1, safePage - delta);
-    const right = Math.min(totalPages, safePage + delta);
-    for (let i = left; i <= right; i++) pages.push(i);
-    return pages;
-  }, [safePage, totalPages]);
+  // Count of active filter bar filters (for badge)
+  const activeFilterCount = [filterVendor, filterLocation, filterPartName, filterStatus].filter(
+    (f) => f !== "ALL",
+  ).length;
+
+  const clearAllFilters = () => {
+    setFilterVendor("ALL");
+    setFilterLocation("ALL");
+    setFilterPartName("ALL");
+    setFilterStatus("ALL");
+    setSearch("");
+  };
+
+  // Client-side pagination calculations (commented out)
+  // const totalItems = filteredGroupedParts.length;
+  // const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
+  // const safePage = Math.min(currentPage, totalPages);
+  // const startIdx = (safePage - 1) * pageSize;
+  // const endIdx = Math.min(startIdx + pageSize, totalItems);
+  // const paginatedParts = filteredGroupedParts.slice(startIdx, endIdx);
+  // const goToPage = (p) => setCurrentPage(Math.max(1, Math.min(p, totalPages)));
+  // const pageNumbers = useMemo(() => {
+  //   const pages = [];
+  //   const delta = 2;
+  //   const left = Math.max(1, safePage - delta);
+  //   const right = Math.min(totalPages, safePage + delta);
+  //   for (let i = left; i <= right; i++) pages.push(i);
+  //   return pages;
+  // }, [safePage, totalPages]);
 
   /* ================= TOGGLE EXPAND ================= */
   const toggleExpand = (partName) => {
@@ -699,6 +768,112 @@ export default function SparePartsInventory() {
               </div>
             </div>
 
+            {/* ===== FILTER BAR ===== */}
+            <div className="flex flex-wrap items-center gap-3 px-5 py-3 border-b border-gray-100 bg-white">
+              {/* Part Name Filter */}
+              <div className="flex items-center gap-1.5 min-w-[160px]">
+                <Package size={13} className="text-gray-400 flex-shrink-0" />
+                <select
+                  value={filterPartName}
+                  onChange={(e) => setFilterPartName(e.target.value)}
+                  className={`flex-1 py-1.5 px-2 border rounded-lg text-xs outline-none transition cursor-pointer ${
+                    filterPartName !== "ALL"
+                      ? "border-[#c62d23] text-[#c62d23] bg-red-50 font-medium"
+                      : "border-gray-200 text-gray-600 bg-white hover:border-gray-300"
+                  }`}
+                >
+                  <option value="ALL">All Parts</option>
+                  {uniquePartNames.map((name) => (
+                    <option key={name} value={name}>
+                      {name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Vendor Filter */}
+              {/* <div className="flex items-center gap-1.5 min-w-[150px]">
+                <Building2 size={13} className="text-gray-400 flex-shrink-0" />
+                <select
+                  value={filterVendor}
+                  onChange={(e) => setFilterVendor(e.target.value)}
+                  className={`flex-1 py-1.5 px-2 border rounded-lg text-xs outline-none transition cursor-pointer ${
+                    filterVendor !== "ALL"
+                      ? "border-[#c62d23] text-[#c62d23] bg-red-50 font-medium"
+                      : "border-gray-200 text-gray-600 bg-white hover:border-gray-300"
+                  }`}
+                >
+                  <option value="ALL">All Vendors</option>
+                  {vendorNames.map((name) => (
+                    <option key={name} value={name}>
+                      {name}
+                    </option>
+                  ))}
+                </select>
+              </div> */}
+
+              {/* Location Filter */}
+              {/* <div className="flex items-center gap-1.5 min-w-[150px]">
+                <MapPin size={13} className="text-gray-400 flex-shrink-0" />
+                <select
+                  value={filterLocation}
+                  onChange={(e) => setFilterLocation(e.target.value)}
+                  className={`flex-1 py-1.5 px-2 border rounded-lg text-xs outline-none transition cursor-pointer ${
+                    filterLocation !== "ALL"
+                      ? "border-[#c62d23] text-[#c62d23] bg-red-50 font-medium"
+                      : "border-gray-200 text-gray-600 bg-white hover:border-gray-300"
+                  }`}
+                >
+                  <option value="ALL">All Locations</option>
+                  {locations.map((loc) => (
+                    <option key={loc} value={loc}>
+                      {loc}
+                    </option>
+                  ))}
+                </select>
+              </div> */}
+
+              {/* Status Filter */}
+              <div className="flex items-center gap-1.5 min-w-[140px]">
+                <AlertCircle size={13} className="text-gray-400 flex-shrink-0" />
+                <select
+                  value={filterStatus}
+                  onChange={(e) => setFilterStatus(e.target.value)}
+                  className={`flex-1 py-1.5 px-2 border rounded-lg text-xs outline-none transition cursor-pointer ${
+                    filterStatus !== "ALL"
+                      ? "border-[#c62d23] text-[#c62d23] bg-red-50 font-medium"
+                      : "border-gray-200 text-gray-600 bg-white hover:border-gray-300"
+                  }`}
+                >
+                  <option value="ALL">All Statuses</option>
+                  <option value="Healthy">Healthy</option>
+                  <option value="Low Stock">Low Stock</option>
+                  <option value="Critical">Critical</option>
+                  <option value="Overstocked">Overstocked</option>
+                </select>
+              </div>
+
+              {/* Clear Filters */}
+              {activeFilterCount > 0 && (
+                <button
+                  onClick={clearAllFilters}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gray-100 hover:bg-red-50 hover:text-[#c62d23] text-gray-500 text-xs font-medium transition border border-gray-200 hover:border-[#c62d23]/30"
+                >
+                  <X size={12} />
+                  Clear filters
+                  <span className="ml-0.5 bg-[#c62d23] text-white rounded-full w-4 h-4 flex items-center justify-center text-[10px] font-bold">
+                    {activeFilterCount}
+                  </span>
+                </button>
+              )}
+
+              <div className="ml-auto text-xs text-gray-400">
+                Showing <span className="font-semibold text-gray-700">{filteredGroupedParts.length}</span> of{" "}
+                <span className="font-semibold text-gray-700">{groupedParts.length}</span> parts
+              </div>
+            </div>
+            {/* ===== END FILTER BAR ===== */}
+
             {/* Table */}
             <div className="overflow-x-auto">
               <table className="w-full text-sm border-collapse">
@@ -745,7 +920,7 @@ export default function SparePartsInventory() {
                         </p>
                       </td>
                     </tr>
-                  ) : paginatedParts.length === 0 ? (
+                  ) : filteredGroupedParts.length === 0 ? (
                     <tr>
                       <td
                         colSpan="10"
@@ -755,7 +930,7 @@ export default function SparePartsInventory() {
                       </td>
                     </tr>
                   ) : (
-                    paginatedParts.map((part) => (
+                    filteredGroupedParts.map((part) => (
                       <React.Fragment key={part.partName}>
                         {/* MASTER ROW */}
                         <tr
@@ -920,7 +1095,7 @@ export default function SparePartsInventory() {
               </table>
             </div>
 
-            {/* ===== PAGINATION BAR ===== */}
+            {/* ===== PAGINATION BAR (commented out) =====
             {totalItems > 0 && (
               <div className="flex items-center justify-between px-4 py-3 border-t border-gray-100 bg-gray-50/50">
                 <div className="flex items-center gap-3">
@@ -1006,6 +1181,7 @@ export default function SparePartsInventory() {
                 </div>
               </div>
             )}
+            ===== END PAGINATION BAR ===== */}
           </div>
 
           {/* ===== MOBILE CARDS ===== */}
@@ -1035,18 +1211,116 @@ export default function SparePartsInventory() {
               </div>
             </div>
 
+            {/* ===== MOBILE FILTER BAR ===== */}
+            <div className="bg-white rounded-xl border border-gray-200 p-3 shadow-sm space-y-2">
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Filters</span>
+                {activeFilterCount > 0 && (
+                  <button
+                    onClick={clearAllFilters}
+                    className="flex items-center gap-1 text-xs text-[#c62d23] font-medium hover:underline"
+                  >
+                    <X size={11} /> Clear all ({activeFilterCount})
+                  </button>
+                )}
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                {/* Part Name */}
+                <div>
+                  <label className="block text-[10px] text-gray-400 font-medium mb-0.5">Part Name</label>
+                  <select
+                    value={filterPartName}
+                    onChange={(e) => setFilterPartName(e.target.value)}
+                    className={`w-full py-1.5 px-2 border rounded-lg text-xs outline-none cursor-pointer ${
+                      filterPartName !== "ALL"
+                        ? "border-[#c62d23] text-[#c62d23] bg-red-50 font-medium"
+                        : "border-gray-200 text-gray-600 bg-white"
+                    }`}
+                  >
+                    <option value="ALL">All Parts</option>
+                    {uniquePartNames.map((name) => (
+                      <option key={name} value={name}>{name}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Vendor */}
+                {/* <div>
+                  <label className="block text-[10px] text-gray-400 font-medium mb-0.5">Vendor</label>
+                  <select
+                    value={filterVendor}
+                    onChange={(e) => setFilterVendor(e.target.value)}
+                    className={`w-full py-1.5 px-2 border rounded-lg text-xs outline-none cursor-pointer ${
+                      filterVendor !== "ALL"
+                        ? "border-[#c62d23] text-[#c62d23] bg-red-50 font-medium"
+                        : "border-gray-200 text-gray-600 bg-white"
+                    }`}
+                  >
+                    <option value="ALL">All Vendors</option>
+                    {vendorNames.map((name) => (
+                      <option key={name} value={name}>{name}</option>
+                    ))}
+                  </select>
+                </div> */}
+
+                {/* Location */}
+                {/* <div>
+                  <label className="block text-[10px] text-gray-400 font-medium mb-0.5">Location</label>
+                  <select
+                    value={filterLocation}
+                    onChange={(e) => setFilterLocation(e.target.value)}
+                    className={`w-full py-1.5 px-2 border rounded-lg text-xs outline-none cursor-pointer ${
+                      filterLocation !== "ALL"
+                        ? "border-[#c62d23] text-[#c62d23] bg-red-50 font-medium"
+                        : "border-gray-200 text-gray-600 bg-white"
+                    }`}
+                  >
+                    <option value="ALL">All Locations</option>
+                    {locations.map((loc) => (
+                      <option key={loc} value={loc}>{loc}</option>
+                    ))}
+                  </select>
+                </div> */}
+
+                {/* Status */}
+                <div>
+                  <label className="block text-[10px] text-gray-400 font-medium mb-0.5">Status</label>
+                  <select
+                    value={filterStatus}
+                    onChange={(e) => setFilterStatus(e.target.value)}
+                    className={`w-full py-1.5 px-2 border rounded-lg text-xs outline-none cursor-pointer ${
+                      filterStatus !== "ALL"
+                        ? "border-[#c62d23] text-[#c62d23] bg-red-50 font-medium"
+                        : "border-gray-200 text-gray-600 bg-white"
+                    }`}
+                  >
+                    <option value="ALL">All Statuses</option>
+                    <option value="Healthy">Healthy</option>
+                    <option value="Low Stock">Low Stock</option>
+                    <option value="Critical">Critical</option>
+                    <option value="Overstocked">Overstocked</option>
+                  </select>
+                </div>
+              </div>
+              <p className="text-[10px] text-gray-400 text-right pt-0.5">
+                Showing <span className="font-semibold text-gray-600">{filteredGroupedParts.length}</span> of{" "}
+                <span className="font-semibold text-gray-600">{groupedParts.length}</span> parts
+              </p>
+            </div>
+            {/* ===== END MOBILE FILTER BAR ===== */}
+
             {loading ? (
               <div className="bg-white rounded-xl p-8 text-center border border-gray-200">
                 <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-[#c62d23]"></div>
                 <p className="mt-2 text-gray-500 text-sm">Loading...</p>
               </div>
-            ) : paginatedParts.length === 0 ? (
+            ) : filteredGroupedParts.length === 0 ? (
               <div className="bg-white rounded-xl p-8 text-center text-gray-400 border border-gray-200 text-sm">
                 No spare parts found
               </div>
             ) : (
               <>
-                {paginatedParts.map((part) => (
+                {filteredGroupedParts.map((part) => (
                   <div
                     key={part.partName}
                     className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden"
@@ -1192,7 +1466,7 @@ export default function SparePartsInventory() {
                   </div>
                 ))}
 
-                {/* Mobile Pagination */}
+                {/* Mobile Pagination (commented out)
                 {totalItems > 0 && (
                   <div className="bg-white rounded-xl border border-gray-200 p-3 flex items-center justify-between shadow-sm">
                     <span className="text-xs text-gray-500">
@@ -1219,6 +1493,7 @@ export default function SparePartsInventory() {
                     </div>
                   </div>
                 )}
+                End Mobile Pagination */}
               </>
             )}
           </div>
@@ -1364,8 +1639,7 @@ export default function SparePartsInventory() {
                 required
               />
 
-              {/* Max Quantity — admin only */}
-               {/* Max Quantity */}
+              {/* Max Quantity */}
               <ModalInput
                 label="Max Quantity"
                 type="number"
@@ -1485,7 +1759,7 @@ export default function SparePartsInventory() {
   );
 }
 
-/* ================= PAGINATION BUTTON ================= */
+/* ================= PAGINATION BUTTON (commented out) =================
 const PagBtn = ({ children, onClick, disabled, active, title }) => (
   <button
     onClick={onClick}
@@ -1503,6 +1777,7 @@ const PagBtn = ({ children, onClick, disabled, active, title }) => (
     {children}
   </button>
 );
+================= END PAGINATION BUTTON ================= */
 
 /* ================= SMALL COMPONENTS ================= */
 const KpiCard = ({

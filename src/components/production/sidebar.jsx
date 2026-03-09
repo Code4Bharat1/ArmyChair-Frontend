@@ -8,8 +8,12 @@ import {
   Users,
   Menu,
   X,
+  MessageCircle,
+  ArrowRightLeft,
 } from "lucide-react";
 import LanguageToggle from "@/components/LanguageToggle";
+
+const WHATSAPP_NUMBER = "919594430295";
 
 export default function ProductionSidebar() {
   const pathname = usePathname();
@@ -23,9 +27,10 @@ export default function ProductionSidebar() {
          : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
      }`;
 
-  const handleLinkClick = () => {
-    setIsOpen(false);
-  };
+  const externalItemClass =
+    "flex items-center gap-3 px-6 py-3 text-sm font-medium transition-all duration-200 rounded-lg mx-2 text-gray-600 hover:bg-gray-100 hover:text-gray-900";
+
+  const handleLinkClick = () => setIsOpen(false);
 
   return (
     <>
@@ -59,45 +64,43 @@ export default function ProductionSidebar() {
         `}
       >
         {/* HEADER */}
-        <div className="p-6 border-b border-gray-200">
+        <div className="p-6 border-b border-gray-200 flex-shrink-0">
           <h2 className="text-xl font-bold text-gray-900">Production</h2>
-          <p className="text-xs text-gray-500 mt-1">
-            Production Management
-          </p>
+          <p className="text-xs text-gray-500 mt-1">Production Management</p>
         </div>
 
-        {/* NAV */}
-        <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
-          <Link
-            href="/production/incomingorders"
-            className={itemClass("/production/incomingorders")}
-            onClick={handleLinkClick}
-          >
+        {/* NAV — scrollable */}
+        <nav className="flex-1 min-h-0 p-4 space-y-2 overflow-y-auto">
+          <Link href="/production/incomingorders" className={itemClass("/production/incomingorders")} onClick={handleLinkClick}>
             <Users size={18} />
             Incoming Orders
           </Link>
 
-          <Link
-            href="/production/TransferRecords"
-            className={itemClass("/production/TransferRecords")}
-            onClick={handleLinkClick}
-          >
-            <Users size={18} />
+          <Link href="/production/TransferRecords" className={itemClass("/production/TransferRecords")} onClick={handleLinkClick}>
+            <ArrowRightLeft size={18} />
             Transfer Records
           </Link>
 
-          <Link
-            href="/production/Inventory"
-            className={itemClass("/production/Inventory")}
-            onClick={handleLinkClick}
-          >
+          <Link href="/production/Inventory" className={itemClass("/production/Inventory")} onClick={handleLinkClick}>
             <Package size={18} />
             Inventory
           </Link>
+
+          {/* Support — WhatsApp */}
+          <a
+            href={`https://wa.me/${WHATSAPP_NUMBER}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className={externalItemClass}
+            onClick={handleLinkClick}
+          >
+            <MessageCircle size={18} />
+            Support
+          </a>
         </nav>
 
-        {/* FOOTER */}
-        <div className="p-4 border-t border-gray-200 text-xs text-gray-500 text-center">
+        {/* FOOTER — always pinned */}
+        <div className="flex-shrink-0 p-4 border-t border-gray-200 bg-gray-50">
           <LanguageToggle />
           <button
             onClick={() => {
@@ -108,7 +111,9 @@ export default function ProductionSidebar() {
           >
             Logout
           </button>
-          Army Industries © 2026
+          <p className="text-xs text-gray-500 text-center mt-1">
+            Army Industries © 2026
+          </p>
         </div>
       </div>
     </>
